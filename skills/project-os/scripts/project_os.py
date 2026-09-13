@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SCHEMA_VERSION = 2
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
 OVERLAY_NAMES = ("react-native-expo",)
@@ -1785,7 +1785,6 @@ def validate_knowledge_coverage(
 def check_project(root: Path, config: Path | None = None) -> int:
     root = root.resolve()
     errors: list[str] = []
-    warnings: list[str] = []
     config_path = config.resolve() if config else root / ".agents" / "SYSTEM.json"
     if config is None:
         check_no_symlink_path(root, config_path, "SYSTEM manifest", errors)
@@ -1804,6 +1803,13 @@ def check_project(root: Path, config: Path | None = None) -> int:
     if system.get("schema_version") != SCHEMA_VERSION:
         errors.append(
             f"SYSTEM schema_version must be {SCHEMA_VERSION}, got {system.get('schema_version')!r}"
+        )
+    if system.get("project_os_version") != VERSION:
+        errors.append(
+            "SYSTEM project_os_version must match the installed Project OS version "
+            f"{VERSION!r}, got {system.get('project_os_version')!r}; run the Project OS "
+            "upgrade workflow: preview sync-knowledge with --dry-run, apply "
+            "sync-knowledge, then run check"
         )
     mode = system.get("mode")
     if not isinstance(mode, str) or mode not in {"lite", "full"}:
@@ -2044,6 +2050,10 @@ def check_project(root: Path, config: Path | None = None) -> int:
         except ProjectOSError:
             shared_value = None
         if isinstance(shared_value, dict):
+            if shared_value.get("knowledge_version") != system.get("project_os_version"):
+                errors.append(
+                    "shared knowledge_version must match SYSTEM project_os_version"
+                )
             if shared_value.get("packs") != ["core", *packs]:
                 errors.append("shared knowledge packs must match SYSTEM packs")
             if shared_value.get("overlays") != overlays:
@@ -2163,19 +2173,12 @@ def check_project(root: Path, config: Path | None = None) -> int:
                 f"unresolved template tokens in {label}: {', '.join(tokens)}"
             )
 
-    if system.get("project_os_version") != VERSION:
-        warnings.append(
-            f"project version is {system.get('project_os_version')!r}; checker version is {VERSION!r}"
-        )
-
     if errors:
         print("Project OS check: FAIL")
         for error in errors:
             print(f"error: {error}")
     else:
         print("Project OS check: PASS")
-    for warning in warnings:
-        print(f"warning: {warning}")
     return 1 if errors else 0
 
 

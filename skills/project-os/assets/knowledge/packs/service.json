@@ -20,11 +20,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://www.postgresql.org/docs/17/transaction-iso.html"
         ],
-        "content_hash": "sha256:0f10a831ca37d210a08fd672a6e5720184634610ff0659b78b8a622923d6ae3c"
+        "content_hash": "sha256:7f35321f5956ef9b0108a8707220bfda9673623978ed59e7c8bc314c3c89222d"
       }
     },
     {
@@ -46,9 +46,9 @@
       "source": {
         "kind": "incident-derived",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [],
-        "content_hash": "sha256:3a44d9e3976de96c1f649fed88d20028cf2ee51628008916a9d56d8a0c43bba8"
+        "content_hash": "sha256:4994526aa7f2a94292aabcdfd676bdb373f4dc030b102b9d4811d6c60df7e077"
       }
     },
     {
@@ -70,11 +70,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://docs.expo.dev/push-notifications/sending-notifications/"
         ],
-        "content_hash": "sha256:b489079f3e90b8e1a201809a6ed491a8b08a0da66c9f82c98a45752bfbda5fd8"
+        "content_hash": "sha256:ba7d033cf79415b964c9ee0def5ab9b38d79e8b3a8fa23ecd60bbe0bd9310743"
       }
     },
     {
@@ -96,11 +96,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://supabase.com/docs/guides/auth/sessions"
         ],
-        "content_hash": "sha256:d8a7fb1038bc6345f4b99618c7aa5e419d9d57cf91e81fce55037159131d2d3f"
+        "content_hash": "sha256:602a12d7e0351939f224e7d22fe70348883339e65dbca4e24a5a5e9447975bfd"
       }
     },
     {
@@ -122,11 +122,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://www.postgresql.org/docs/17/sql-createfunction.html"
         ],
-        "content_hash": "sha256:e452a50bf1558896e699840f0439ffeca77a489d508a735da8d849c9fd308a5d"
+        "content_hash": "sha256:c8aca55510781bd6f02da9ef670c9aee7221f7a005e93022c3effe65f9c0643a"
       }
     },
     {
@@ -148,12 +148,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://supabase.com/docs/reference/javascript/auth-updateuser",
           "https://supabase.com/docs/reference/javascript/auth-verifyotp"
         ],
-        "content_hash": "sha256:f810116858a51a0073be25f1d3f1aa99a8528202cb21922a2f2d01905bc77e33"
+        "content_hash": "sha256:9164ce7812976beb78a4a70f9401158a5adbd491b583445bca8d8c29975cbcb0"
       }
     },
     {
@@ -175,12 +175,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://react.dev/reference/react/useEffect",
           "https://supabase.com/docs/guides/auth/sessions"
         ],
-        "content_hash": "sha256:abdd9f232c32b8817d24170f48c9bc7b957a27dce49cfe9b9a963ae37ee05ca0"
+        "content_hash": "sha256:29b044c005ff928b863558fb5d58e5f8c7a9980cc3372b97583026e1d9194e01"
       }
     },
     {
@@ -202,13 +202,13 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://developers.cloudflare.com/turnstile/get-started/server-side-validation/",
           "https://github.com/supabase/auth/blob/v2.196.0/internal/api/api.go",
           "https://github.com/supabase/auth/blob/v2.196.0/internal/security/captcha.go"
         ],
-        "content_hash": "sha256:66d0d063f3ea1f73a1990e4adc02b0d2cabffdcae32f1184b3020f6bcb2955f2"
+        "content_hash": "sha256:6390e4dfd7632c22baea72696b4570abc3b9bbfd1a45af2b2dc03dbe424cac30"
       }
     },
     {
@@ -230,11 +230,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://supabase.com/docs/reference/javascript/functions-invoke"
         ],
-        "content_hash": "sha256:166b93098e9108be45122a4bb266305180bcccfdd55f9160897d29e5ba455584"
+        "content_hash": "sha256:5b4e449f5c641bfefa05982e2bc8c545218955b7625b3b9eeb9eadb37a7e3f11"
       }
     },
     {
@@ -256,11 +256,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2"
         ],
-        "content_hash": "sha256:370025554328af6a121baee26fc30231eecb2f6d8d087281df0f9c6504055da2"
+        "content_hash": "sha256:0c93a01bd17483910f64d1f60228562cbb36898c57b303ab78aeeee7c8011717"
       }
     },
     {
@@ -282,11 +282,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://docs.expo.dev/push-notifications/sending-notifications/"
         ],
-        "content_hash": "sha256:e6a39aeb430efc02c1f8417669f373a60a99a138370091076200a3f17acd7363"
+        "content_hash": "sha256:5941c6101f289e14cd6b83f4ea1b689194180c772e44968514f990b749d90b9e"
       }
     },
     {
@@ -308,11 +308,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://github.com/supabase/storage/blob/master/src/storage/schemas/object.ts"
         ],
-        "content_hash": "sha256:94da4e46d67ad95a83ca3765c6b1de7bcd63cfe2d39c8998d4be6b2b779effc9"
+        "content_hash": "sha256:d83abffd99ce7ca87a6549e2777f3c713be0fe20d69fa273ee22a4fdb45f43d4"
       }
     },
     {
@@ -334,12 +334,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "service",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://supabase.com/docs/guides/storage/cdn/smart-cdn",
           "https://supabase.com/docs/reference/javascript/file-buckets-download"
         ],
-        "content_hash": "sha256:df744483d4007cc42243a036af69a00459622226e09eb1eab6ec1266cc94a1db"
+        "content_hash": "sha256:7b27aefdd893856ae742f3f5e000725555d4c1f7ececa603d8ca99fe92e60ba7"
       }
     }
   ]

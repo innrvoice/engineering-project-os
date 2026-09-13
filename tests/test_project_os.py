@@ -90,15 +90,65 @@ class KnowledgeAssetTest(unittest.TestCase):
             self.assertEqual(source["content_hash"], PROJECT_OS.entry_content_hash(entry))
             self.assertIsNone(denylist.search(json.dumps(entry, ensure_ascii=False)), entry["id"])
 
-    def test_manifest_and_runtime_versions_match(self) -> None:
+    def test_release_version_is_in_lockstep(self) -> None:
         portable = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
         compatibility = json.loads(
             (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(portable["version"], "1.0.0")
-        self.assertEqual(compatibility["version"], "1.0.0")
-        self.assertEqual(PROJECT_OS.VERSION, "1.0.0")
+        marketplace = json.loads(
+            (ROOT / ".agents" / "plugins" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(PROJECT_OS.VERSION, "1.0.1")
+        self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 2)
+        self.assertEqual(portable["version"], PROJECT_OS.VERSION)
+        self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
         self.assertEqual(portable["name"], compatibility["name"])
+        portable_interface = portable["extensions"]["com.openai"]["interface"]
+        self.assertEqual(
+            portable_interface["defaultPrompt"],
+            compatibility["interface"]["defaultPrompt"],
+        )
+        self.assertTrue(
+            all(len(prompt) <= 128 for prompt in portable_interface["defaultPrompt"])
+        )
+        self.assertTrue(
+            all(
+                prompt.startswith("$project-os ")
+                for prompt in portable_interface["defaultPrompt"]
+            )
+        )
+        self.assertEqual(
+            marketplace["plugins"][0]["source"]["ref"],
+            f"v{PROJECT_OS.VERSION}",
+        )
+        self.assertEqual(
+            portable["$schema"],
+            "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+        )
+
+        knowledge_root = ROOT / "skills" / "project-os" / "assets" / "knowledge"
+        for path in sorted(knowledge_root.rglob("*.json")):
+            value = json.loads(path.read_text(encoding="utf-8"))
+            for entry in value["entries"]:
+                self.assertEqual(
+                    entry["source"]["project_os_version"], PROJECT_OS.VERSION, path
+                )
+
+        active_release_versions: set[str] = set()
+        markdown_paths = [
+            ROOT / "README.md",
+            ROOT / "SECURITY.md",
+            *(ROOT / "docs").glob("*.md"),
+        ]
+        for path in markdown_paths:
+            active_release_versions.update(
+                re.findall(
+                    r"\bv?(\d+\.\d+\.\d+)\b", path.read_text(encoding="utf-8")
+                )
+            )
+        self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
 
 
 class DetectionTest(unittest.TestCase):
@@ -166,9 +216,12 @@ class InitializationTest(unittest.TestCase):
             self.assertTrue((target / ".agents" / "SYSTEM.json").is_file())
             checked = run_cli("check", "--target", str(target))
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+            system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
             knowledge = json.loads(
                 (target / ".agents" / "knowledge" / "shared" / "failures.json").read_text()
             )
+            self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
+            self.assertEqual(knowledge["knowledge_version"], PROJECT_OS.VERSION)
             self.assertEqual(len(knowledge["entries"]), 7)
 
     def test_full_init_requires_and_creates_program_and_history(self) -> None:
@@ -379,6 +432,129 @@ class ValidationAndSyncTest(unittest.TestCase):
             overlays,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def mark_project_as_outdated(self, target: Path) -> None:
+        knowledge_path = target / ".agents" / "knowledge" / "shared" / "failures.json"
+        knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
+        knowledge["knowledge_version"] = "0.0.0"
+        managed_knowledge: dict[str, str] = {}
+        for entry in knowledge["entries"]:
+            entry["source"]["project_os_version"] = "0.0.0"
+            entry["source"]["content_hash"] = PROJECT_OS.entry_content_hash(entry)
+            managed_knowledge[entry["id"]] = entry["source"]["content_hash"]
+        knowledge_path.write_text(
+            json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        system_path = target / ".agents" / "SYSTEM.json"
+        system = json.loads(system_path.read_text(encoding="utf-8"))
+        system["project_os_version"] = "0.0.0"
+        system["managed_knowledge"] = dict(sorted(managed_knowledge.items()))
+        system_path.write_text(
+            json.dumps(system, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+    def test_check_rejects_project_version_mismatch_with_upgrade_guidance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            self.init(target)
+            system_path = target / ".agents" / "SYSTEM.json"
+            system = json.loads(system_path.read_text(encoding="utf-8"))
+            system["project_os_version"] = "0.0.0"
+            system_path.write_text(
+                json.dumps(system, indent=2) + "\n", encoding="utf-8"
+            )
+
+            checked = run_cli("check", "--target", str(target))
+            self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+            self.assertIn("SYSTEM project_os_version must match", checked.stdout)
+            self.assertIn("upgrade workflow", checked.stdout)
+
+    def test_check_rejects_shared_knowledge_version_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            self.init(target)
+            knowledge_path = (
+                target / ".agents" / "knowledge" / "shared" / "failures.json"
+            )
+            knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
+            knowledge["knowledge_version"] = "0.0.0"
+            knowledge_path.write_text(
+                json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+
+            checked = run_cli("check", "--target", str(target))
+            self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+            self.assertIn(
+                "shared knowledge_version must match SYSTEM project_os_version",
+                checked.stdout,
+            )
+
+    def test_upgrade_dry_run_is_byte_preserving(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            self.init(target, packs="mobile", overlays="react-native-expo")
+            self.mark_project_as_outdated(target)
+            before = file_hashes(target)
+
+            synced = run_cli(
+                "sync-knowledge", "--target", str(target), "--dry-run"
+            )
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            self.assertIn("dry-run: no files written", synced.stdout)
+            self.assertEqual(file_hashes(target), before)
+
+    def test_upgrade_apply_updates_versions_and_passes_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            self.init(target, packs="mobile", overlays="react-native-expo")
+            self.mark_project_as_outdated(target)
+
+            synced = run_cli("sync-knowledge", "--target", str(target))
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
+            knowledge = json.loads(
+                (
+                    target / ".agents" / "knowledge" / "shared" / "failures.json"
+                ).read_text()
+            )
+            self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
+            self.assertEqual(knowledge["knowledge_version"], PROJECT_OS.VERSION)
+            self.assertTrue(
+                all(
+                    entry["source"]["project_os_version"] == PROJECT_OS.VERSION
+                    for entry in knowledge["entries"]
+                )
+            )
+            checked = run_cli("check", "--target", str(target))
+            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+
+    def test_upgrade_conflict_aborts_without_writing_any_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            self.init(target, packs="mobile", overlays="react-native-expo")
+            self.mark_project_as_outdated(target)
+            knowledge_path = (
+                target / ".agents" / "knowledge" / "shared" / "failures.json"
+            )
+            knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
+            knowledge["entries"][0]["title"] = "Local edit"
+            knowledge["entries"][0]["source"][
+                "content_hash"
+            ] = PROJECT_OS.entry_content_hash(knowledge["entries"][0])
+            knowledge_path.write_text(
+                json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            before = file_hashes(target)
+
+            synced = run_cli("sync-knowledge", "--target", str(target))
+            self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
+            self.assertIn("sync aborted", synced.stdout)
+            self.assertEqual(file_hashes(target), before)
 
     def test_active_plan_is_derived_and_optional_but_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

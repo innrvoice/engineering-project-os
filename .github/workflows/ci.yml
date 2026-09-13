@@ -28,7 +28,7 @@ jobs:
         run: python -c "import json, pathlib; [json.loads(path.read_text(encoding='utf-8')) for path in pathlib.Path('.').rglob('*.json')]"
 
       - name: Check manifest versions
-        run: python -c "import json, pathlib; paths = [pathlib.Path('plugin.json'), pathlib.Path('.codex-plugin/plugin.json')]; assert {json.loads(path.read_text(encoding='utf-8'))['version'] for path in paths} == {'1.0.0'}"
+        run: python -c "import json, pathlib, runpy; version = runpy.run_path('skills/project-os/scripts/project_os.py')['VERSION']; paths = [pathlib.Path('plugin.json'), pathlib.Path('.codex-plugin/plugin.json')]; assert {json.loads(path.read_text(encoding='utf-8'))['version'] for path in paths} == {version}"
 
       - name: Compile helper
         run: python -B -m compileall -q skills/project-os/scripts

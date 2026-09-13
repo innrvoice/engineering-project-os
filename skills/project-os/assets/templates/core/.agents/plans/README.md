@@ -3,6 +3,9 @@
 `index.json` is the only plan status register. Simple bounded tasks do not need a plan. Create one just
 in time when work must survive multiple checkpoints or has several evidence gates.
 
+Opening a plan records the intended outcome and its acceptance contract; it does not perform or prove
+the work. Resume from current repository evidence, not from chat history alone.
+
 Status values are `planned`, `active`, `blocked`, `done`, and `superseded`.
 
 While `execution_state` is `running`, exactly one plan must be active. `active_plan` is an optional

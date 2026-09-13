@@ -1,6 +1,6 @@
 {
   "name": "engineering-project-os",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Bootstrap and maintain a stack-agnostic, repository-local engineering operating system for Codex.",
   "author": {
     "name": "Pavel",
@@ -20,9 +20,9 @@
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://github.com/innrvoice/engineering-project-os",
     "defaultPrompt": [
-      "Bootstrap Project OS in this repository.",
-      "Adopt this repository's existing engineering records safely.",
-      "Check Project OS and report inconsistencies."
+      "$project-os Inspect this repository and recommend a safe setup without changing files.",
+      "$project-os Adopt existing engineering records without overwriting project-owned files.",
+      "$project-os Upgrade this repository: preview managed changes, apply a clean sync and run the checker."
     ]
   }
 }

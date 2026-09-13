@@ -2,6 +2,9 @@
 
 Project OS deliberately separates incidents from reusable lessons.
 
+Knowledge is stored in repository files. Nothing is uploaded or synchronized between projects in the
+background. Promotion and synchronization happen only when explicitly requested.
+
 ## Project findings
 
 `.agents/findings/findings.json` records concrete project problems and candidates. A finding keeps a
@@ -29,13 +32,16 @@ Promote a lesson only after the failure is confirmed. Remove project names, user
 absolute machine paths, private URLs, deployment identifiers, and claims that depend on unverified
 infrastructure. Generalize the mechanism, not the story.
 
-Use the helper to import missing seed lessons without overwriting local edits:
+Use the helper to import or update managed seed lessons without overwriting local edits. Resolve
+`scripts/project_os.py` relative to the installed Project OS skill directory.
 
-```bash
-python3 scripts/project_os.py sync-knowledge --target <repository> --dry-run
-python3 scripts/project_os.py sync-knowledge --target <repository>
+Run in Terminal with the installed helper path resolved:
+
+```shell
+python3 <project-os-skill-directory>/scripts/project_os.py sync-knowledge --target <repository> --dry-run
+python3 <project-os-skill-directory>/scripts/project_os.py sync-knowledge --target <repository>
 ```
 
-If an existing ID differs from the seed, the helper reports a conflict and leaves the project entry
-unchanged. Resolve that conflict by reviewing scope and provenance, not by selecting the newest text
-automatically.
+If an existing managed ID differs locally from the installed seed, the helper reports a conflict and
+aborts before applying any changes. Resolve that conflict by reviewing scope and provenance, not by
+selecting the newest text automatically. Project-specific knowledge is never replaced by this command.

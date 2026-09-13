@@ -18,6 +18,12 @@ Capability guidance lives under `.agents/packs/`. Read only selected packs and o
 the requested change. Detected languages and frameworks are evidence, not behavioral profiles or
 permission to infer commands.
 
+Project OS is already connected to this repository. Ordinary engineering work follows this file and
+the routed records without requiring `$project-os`. That prefix explicitly invokes the installed
+Project OS skill for one message and is appropriate when the user wants to inspect, check, repair, or
+upgrade the control plane, manage durable plans or checkpoints, or curate findings and knowledge. It is
+not a shell command or a persistent mode.
+
 ## Working method
 
 1. Establish the concrete outcome, affected owners and callers, and the cheapest decisive check.

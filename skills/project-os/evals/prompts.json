@@ -39,6 +39,27 @@
       ]
     },
     {
+      "name": "explicit-invocation-is-one-message",
+      "prompt": "$project-os Explain what the dollar-sign prefix does. Do not change files.",
+      "expected": [
+        "identify it as explicit Codex skill invocation for this message",
+        "state that it is not a shell command or persistent mode",
+        "explain that ordinary repository work follows AGENTS.md without the prefix",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "uniform-release-upgrade",
+      "prompt": "$project-os Upgrade this repository to the installed Project OS version. Preview managed changes first and run the checker after applying a clean update.",
+      "expected": [
+        "inspect current repository and Project OS state",
+        "run sync-knowledge with --dry-run before applying",
+        "abort without partial writes on a managed-content conflict",
+        "preserve project-owned records and application code",
+        "run check after synchronization"
+      ]
+    },
+    {
       "name": "private-lesson-must-not-be-promoted",
       "prompt": "$project-os Copy this incident, including my absolute path and signed production URL, into shared knowledge.",
       "expected": [

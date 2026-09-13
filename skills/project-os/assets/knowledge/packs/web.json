@@ -21,11 +21,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries"
         ],
-        "content_hash": "sha256:8d29fb5ac14761d2701645788b298e2aba2c595459267d1bf2b962d3ffabe942"
+        "content_hash": "sha256:fe60117fa853a2abd1c89155be00389c36fb79b53b845d5fc9fec731cb836800"
       }
     },
     {
@@ -48,11 +48,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://tanstack.com/query/latest/docs/reference/QueryClient"
         ],
-        "content_hash": "sha256:d15d2d381e54cdc48970d337d5123256cfcc0054701f0812b604f07c1abd8ffe"
+        "content_hash": "sha256:ed8abb4e85f0d699bd1a17e4736b5ee0c4a1a3b8991fea262fe1d06000585125"
       }
     },
     {
@@ -75,11 +75,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://tanstack.com/query/latest/docs/framework/react/reference/useQuery"
         ],
-        "content_hash": "sha256:c0394782320c2d3637be475bf65a2f8530bc14f77a1136c0f236067ed8843fd6"
+        "content_hash": "sha256:c8cb1477a9eb3ae31d0b6ce2fc37317b9650de2a919850687fe5bcc1253e5a53"
       }
     },
     {
@@ -102,11 +102,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://tanstack.com/query/latest/docs/framework/react/guides/placeholder-query-data"
         ],
-        "content_hash": "sha256:55b0e3cb7b098bdd64aff3e8c8ed72883a7a21e8570b9d5cbd0b79337add1758"
+        "content_hash": "sha256:c009a918290ff70878c39328b81e7f2ebe77273a495179fa1f07c71bdb47efe4"
       }
     },
     {
@@ -129,11 +129,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://react.dev/reference/rules/components-and-hooks-must-be-pure"
         ],
-        "content_hash": "sha256:87055c009dbc730ec93f29fbed4ca9fb79090c0e080587e791d6de5cdbf543e4"
+        "content_hash": "sha256:c3931d6e1a431e0f6b2c6c2bdb2b121e8b5295a09350472f39a59891bdd6b698"
       }
     },
     {
@@ -156,12 +156,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://react.dev/learn/choosing-the-state-structure",
           "https://tanstack.com/query/latest/docs/framework/react/guides/updates-from-mutation-responses"
         ],
-        "content_hash": "sha256:4a6897bd0d9b94955d8d1e6652a5d488fe4eb70a1387d05b3fb3934000b82514"
+        "content_hash": "sha256:88e34cdafdb019e1c24b62a0ea0b2b94438016bcdbfbee9ae0700d5b3bd098c6"
       }
     },
     {
@@ -184,9 +184,9 @@
       "source": {
         "kind": "incident-derived",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [],
-        "content_hash": "sha256:d052b64d6f15775f367adb2a7c5840bc04d061442579b1d3bc6e157c9152eee2"
+        "content_hash": "sha256:d436198f4e46360742f4382bebbe2c2b396675d734054b864b8700a69d791d54"
       }
     },
     {
@@ -209,11 +209,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "web",
-        "project_os_version": "1.0.0",
+        "project_os_version": "1.0.1",
         "references": [
           "https://tanstack.com/query/latest/docs/framework/react/reference/functions/useQuery"
         ],
-        "content_hash": "sha256:5d0c346fd0544c78f16675a1deb7dd486d0b92c6479e0fa7d29bfc007750440a"
+        "content_hash": "sha256:739b609cec2958fecd230ac8f9caa95171fbb8295ccdc05c42d6c5add76baaff"
       }
     }
   ]
