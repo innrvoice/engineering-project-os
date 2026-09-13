@@ -19,6 +19,7 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Advanced the repository manifest to schema 3 and aligned release surfaces on version 2.0.0.
 - Documented safe self-hosting with a stable installed skill and candidate source helper.
 - Added vector identity assets and aligned plugin and skill presentation metadata.
+- Updated CI actions to current Node 24-based major releases.
 
 ## [1.0.1] - 2026-09-13
 
