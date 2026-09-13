@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "DATA-QUOTA-011",
+      "title": "Account transfer can exceed a rolling usage limit",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "account handoff merges event ledgers used to calculate a rolling quota.",
+      "mechanism": "two individually valid windows combined above the limit. The next-available timestamp used the oldest event, although its expiry still left the merged account over quota.",
+      "prevention": "retain events and select the expiry that actually leaves one usable slot. Compute the window and server timestamp from one instant; keep authorization and mutation enforcement separate.",
+      "verification": [
+        "transfer two non-full accounts into an over-limit account through the real command; check retry time, event ownership, idempotent replay, exact-limit and below-limit controls."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL 17 rolling event quota and account-transfer RPCs. Relevant to other backends with the same merge semantics; native countdown acceptance is a separate boundary."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.postgresql.org/docs/17/functions-window.html"
+        ],
+        "content_hash": "sha256:4f440ce389a6f27ea623d4e87d32ede9300f17a2b4df2c31e304c1ee764b137a"
+      }
+    },
+    {
+      "id": "DATA-TIME-005",
+      "title": "Derive exact timestamp relationships from one instant",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "stored timestamps or fixtures must satisfy an exact lifetime or elapsed-time invariant.",
+      "mechanism": "reading the wall clock separately for each timestamp introduces a small difference; a fixture can pass repeatedly and then violate the exact duration by one microsecond.",
+      "prevention": "capture one instant and derive all related timestamps from it. In PostgreSQL choose transaction or statement time according to the contract; in mobile code reuse the captured value. Do not weaken the duration constraint to conceal independently sampled fixture clocks.",
+      "verification": [
+        "assert the exact relationship and execute the real database constraint. Keep suspension and device-clock-change scenarios separate from deterministic fixture construction."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL 17.6; the independently sampled clock failure also applies to JS dates."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.postgresql.org/docs/17/functions-datetime.html"
+        ],
+        "content_hash": "sha256:c50e5e259b6bc4c987e791d37bd3d6ae6f33f7eeebc859ec015151bce4f6f0f1"
+      }
+    },
+    {
+      "id": "DATA-WINDOW-003",
+      "title": "A bounded page window must recover when its contents disappear",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "bidirectional keyset pagination with evicted pages and expiring or moderated rows.",
+      "mechanism": "every retained page becomes empty. The server has no returned row from which to construct reverse cursors, so still-visible earlier rows become unreachable through that window.",
+      "prevention": "distinguish an initial empty result from an emptied window whose beginning was evicted. Reuse the query library's initial-page flow after a settled successful empty result, preserving the selection and owner. Do not restart on offline, pending or failed responses.",
+      "verification": [
+        "load beyond the cache window, remove its retained rows while earlier rows remain, refetch and assert that those earlier rows become reachable. Check genuinely empty and offline controls. Repeat across real expiry, suspension and reconnect."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL keysets and TanStack Query 5.101.4; response cursor rules vary by API."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries"
+        ],
+        "content_hash": "sha256:25cafc9a7b0cf44b7e5fb6164dd84dc106546aba4dcb91c5a8ff6d6eea8e4f8a"
+      }
+    },
+    {
+      "id": "DATA-TIME-003",
+      "title": "Timestamp representation can change paginated composition",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "server and device timestamps are combined into one ordered list or page frontier.",
+      "mechanism": "PostgreSQL JSON omits trailing fractional zeros and uses an explicit UTC offset. Comparing those strings as locale text reorders instants and can exclude local rows from a page.",
+      "prevention": "compare instants, then the specified stable tie-breaker. Preserve original cursor values. Check required precision: JavaScript Date has milliseconds; valid database microseconds need a supported precise date implementation. Do not add a bespoke ISO parser or truncate server cursors.",
+      "verification": [
+        "use real database serialization, mixed local/server dates, equal instants in different representations, fractional timestamps and page-boundary insertion. Verify native compatibility and cost if a new library is needed; Node-only success does not establish Hermes runtime acceptance."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL 17 / ECMAScript Date / Temporal polyfill 0.5.1. The exact library is conditional on the adopting project's runtime and precision requirements."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tc39.es/ecma262/2024/multipage/numbers-and-dates.html",
+          "https://tc39.es/proposal-temporal/docs/instant.html"
+        ],
+        "content_hash": "sha256:1e3cda22b6b304f06fac15eb756bb08faf55f60b5d937114b72a0f2fa9faeefa"
+      }
+    },
+    {
+      "id": "DATA-RESTORE-010",
+      "title": "Local queue emptiness does not prove restore completeness",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "durable media is published successfully before a later local-to-private-archive copy.",
+      "mechanism": "a shared entity survived on the server after the application's local database was removed, but the private-archive inventory compared only new local rows with completed archive deltas. It reported synchronization complete while the account had neither a local row nor a private archive copy. A retrying paged restore also retained its server session but not its page cursor or per-file progress, making useful work appear to restart after a connection loss.",
+      "prevention": "inventory the server-owned publication outcome independently from local state. At successful publication, retain a private cleanup lease on the final object until the private archive completes or deletion wins. Persist restore cursor and progress at file/entity boundaries; use deterministic destinations, checksum verification and owner-scoped upsert so replay skips exact bytes and cannot duplicate rows or media layouts.",
+      "verification": [
+        "remove the local row after publication, expire the public projection, then restore and archive from the retained source. Interrupt before and after each file and page boundary; assert nonzero resumed progress, no repeated exact download, one SQLite UUID, one media directory and no temporary download files. Keep source-missing state explicit instead of Synchronized."
+      ],
+      "boundaries": [
+        "2026-09-13 with the application iPhone evidence, Expo SDK 57 focused restore tests and PostgreSQL 17.6 full local pgTAP (60 files, 1618 checks). Physical network interruption remains a separate gate."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/",
+          "https://supabase.com/docs/reference/javascript/file-buckets-createsignedurl",
+          "https://www.sqlite.org/lang_upsert.html"
+        ],
+        "content_hash": "sha256:244bebb2a6ceab8ee9854bb7c9abbf7b153082358f8c9a10292f21e2dba96180"
+      }
+    },
+    {
+      "id": "DATA-STATE-008",
+      "title": "Reversing one restriction must preserve another terminal action",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "several independent actions hide or remove the same durable content.",
+      "mechanism": "an owner removal skips content already hidden by another reason. Reversing that earlier reason then exposes the content because the later terminal action was never recorded. Looking only for an active restriction also fails after an allowed unblock or permission change.",
+      "prevention": "retain the terminal action even when the content is already hidden. Preserve independent audit history and stronger deletion reasons; reversal must undo only its own authority. An existing status model may already express this distinction without a new state machine or schema.",
+      "verification": [
+        "apply both orders of the actions, reverse the temporary restriction, and check ordinary reader results. Include unblock before reversal, genuinely restorable content, stronger deletion, new content after unblock and real concurrent database transactions in both orders."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL 17.6. Business precedence must be derived from each project's contract."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.postgresql.org/docs/17/transaction-iso.html"
+        ],
+        "content_hash": "sha256:62d9ef31cb9119b5ba7da7dd95411dc2529d759f3877ab74d7d2764e43e738f1"
+      }
+    },
+    {
+      "id": "DATA-LOCK-007",
+      "title": "Take the shared lock before checking destructive-operation state",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "onboarding, restore or delayed inserts can overlap deletion of the same durable owner.",
+      "mechanism": "a BEFORE INSERT guard reads deletion state, then insertion waits on a unique key. The deleting transaction commits while it waits; insertion continues using the already-passed guard and recreates the record even though the deletion job is now present.",
+      "prevention": "serialize creation and deletion on the same owner key before checking state. Preserve lock order and ensure the post-wait read uses the intended transaction isolation/snapshot behavior. A guard or transaction alone does not prove that its check happens after competing work.",
+      "verification": [
+        "use two real database connections, observe the actual lock wait, commit deletion, then assert that the delayed insert is rejected and deletion receipts/jobs remain intact. Verify ordinary creation and cleanup independently; clean only generated fixture identities."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL 17.6 under Read Committed with a volatile PL/pgSQL trigger."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.postgresql.org/docs/17/explicit-locking.html",
+          "https://www.postgresql.org/docs/17/xfunc-volatility.html"
+        ],
+        "content_hash": "sha256:fcf37787f525127a16405d7c6d592818dca28e5042b18ea1747be3df2faa59d2"
+      }
+    },
+    {
+      "id": "DATA-RESTORE-001",
+      "title": "Metadata alone does not make restored media ready",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "database rows and binary files are committed through different storage systems.",
+      "mechanism": "a partial download, process death or filename collision leaves a ready row with absent, truncated or wrong media. A retry can accidentally adopt the incomplete prior attempt.",
+      "prevention": "retain the established staging/verification/commit order and recovery markers. Verify file properties required by the real media contract before advertising readiness. Use platform file operations and existing repositories; do not add a custom binary parser or assume cross-store atomicity.",
+      "verification": [
+        "interrupt download, file placement and metadata commit separately; relaunch and retry. Assert the correct owner, complete bytes and renderable content. Include realistic low-space failure and paged restore when the data volume crosses the backend page size."
+      ],
+      "boundaries": [
+        "2026-09-06, Expo SDK 57. Native file behavior and replacement semantics need platform proof."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/",
+          "https://www.sqlite.org/atomiccommit.html"
+        ],
+        "content_hash": "sha256:be2542e29800c9e72d9a7888cd6deb72bd0d59285d081ced26205abbaf923df2"
+      }
+    },
+    {
+      "id": "DATA-RESTORE-002",
+      "title": "Deletion must win over stale restore",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "synchronization or restore can race with deletion.",
+      "mechanism": "local-first hiding succeeds, but late remote or archive work recreates the item.",
+      "prevention": "preserve the product's durable deletion intent and owner. Do not clear the intent merely because the UI removed a row. Reconciliation must recognize the canonical deletion outcome. An already fetched restore snapshot can outlive a successful delete response. Retain its local exclusion until entered restore work has drained, then remove any late files before clearing it. Operational and test cleanup obey the same rule: a failed prerequisite deletion must preserve its queued recovery and acceptance receipt. Collecting an error is insufficient if cleanup then erases the work needed to recover. Verify already-absent resources separately from failed deletion.",
+      "verification": [
+        "delete while restore is paused, lose a response, restart and switch accounts. Check the exact item across rows, files and remote cleanup; global object counts are not sufficient evidence."
+      ],
+      "boundaries": [
+        "2026-09-07 with controlled async ordering and real SQLite exclusion. Native file timing remains a separate check. Tombstone/receipt details are backend-specific and are not prescribed here."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.sqlite.org/lang_transaction.html"
+        ],
+        "content_hash": "sha256:838563abd1e3ce442d99dc554ed7c007cfa71bb05dc84f9c657590633eb07fdd"
+      }
+    },
+    {
+      "id": "DATA-OWNERSHIP-003",
+      "title": "New retained state must obey owner deletion",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "a mobile backend adds canonical snapshots, receipts or event tables linked to an owner.",
+      "mechanism": "a child BEFORE DELETE trigger updates another child while an owner deletion is cascading. The referenced owner is already absent, so the update can violate its foreign key and roll back account deletion. An isolated feature test can pass while the older deletion path fails.",
+      "prevention": "review every new trigger/table against account deletion, item deletion, TTL and ownership transfer. Retain state only for a living owner; preserve normal foreign-key cascades and cleanup queues. Do not bypass constraints or return a trigger value that suppresses required deletion.",
+      "verification": [
+        "run real database deletion with populated retained tables and pending operations, assert exact cleanup and another owner's survival, then exercise ordinary TTL retention separately."
+      ],
+      "boundaries": [
+        "2026-09-06 on PostgreSQL 17.6. The general review rule transfers; trigger timing must be checked against the actual database engine rather than assumed identical for SQLite."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.postgresql.org/docs/17/trigger-definition.html"
+        ],
+        "content_hash": "sha256:f7bb584d39ce9e301a3af725c678c7f667236851f5f00c18c03044664a496dbc"
+      }
+    },
+    {
+      "id": "DATA-TRANSACTION-004",
+      "title": "Async transaction scope and completion identity",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "account handoff or synchronization commits several local writes across awaits.",
+      "mechanism": "a transaction on a shared SQLite connection can absorb an unrelated write and roll it back after that writer already returned success. A separate read-then-delete can also remove a newer recovery ticket instead of the completed one.",
+      "prevention": "use the maintained transaction API with an isolated transaction handle when operations can overlap. Put the expected receipt/ticket identity in the mutation predicate. Do not treat an earlier JavaScript read as an atomic precondition, or build a custom transaction framework. Verify connection-local PRAGMAs: Expo's transaction connection does not inherit foreign_keys, and changing it after BEGIN has no effect. Preserve child cleanup explicitly when needed.",
+      "verification": [
+        "pause the transaction, attempt an unrelated write, then fail the transaction. The unrelated write must either persist or explicitly fail as locked. Replace a recovery ticket before a delayed completion and assert the replacement survives. Retry after rollback. Check for orphan receipts with the real connection settings; extra constraints in mocks hide bugs."
+      ],
+      "boundaries": [
+        "2026-09-07, Expo SQLite 57.0.2 source and real Node SQLite connections. Native scheduling and platform persistence still require device verification; the Node adapter proves SQL behavior."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://docs.expo.dev/versions/latest/sdk/sqlite/",
+          "https://www.sqlite.org/foreignkeys.html",
+          "https://www.sqlite.org/json1.html"
+        ],
+        "content_hash": "sha256:45935ccddab153a37e4c510c01e2fe6871b9989bd4781ffd6573aad96f68d788"
+      }
+    },
+    {
+      "id": "DATA-LOCK-005",
+      "title": "Composed server commands must preserve lock order",
+      "status": "active",
+      "applies_to": [
+        "data"
+      ],
+      "trigger": "a mobile RPC wraps an existing transactional mutation with a revision or ownership check.",
+      "mechanism": "the wrapper takes a shared row lock, then the delegated command needs an exclusive lock on that row. Two concurrent callers retain shared locks while awaiting upgrades.",
+      "prevention": "trace wrapper, delegated mutation and triggers together. Acquire the strongest required lock first on the affected command; preserve concurrency of unrelated commands. Check other locks and audience/revision replacement before adding a global lock or a client retry workaround. Include implicit foreign-key locks: a child mutation that later inserts a parent-owned event can deadlock with a parent deletion waiting on that child. Both commands must acquire parent/child locks in the same order while rechecking visibility after a wait.",
+      "verification": [
+        "pause real database transactions between existing boundaries, then release them. Verify both valid commands commit and a concurrent revision change still excludes stale writes. Single-session policy tests cannot reproduce a lock cycle."
+      ],
+      "boundaries": [
+        "2026-09-07, PostgreSQL 17 real concurrent message, reaction, state-change, report, and revision fixtures. Lock modes and ordering are database-specific; do not copy PostgreSQL syntax into SQLite."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "data",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://www.postgresql.org/docs/17/explicit-locking.html"
+        ],
+        "content_hash": "sha256:4e7d9e87cebe0b5f17673f47cdd96f95a016d9caa84612b0fab97f65edc0c93a"
+      }
+    }
+  ]
+}

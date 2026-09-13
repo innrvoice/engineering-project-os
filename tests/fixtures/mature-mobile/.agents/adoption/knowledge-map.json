@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "source_count": 1,
+  "mapped_source_count": 1,
+  "sources": [
+    {
+      "path": ".agents/knowledge/legacy/lessons.md",
+      "sha256": "sha256:0cc18f7164c4c8d7a1cbb253ea881b8863a141d814a76d90f1e43c5bcb2e4fc0"
+    }
+  ],
+  "entries": [
+    {
+      "source": ".agents/knowledge/legacy/lessons.md",
+      "line": 3,
+      "legacy_id": "LEGACY-DIAG-001",
+      "title": "Locate the failed boundary before replacing transport",
+      "occurrence": 1,
+      "fingerprint": "cc794be01682c09a",
+      "canonical_id": "CORE-DIAG-002",
+      "disposition": "promoted",
+      "target": "core"
+    }
+  ]
+}

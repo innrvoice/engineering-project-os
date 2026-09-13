@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "WEB-QUERY-004",
+      "title": "Pagination shares the refresh owner",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a TanStack infinite query is refreshed while an automatic scroll callback requests an adjacent page, including reverse pagination after a bounded window evicts its beginning.",
+      "mechanism": "the default pagination call cancels an entered refresh and keeps stale cached pages. Checking only the corresponding page-loading flag does not account for background refetch.",
+      "prevention": "guard automatic pagination with the whole query's isFetching state and use the supported cancelRefetch:false option when an entered refresh must win. The option also covers a callback retained from a render before the query started fetching; no custom request queue is needed.",
+      "verification": [
+        "pause a real QueryObserver refresh, fire a retained scroll callback in each direction, then complete the refresh. Assert fresh visible rows, not just the arguments sent to a mock."
+      ],
+      "boundaries": [
+        "2026-09-07, TanStack Query 5.101.4. Recheck the supported concurrency options on upgrades."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries"
+        ],
+        "content_hash": "sha256:8d29fb5ac14761d2701645788b298e2aba2c595459267d1bf2b962d3ffabe942"
+      }
+    },
+    {
+      "id": "WEB-QUERY-006",
+      "title": "Terminal command feedback must not wait for unrelated refetches",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a durable mutation is followed by cache invalidation or a quota refresh.",
+      "mechanism": "awaiting those reads kept a terminal error CTA busy and a committed publication on its loading screen. The underlying entity was already visible elsewhere.",
+      "prevention": "await persistence/reconciliation needed to establish the outcome; schedule best-effort query refetches independently with error handling. Do not release real in-flight writes early.",
+      "verification": [
+        "hold query/metadata refresh promises pending across failure and successful retry; the result must settle while reads remain pending. Retain account/focus and lost-response tests."
+      ],
+      "boundaries": [
+        "2026-09-07, TanStack Query 5.101.4, RN 0.86.3. Three focused regressions failed before repair and passed after it; phone transport and native presentation remain distinct verification boundaries."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/reference/QueryClient"
+        ],
+        "content_hash": "sha256:d15d2d381e54cdc48970d337d5123256cfcc0054701f0812b604f07c1abd8ffe"
+      }
+    },
+    {
+      "id": "WEB-QUERY-007",
+      "title": "Independent reads must not hide an actionable failure",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "one empty screen combines two independent remote queries.",
+      "mechanism": "rendering either pending query before checking errors hid Retry after the other query had already failed. The spinner lasted until the second request also settled.",
+      "prevention": "let an actionable initial error take precedence over another source's pending state; preserve any successfully loaded rows. This presentation fix does not diagnose request latency.",
+      "verification": [
+        "reject each source in turn while holding the other pending; Retry must be visible."
+      ],
+      "boundaries": [
+        "2026-09-07, TanStack Query 5.101.4 / React Native 0.86.3; two regressions failed before repair."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/framework/react/reference/useQuery"
+        ],
+        "content_hash": "sha256:c0394782320c2d3637be475bf65a2f8530bc14f77a1136c0f236067ed8843fd6"
+      }
+    },
+    {
+      "id": "WEB-QUERY-003",
+      "title": "Placeholder data also has a filter context",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a mounted query retains its previous result while its key changes.",
+      "mechanism": "correct new cache keys coexist with old displayed rows because placeholderData intentionally reuses the previous query. Client filtering cannot repair aggregate counts or every authorization/history dimension after the fact.",
+      "prevention": "permit retention only for explicitly compatible context changes, such as buffered map movement with the same owner and filters. Use the supported previous-query metadata/key callback.",
+      "verification": [
+        "defer the replacement request, change scope, time range, a domain filter, and account, then inspect the displayed result before resolution. Separately preserve the valid movement-only case."
+      ],
+      "boundaries": [
+        "2026-09-07, installed TanStack Query 5.101.4 with a real QueryClient/hook regression."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/framework/react/guides/placeholder-query-data"
+        ],
+        "content_hash": "sha256:55b0e3cb7b098bdd64aff3e8c8ed72883a7a21e8570b9d5cbd0b79337add1758"
+      }
+    },
+    {
+      "id": "WEB-STATE-004",
+      "title": "Derived projections must preserve cached inputs",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a render combines cached remote aggregates with local rows.",
+      "mechanism": "a top-level spread retains a nested counter object. Local additions mutate that object, so subsequent projections add the same contributions again and disagree with total counts.",
+      "prevention": "own every nested structure that a projection mutates. Copy only the mutated structures; do not hide the problem with global deep cloning or cache clearing.",
+      "verification": [
+        "run the actual display projection twice with the same cached input. Assert the same visible counts both times and unchanged source counters, including a cell shared by both sources."
+      ],
+      "boundaries": [
+        "2026-09-07, React 19.2 / TanStack Query 5; independent of native rendering."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://react.dev/reference/rules/components-and-hooks-must-be-pure"
+        ],
+        "content_hash": "sha256:87055c009dbc730ec93f29fbed4ca9fb79090c0e080587e791d6de5cdbf543e4"
+      }
+    },
+    {
+      "id": "WEB-STATE-007",
+      "title": "Temporary display overrides end when canonical eligibility changes",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a one-time reveal or optimistic overlay retains a snapshot beside a live server row.",
+      "mechanism": "the old snapshot continues replacing the whole row after its triggering condition ends, hiding fresh metadata and preserving disabled interactions. A delayed response can recreate it.",
+      "prevention": "apply an override only while the current canonical row remains eligible. Clear it when that condition ends and check current eligibility before accepting delayed results. Prefer current server fields for information that the temporary override does not own. An optimistic counter must also yield to refreshed canonical props after a lost response. Leaving the view cannot strand its optimistic value in a shared cache; settle and reconcile under the initiating account, while keeping view updates restricted to their original owner.",
+      "verification": [
+        "complete the canonical transition before and after the delayed override response. Observe fresh data, then repeat the original action and verify that old temporary state is not reused."
+      ],
+      "boundaries": [
+        "2026-09-07, React 19.2 / TanStack Query 5.101.4 with real component/query lifecycle tests. Native persistence and multi-device invalidation require separate platform evidence."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://react.dev/learn/choosing-the-state-structure",
+          "https://tanstack.com/query/latest/docs/framework/react/guides/updates-from-mutation-responses"
+        ],
+        "content_hash": "sha256:4a6897bd0d9b94955d8d1e6652a5d488fe4eb70a1387d05b3fb3934000b82514"
+      }
+    },
+    {
+      "id": "WEB-REQUEST-010",
+      "title": "Request activity should not replace stable structure or confirmed content",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a query-backed list or detail surface has stable chrome, retained content or an established empty/terminal result while initial projection, background refetch, explicit refresh, pagination or media recovery is active.",
+      "mechanism": "the primary feed used generic pending/fetching flags as complete presentation states. Cold entry and automatic continuation repeatedly replaced and remounted the same empty section, and initial pending hid available local rows. Empty-list end-reached callbacks could add more requests. A map detail surface later treated foreground media `isFetching` as a new initial load, replacing its settled error and all real entity chrome with a media-only shimmer.",
+      "prevention": "model stable content separately from request activity. Mount section structure when its prerequisites are ready, retain confirmed rows or empty results, and place progress at the activity's owner: one quiet initial indicator, native refresh control or pagination footer. Gate end-reached on scrollable content. A background media request may replace only the media state after it produces a new source; it must not recreate initial pending or hide settled detail chrome. Do not weaken fresh-query identity or terminal no-data errors.",
+      "verification": [
+        "cover cold empty entry through automatic continuation, local rows during first remote projection, background refresh, explicit pull refresh, empty end-reached and terminal media followed by foreground refetch. Assert stable structure, no changing explanatory copy and one continuation owner. Repeat on the target device because source rendering does not establish native timing."
+      ],
+      "boundaries": [
+        "2026-09-12, React Native 0.86.3, TanStack Query 5.101.4 and React Native Testing Library 14."
+      ],
+      "source": {
+        "kind": "incident-derived",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [],
+        "content_hash": "sha256:d052b64d6f15775f367adb2a7c5840bc04d061442579b1d3bc6e157c9152eee2"
+      }
+    },
+    {
+      "id": "WEB-REQUEST-005",
+      "title": "A refresh error can coexist with confirmed cached data",
+      "status": "active",
+      "applies_to": [
+        "web",
+        "mobile"
+      ],
+      "trigger": "a query-backed settings surface has already loaded a confirmed value and its later refresh fails. The query library retains data while reporting an error.",
+      "mechanism": "an error-only render branch replaces all existing content, hiding a safety warning even though the last confirmed reduced-protection setting remains available.",
+      "prevention": "distinguish first-load failure from failed refresh. When the contract requires it, retain the last confirmed value and its warning, label freshness uncertainty, and expose Retry. Disable edits until the authoritative setting is ready; never reuse another account's cache.",
+      "verification": [
+        "use the installed query observer for ready -> refetch error -> recovered data, then verify the actual surface, initial no-data errors, disabled actions and account replacement. Include supported languages and a device recovery scenario for final UI acceptance."
+      ],
+      "boundaries": [
+        "2026-09-07, TanStack Query 5.101.4 and React Native Testing Library 14. Synthetic refetch failures establish rendering semantics, not provider availability or physical acceptance."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "web",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/framework/react/reference/functions/useQuery"
+        ],
+        "content_hash": "sha256:5d0c346fd0544c78f16675a1deb7dd486d0b92c6479e0fa7d29bfc007750440a"
+      }
+    }
+  ]
+}

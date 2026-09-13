@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "findings": [
+    {
+      "id": "FIX-001",
+      "status": "verified",
+      "impact": "Adoption compatibility is exercised.",
+      "evidence": [
+        ".agents/audit/evidence/FIX-001.md"
+      ],
+      "required_check": "Run the deterministic checker."
+    }
+  ]
+}

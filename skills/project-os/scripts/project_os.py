@@ -1,0 +1,2525 @@
+#!/usr/bin/env python3
+"""Bootstrap, adopt, validate, and synchronize repository-local Project OS state."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import re
+import sys
+import tempfile
+from datetime import date
+from pathlib import Path, PurePosixPath
+from typing import Any, Callable, Iterable, Sequence
+
+
+VERSION = "1.0.0"
+SCHEMA_VERSION = 2
+PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
+OVERLAY_NAMES = ("react-native-expo",)
+OVERLAY_REQUIREMENTS = {"react-native-expo": {"mobile"}}
+PLAN_STATUSES = {"planned", "active", "blocked", "done", "superseded"}
+FINDING_STATUSES = {
+    "candidate",
+    "confirmed",
+    "fixed_unverified",
+    "verified",
+    "accepted_risk",
+    "deferred",
+    "rejected",
+    "merged",
+}
+FAILURE_STATUSES = {"active", "retired", "replaced"}
+COVERAGE_DISPOSITIONS = {"promoted", "merged", "retained_private", "retired"}
+RESERVED_TEMPLATE_TOKENS = {
+    "__UPDATED_DATE__",
+    "__PROJECT_NAME__",
+    "__DETECTION_LINES__",
+    "__PACK_NAMES__",
+    "__OVERLAY_NAMES__",
+    "__MODE__",
+}
+LESSON_HEADING_PATTERN = re.compile(r"^## ([A-Z][A-Z0-9-]*-\d+):\s*(.+?)\s*$")
+PRIVATE_KNOWLEDGE_PATTERNS = (
+    (re.compile(r"(?:/Users/|/home/|/private/var/|/var/folders/|C:\\Users\\)"), "private path"),
+    (re.compile(r"\b(?:sk-(?:proj-)?|ghp_|github_pat_|xox[baprs]-|AKIA)[A-Za-z0-9_-]+"), "credential-like token"),
+    (re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----"), "private key"),
+    (re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE), "email address"),
+    (re.compile(r"https?://(?:localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?", re.IGNORECASE), "private URL"),
+    (re.compile(r"[?&](?:token|access_token|signature|x-amz-signature)=[^&\s]+", re.IGNORECASE), "signed URL"),
+)
+
+SKILL_ROOT = Path(__file__).resolve().parent.parent
+ASSETS = SKILL_ROOT / "assets"
+CORE_TEMPLATE = ASSETS / "templates" / "core"
+FULL_TEMPLATE = ASSETS / "templates" / "full"
+PACK_TEMPLATE = ASSETS / "packs"
+OVERLAY_TEMPLATE = ASSETS / "overlays"
+KNOWLEDGE_TEMPLATE = ASSETS / "knowledge"
+
+DEFAULT_PATHS: dict[str, Any] = {
+    "context": ".agents/CONTEXT.md",
+    "state": ".agents/STATE.md",
+    "plans": ".agents/plans/index.json",
+    "findings": ".agents/findings/findings.json",
+    "evidence": ".agents/evidence",
+    "program": None,
+    "history": None,
+    "shared_knowledge": ".agents/knowledge/shared/failures.json",
+    "project_knowledge": [".agents/knowledge/project/failures.json"],
+    "legacy_knowledge": [],
+    "knowledge_coverage": None,
+}
+
+
+class ProjectOSError(RuntimeError):
+    pass
+
+
+def load_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise ProjectOSError(f"Missing JSON file: {path}") from error
+    except json.JSONDecodeError as error:
+        raise ProjectOSError(
+            f"Invalid JSON in {path}: line {error.lineno}, column {error.colno}: {error.msg}"
+        ) from error
+
+
+def atomic_write_text(path: Path, content: str, expected_sha256: str | None = None) -> None:
+    """Atomically replace an existing regular file after an optional concurrency check."""
+    if path.is_symlink():
+        raise ProjectOSError(f"Refusing to replace a symlink: {path}")
+    if expected_sha256 is not None:
+        if not path.is_file():
+            raise ProjectOSError(f"File changed during operation: {path}")
+        current_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        if current_sha256 != expected_sha256:
+            raise ProjectOSError(f"File changed during operation: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    original_mode = path.stat().st_mode & 0o7777 if path.exists() else None
+    descriptor, raw_temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(raw_temporary)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if original_mode is not None:
+            os.chmod(temporary, original_mode)
+        if expected_sha256 is not None:
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
+                raise ProjectOSError(f"File changed during operation: {path}")
+        os.replace(temporary, path)
+    except OSError as error:
+        raise ProjectOSError(f"Atomic write failed for {path}: {error}") from error
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def package_metadata(root: Path) -> tuple[dict[str, Any], list[str]]:
+    path = root / "package.json"
+    if not path.is_file():
+        return {}, []
+    try:
+        value = load_json(path)
+    except ProjectOSError:
+        return {}, ["package.json exists but is not valid JSON"]
+
+    dependency_names: set[str] = set()
+    for key in ("dependencies", "devDependencies", "peerDependencies"):
+        dependencies = value.get(key, {})
+        if isinstance(dependencies, dict):
+            dependency_names.update(str(name).lower() for name in dependencies)
+    scripts = value.get("scripts", {})
+    script_names = sorted(str(name) for name in scripts) if isinstance(scripts, dict) else []
+    return {"dependencies": sorted(dependency_names), "scripts": script_names}, []
+
+
+def read_small_text(path: Path, limit: int = 250_000) -> str:
+    if not path.is_file() or path.stat().st_size > limit:
+        return ""
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+
+
+def iter_string_values(value: Any) -> Iterable[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from iter_string_values(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from iter_string_values(item)
+
+
+def private_material_labels(value: Any) -> list[str]:
+    labels: set[str] = set()
+    for text in iter_string_values(value):
+        for pattern, label in PRIVATE_KNOWLEDGE_PATTERNS:
+            if pattern.search(text):
+                labels.add(label)
+    return sorted(labels)
+
+
+def any_exists(root: Path, names: Iterable[str]) -> bool:
+    return any((root / name).exists() for name in names)
+
+
+def any_top_level_match(root: Path, patterns: Iterable[str]) -> bool:
+    return any(any(root.glob(pattern)) for pattern in patterns)
+
+
+def detect_repository(root: Path) -> dict[str, Any]:
+    root = root.resolve()
+    if not root.is_dir():
+        raise ProjectOSError(f"Target is not a directory: {root}")
+
+    signal_candidates = (
+        "package.json",
+        "tsconfig.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "package-lock.json",
+        "pyproject.toml",
+        "requirements.txt",
+        "setup.py",
+        "Pipfile",
+        "uv.lock",
+        "poetry.lock",
+        "deps.edn",
+        "project.clj",
+        "bb.edn",
+        "shadow-cljs.edn",
+        "go.mod",
+        "Cargo.toml",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "Package.swift",
+        "pubspec.yaml",
+        "Gemfile",
+        "composer.json",
+        "Dockerfile",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "compose.yml",
+        "compose.yaml",
+        "eas.json",
+        "app.json",
+        "app.config.js",
+        "app.config.ts",
+        "Makefile",
+        "justfile",
+    )
+    signals = [name for name in signal_candidates if (root / name).exists()]
+    for directory in (
+        ".github/workflows",
+        "api",
+        "server",
+        "services",
+        "workers",
+        "migrations",
+        "ios",
+        "android",
+        "supabase/functions",
+        "supabase/migrations",
+    ):
+        if (root / directory).exists():
+            signals.append(f"{directory}/")
+
+    package, package_warnings = package_metadata(root)
+    dependencies = set(package.get("dependencies", []))
+    python_text = "\n".join(
+        read_small_text(root / name).lower()
+        for name in ("pyproject.toml", "requirements.txt", "setup.py")
+    )
+
+    toolchains: list[str] = []
+    toolchain_checks = (
+        ("javascript-typescript", any_exists(root, ("package.json", "tsconfig.json"))),
+        (
+            "python",
+            any_exists(
+                root,
+                ("pyproject.toml", "requirements.txt", "setup.py", "Pipfile", "uv.lock"),
+            )
+            or any_top_level_match(root, ("*.py",)),
+        ),
+        (
+            "clojure",
+            any_exists(root, ("deps.edn", "project.clj", "bb.edn", "shadow-cljs.edn")),
+        ),
+        ("go", (root / "go.mod").exists()),
+        ("rust", (root / "Cargo.toml").exists()),
+        (
+            "java-kotlin",
+            any_exists(root, ("pom.xml", "build.gradle", "build.gradle.kts"))
+            or any_top_level_match(root, ("*.gradle", "*.gradle.kts")),
+        ),
+        (
+            "swift-objective-c",
+            (root / "Package.swift").exists()
+            or any_top_level_match(root, ("*.xcodeproj", "*.xcworkspace"))
+            or (root / "ios").is_dir(),
+        ),
+        ("dart", (root / "pubspec.yaml").exists()),
+        ("ruby", (root / "Gemfile").exists()),
+        ("php", (root / "composer.json").exists()),
+        ("dotnet", any_top_level_match(root, ("*.sln", "*.csproj", "*.fsproj"))),
+    )
+    toolchains.extend(name for name, present in toolchain_checks if present)
+
+    has_react_native = "react-native" in dependencies
+    has_expo = "expo" in dependencies
+    has_mobile = (
+        has_react_native
+        or (root / "pubspec.yaml").exists()
+        or (root / "ios").is_dir()
+        or (root / "android").is_dir()
+        or any_top_level_match(root, ("*.xcodeproj", "*.xcworkspace"))
+    )
+
+    web_framework_dependencies = {
+        "next",
+        "vue",
+        "nuxt",
+        "svelte",
+        "@sveltejs/kit",
+        "@angular/core",
+        "solid-js",
+        "astro",
+    }
+    explicit_web_files = any_exists(
+        root,
+        ("index.html", "vite.config.js", "vite.config.ts", "next.config.js", "next.config.mjs"),
+    )
+    has_web = (
+        bool(web_framework_dependencies.intersection(dependencies))
+        or explicit_web_files
+        or ("react-dom" in dependencies and not has_mobile)
+    )
+
+    service_dependencies = {
+        "express",
+        "fastify",
+        "koa",
+        "hapi",
+        "@nestjs/core",
+        "django",
+        "fastapi",
+        "flask",
+        "starlette",
+        "celery",
+    }
+    service_markers = ("django", "fastapi", "flask", "starlette", "celery", "gunicorn")
+    has_service = (
+        bool(service_dependencies.intersection(dependencies))
+        or any(marker in python_text for marker in service_markers)
+        or (root / "supabase" / "functions").is_dir()
+        or any(
+            (root / name).is_dir()
+            for name in ("api", "backend", "server", "services", "workers")
+        )
+    )
+
+    data_dependencies = {
+        "pg",
+        "prisma",
+        "@prisma/client",
+        "typeorm",
+        "sequelize",
+        "mongoose",
+        "sqlalchemy",
+        "alembic",
+        "diesel",
+    }
+    has_data = (
+        bool(data_dependencies.intersection(dependencies))
+        or any(marker in python_text for marker in ("sqlalchemy", "alembic", "django"))
+        or (root / "supabase" / "migrations").is_dir()
+        or any((root / name).is_dir() for name in ("migrations", "db", "database", "schema"))
+        or any_top_level_match(root, ("*.sql",))
+    )
+
+    has_delivery = (
+        any_exists(
+            root,
+            (
+                "Dockerfile",
+                "docker-compose.yml",
+                "docker-compose.yaml",
+                "compose.yml",
+                "compose.yaml",
+                "eas.json",
+                "fly.toml",
+                "railway.json",
+                "railway.toml",
+                "vercel.json",
+                "netlify.toml",
+            ),
+        )
+        or (root / ".github" / "workflows").is_dir()
+        or any((root / name).is_dir() for name in ("terraform", "k8s", "helm"))
+    )
+
+    recommended_packs = [
+        name
+        for name, present in (
+            ("service", has_service),
+            ("web", has_web),
+            ("mobile", has_mobile),
+            ("data", has_data),
+            ("delivery", has_delivery),
+        )
+        if present
+    ]
+    recommended_overlays = ["react-native-expo"] if has_react_native and has_expo else []
+
+    package_manager = None
+    for lockfile, manager in (
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+    ):
+        if (root / lockfile).exists():
+            package_manager = manager
+            break
+
+    return {
+        "target": str(root),
+        "repository": root.name,
+        "toolchain_signals": toolchains,
+        "recommended_packs": recommended_packs,
+        "recommended_overlays": recommended_overlays,
+        "signals": sorted(set(signals)),
+        "package_manager_signal": package_manager,
+        "package_scripts": package.get("scripts", []),
+        "warnings": package_warnings,
+        "note": (
+            "Signals recommend capability packs only. Verify commands, architecture, and product "
+            "authority from the repository before recording them."
+        ),
+    }
+
+
+def parse_selection(
+    value: str,
+    detected: Iterable[str],
+    allowed: Sequence[str],
+    label: str,
+) -> list[str]:
+    normalized = value.strip().lower()
+    if normalized in {"auto", "selected"}:
+        detected_set = set(detected)
+        return [name for name in allowed if name in detected_set]
+    if normalized in {"", "none"}:
+        return []
+    requested = [part.strip().lower() for part in value.split(",") if part.strip()]
+    unknown = sorted(set(requested).difference(allowed))
+    if unknown:
+        raise ProjectOSError(
+            f"Unknown {label}: {', '.join(unknown)}. Allowed: {', '.join(allowed)}"
+        )
+    requested_set = set(requested)
+    return [name for name in allowed if name in requested_set]
+
+
+def validate_overlay_dependencies(packs: Sequence[str], overlays: Sequence[str]) -> None:
+    pack_set = set(packs)
+    for overlay in overlays:
+        missing = OVERLAY_REQUIREMENTS.get(overlay, set()).difference(pack_set)
+        if missing:
+            raise ProjectOSError(
+                f"Overlay {overlay} requires packs: {', '.join(sorted(missing))}"
+            )
+
+
+def detection_lines(detection: dict[str, Any]) -> str:
+    toolchains = detection.get("toolchain_signals", [])
+    signals = detection.get("signals", [])
+    return "\n".join(
+        (
+            "- Toolchains: " + (", ".join(toolchains) if toolchains else "none detected"),
+            "- Repository signals: "
+            + (
+                ", ".join(f"`{signal}`" for signal in signals)
+                if signals
+                else "none detected"
+            ),
+        )
+    )
+
+
+def render_template(content: str, replacements: dict[str, str]) -> str:
+    rendered = content
+    for token, value in replacements.items():
+        rendered = rendered.replace(token, value)
+    return rendered
+
+
+def iter_template_files(root: Path) -> Iterable[Path]:
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            yield path
+
+
+def require_destination_within_root(root: Path, destination: Path) -> None:
+    root = root.resolve()
+    try:
+        destination.resolve().relative_to(root)
+        destination.relative_to(root)
+    except ValueError as error:
+        raise ProjectOSError(f"Refusing to access a path outside the target: {destination}") from error
+
+
+def reject_symlink_path(root: Path, destination: Path) -> None:
+    """Reject a mutation when any destination component is a symlink."""
+    root = root.resolve()
+    require_destination_within_root(root, destination)
+    relative = destination.relative_to(root)
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ProjectOSError(f"Refusing to mutate through a symlink: {current}")
+
+
+def check_no_symlink_path(
+    root: Path, path: Path, label: str, errors: list[str]
+) -> None:
+    try:
+        reject_symlink_path(root, path)
+    except ProjectOSError as error:
+        message = f"{label} must not use symlink components: {error}"
+        if message not in errors:
+            errors.append(message)
+
+
+def repo_relative_path(root: Path, raw_path: Any) -> Path | None:
+    """Parse a repository-relative POSIX path without accepting traversal syntax."""
+    if not isinstance(raw_path, str) or raw_path in {"", ".", ".."} or "\\" in raw_path:
+        return None
+    pure = PurePosixPath(raw_path)
+    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+        return None
+    candidate = root.joinpath(*pure.parts)
+    try:
+        candidate.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def safe_relative(root: Path, raw_path: Any) -> Path | None:
+    return repo_relative_path(root, raw_path)
+
+
+def relative_string(root: Path, path: Path | None) -> str | None:
+    if path is None:
+        return None
+    if path.is_symlink():
+        return None
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def create_parent_directories(root: Path, parent: Path, created: list[Path]) -> None:
+    root = root.resolve()
+    require_destination_within_root(root, parent)
+    relative = parent.relative_to(root)
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ProjectOSError(f"Refusing to create through a symlink: {current}")
+        if current.exists():
+            if not current.is_dir():
+                raise ProjectOSError(f"Expected a directory but found a file: {current}")
+            continue
+        try:
+            current.mkdir()
+        except FileExistsError:
+            if current.is_symlink() or not current.is_dir():
+                raise ProjectOSError(f"Unsafe path appeared during operation: {current}")
+        else:
+            created.append(current)
+
+
+def unique_existing(
+    root: Path,
+    candidates: Sequence[str],
+    kind: str,
+    label: str,
+    errors: list[str],
+    prefer_nonempty: bool = False,
+) -> Path | None:
+    matches: list[Path] = []
+    for relative in candidates:
+        path = root / relative
+        if path.is_symlink():
+            errors.append(f"unsafe symlink for {label}: {relative}")
+            continue
+        if kind == "file" and path.is_file():
+            matches.append(path)
+        if kind == "dir" and path.is_dir():
+            matches.append(path)
+    if prefer_nonempty and len(matches) > 1:
+        nonempty = [
+            path
+            for path in matches
+            if any(item.is_file() and not item.is_symlink() for item in path.rglob("*"))
+        ]
+        if len(nonempty) == 1:
+            return nonempty[0]
+        if nonempty:
+            matches = nonempty
+    if len(matches) > 1:
+        errors.append(
+            f"ambiguous {label} owners: "
+            + ", ".join(path.relative_to(root).as_posix() for path in matches)
+        )
+        return None
+    return matches[0] if matches else None
+
+
+def default_system(
+    root: Path,
+    mode: str,
+    installation: str,
+    packs: Sequence[str],
+    overlays: Sequence[str],
+    paths: dict[str, Any],
+) -> dict[str, Any]:
+    managed_guidance: dict[str, str] = {
+        ".agents/packs/README.md": "sha256:"
+        + hashlib.sha256((PACK_TEMPLATE / "README.md").read_bytes()).hexdigest()
+    }
+    for name in packs:
+        relative = f".agents/packs/{name}.md"
+        managed_guidance[relative] = (
+            "sha256:" + hashlib.sha256((PACK_TEMPLATE / f"{name}.md").read_bytes()).hexdigest()
+        )
+    for name in overlays:
+        relative = f".agents/packs/overlays/{name}.md"
+        managed_guidance[relative] = (
+            "sha256:" + hashlib.sha256((OVERLAY_TEMPLATE / f"{name}.md").read_bytes()).hexdigest()
+        )
+    managed_knowledge = {
+        entry["id"]: entry_content_hash(entry)
+        for entry in seed_documents(packs, overlays)
+    }
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "project_os_version": VERSION,
+        "mode": mode,
+        "installation": installation,
+        "generated_on": date.today().isoformat(),
+        "packs": list(packs),
+        "pack_paths": [f".agents/packs/{name}.md" for name in packs],
+        "overlays": list(overlays),
+        "overlay_paths": [f".agents/packs/overlays/{name}.md" for name in overlays],
+        "managed_guidance": managed_guidance,
+        "managed_knowledge": dict(sorted(managed_knowledge.items())),
+        "toolchain_signals": detect_repository(root)["toolchain_signals"],
+        "paths": paths,
+    }
+
+
+def seed_documents(packs: Sequence[str], overlays: Sequence[str]) -> list[dict[str, Any]]:
+    selected_packs = set(packs)
+    paths = [KNOWLEDGE_TEMPLATE / "core.json"]
+    paths.extend(KNOWLEDGE_TEMPLATE / "packs" / f"{name}.json" for name in PACK_NAMES)
+    paths.extend(KNOWLEDGE_TEMPLATE / "overlays" / f"{name}.json" for name in overlays)
+    missing = [path for path in paths if not path.is_file()]
+    if missing:
+        raise ProjectOSError(
+            "Missing bundled knowledge asset: "
+            + ", ".join(path.relative_to(SKILL_ROOT).as_posix() for path in missing)
+        )
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for path in paths:
+        value = load_json(path)
+        source_entries = value.get("entries", []) if isinstance(value, dict) else None
+        if not isinstance(source_entries, list):
+            raise ProjectOSError(f"Knowledge seed must contain an entries array: {path}")
+        for entry in source_entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+                raise ProjectOSError(f"Knowledge seed has an invalid entry: {path}")
+            source = entry.get("source", {})
+            source_pack = source.get("pack") if isinstance(source, dict) else None
+            applies_to = entry.get("applies_to", [])
+            selected = (
+                path.name == "core.json" and path.parent == KNOWLEDGE_TEMPLATE
+            ) or (
+                isinstance(source_pack, str)
+                and source_pack in {f"overlay/{name}" for name in overlays}
+            )
+            if path.parent.name == "packs":
+                selected = source_pack in selected_packs or bool(
+                    isinstance(applies_to, list) and selected_packs.intersection(applies_to)
+                )
+            if not selected:
+                continue
+            if entry["id"] in seen:
+                raise ProjectOSError(f"Duplicate knowledge seed id {entry['id']}: {path}")
+            seen.add(entry["id"])
+            entries.append(entry)
+    return entries
+
+
+def composed_knowledge(packs: Sequence[str], overlays: Sequence[str]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "knowledge_version": VERSION,
+        "packs": ["core", *packs],
+        "overlays": list(overlays),
+        "entries": sorted(seed_documents(packs, overlays), key=lambda entry: entry["id"]),
+    }
+
+
+def validate_composed_knowledge(
+    value: dict[str, Any], packs: Sequence[str], overlays: Sequence[str]
+) -> None:
+    """Fail closed before bundled knowledge can be written into a target repository."""
+    errors: list[str] = []
+    if value.get("schema_version") != 1:
+        errors.append("schema_version must be 1")
+    if value.get("knowledge_version") != VERSION:
+        errors.append(f"knowledge_version must be {VERSION}")
+    if value.get("packs") != ["core", *packs]:
+        errors.append("packs do not match the selected capability packs")
+    if value.get("overlays") != list(overlays):
+        errors.append("overlays do not match the selected ecosystem overlays")
+
+    required = (
+        "id",
+        "title",
+        "status",
+        "applies_to",
+        "trigger",
+        "mechanism",
+        "prevention",
+        "verification",
+        "boundaries",
+        "source",
+    )
+    entries = value.get("entries")
+    check_unique_ids(entries, "bundled knowledge", errors, required, FAILURE_STATUSES)
+    allowed_source_packs = {
+        "core",
+        *PACK_NAMES,
+        *(f"overlay/{name}" for name in OVERLAY_NAMES),
+    }
+    if isinstance(entries, list):
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            entry_id = entry.get("id", f"index {index}")
+            for key in ("id", "title", "trigger", "mechanism", "prevention"):
+                if not isinstance(entry.get(key), str) or not entry.get(key):
+                    errors.append(f"bundled knowledge {entry_id!r} has invalid {key}")
+            for key in ("applies_to", "verification", "boundaries"):
+                values = entry.get(key)
+                if (
+                    not isinstance(values, list)
+                    or not values
+                    or any(not isinstance(item, str) or not item for item in values)
+                ):
+                    errors.append(f"bundled knowledge {entry_id!r} has invalid {key}")
+            source = entry.get("source")
+            if not isinstance(source, dict):
+                errors.append(f"bundled knowledge {entry_id!r} has invalid source")
+                continue
+            source_kind = source.get("kind")
+            if not isinstance(source_kind, str) or source_kind not in {
+                "project-os-pack",
+                "incident-derived",
+            }:
+                errors.append(f"bundled knowledge {entry_id!r} has invalid source kind")
+            source_pack = source.get("pack")
+            if not isinstance(source_pack, str) or source_pack not in allowed_source_packs:
+                errors.append(f"bundled knowledge {entry_id!r} has invalid source pack")
+            references = source.get("references")
+            if not isinstance(references, list) or any(
+                not isinstance(reference, str) or not reference.startswith("https://")
+                for reference in references
+            ):
+                errors.append(f"bundled knowledge {entry_id!r} has invalid source references")
+            if source_kind == "project-os-pack" and not references:
+                errors.append(f"bundled knowledge {entry_id!r} needs a public source reference")
+            if source.get("content_hash") != entry_content_hash(entry):
+                errors.append(f"bundled knowledge {entry_id!r} content_hash is stale")
+
+    for label in private_material_labels(value):
+        errors.append(f"bundled knowledge contains a {label}")
+    if errors:
+        raise ProjectOSError("Invalid bundled knowledge: " + "; ".join(errors))
+
+
+def guidance_operations(
+    root: Path,
+    packs: Sequence[str],
+    overlays: Sequence[str],
+) -> list[tuple[str, Path, str | None]]:
+    operations: list[tuple[str, Path, str | None]] = []
+    readme_source = PACK_TEMPLATE / "README.md"
+    readme_destination = root / ".agents" / "packs" / "README.md"
+    operations.append(
+        ("skip", readme_destination, None)
+        if readme_destination.exists()
+        else ("create", readme_destination, readme_source.read_text(encoding="utf-8"))
+    )
+    for name in packs:
+        source = PACK_TEMPLATE / f"{name}.md"
+        destination = root / ".agents" / "packs" / f"{name}.md"
+        operations.append(
+            ("skip", destination, None)
+            if destination.exists()
+            else ("create", destination, source.read_text(encoding="utf-8"))
+        )
+    for name in overlays:
+        source = OVERLAY_TEMPLATE / f"{name}.md"
+        destination = root / ".agents" / "packs" / "overlays" / f"{name}.md"
+        operations.append(
+            ("skip", destination, None)
+            if destination.exists()
+            else ("create", destination, source.read_text(encoding="utf-8"))
+        )
+    return operations
+
+
+def guidance_content_map(packs: Sequence[str], overlays: Sequence[str]) -> dict[str, str]:
+    contents = {
+        ".agents/packs/README.md": (PACK_TEMPLATE / "README.md").read_text(encoding="utf-8")
+    }
+    for name in packs:
+        contents[f".agents/packs/{name}.md"] = (PACK_TEMPLATE / f"{name}.md").read_text(
+            encoding="utf-8"
+        )
+    for name in overlays:
+        contents[f".agents/packs/overlays/{name}.md"] = (
+            OVERLAY_TEMPLATE / f"{name}.md"
+        ).read_text(encoding="utf-8")
+    return contents
+
+
+def execute_operations(
+    root: Path,
+    operations: Sequence[tuple[str, Path, str | None]],
+    dry_run: bool,
+    before_write: Callable[[], None] | None = None,
+) -> None:
+    seen: set[Path] = set()
+    for action, destination, content in operations:
+        if action not in {"create", "skip"}:
+            raise ProjectOSError(f"Unsupported file operation: {action}")
+        require_destination_within_root(root, destination)
+        reject_symlink_path(root, destination)
+        if destination in seen:
+            raise ProjectOSError(f"Duplicate file operation: {destination}")
+        seen.add(destination)
+        if action == "create" and destination.exists():
+            raise ProjectOSError(f"Refusing to overwrite an existing file: {destination}")
+        if action == "skip" and not destination.is_file():
+            raise ProjectOSError(f"Preserved destination is not a regular file: {destination}")
+        if action == "create" and content is None:
+            raise ProjectOSError(f"Create operation has no content: {destination}")
+
+    for action, destination, _ in operations:
+        print(f"{action}: {destination.relative_to(root)}")
+    if dry_run:
+        return
+    if before_write is not None:
+        before_write()
+
+    created_files: list[Path] = []
+    created_directories: list[Path] = []
+    try:
+        for action, destination, content in operations:
+            if action == "skip":
+                continue
+            create_parent_directories(root, destination.parent, created_directories)
+            reject_symlink_path(root, destination)
+            handle = destination.open("x", encoding="utf-8")
+            created_files.append(destination)
+            with handle:
+                handle.write(content or "")
+                handle.flush()
+                os.fsync(handle.fileno())
+    except (OSError, ProjectOSError) as error:
+        rollback_failures: list[str] = []
+        for path in reversed(created_files):
+            try:
+                path.unlink()
+            except OSError as rollback_error:
+                rollback_failures.append(f"{path}: {rollback_error}")
+        for path in reversed(created_directories):
+            try:
+                path.rmdir()
+            except OSError as rollback_error:
+                rollback_failures.append(f"{path}: {rollback_error}")
+        if isinstance(error, ProjectOSError):
+            raise
+        rollback_note = (
+            " rollback incomplete: " + "; ".join(rollback_failures)
+            if rollback_failures
+            else " created files were rolled back"
+        )
+        raise ProjectOSError(f"Project OS write failed;{rollback_note}: {error}") from error
+
+
+def execute_sync_transaction(
+    root: Path,
+    creates: Sequence[tuple[Path, str]],
+    replacements: Sequence[tuple[Path, str, str]],
+) -> None:
+    """Apply a small text-file transaction with hash-guarded rollback."""
+    root = root.resolve()
+    destinations = [path for path, _ in creates] + [path for path, _, _ in replacements]
+    if len(destinations) != len(set(destinations)):
+        raise ProjectOSError("Sync transaction contains duplicate destinations")
+    for path, _ in creates:
+        require_destination_within_root(root, path)
+        reject_symlink_path(root, path)
+        if path.exists():
+            raise ProjectOSError(f"File changed during sync: {path}")
+    for path, _, expected_sha256 in replacements:
+        require_destination_within_root(root, path)
+        reject_symlink_path(root, path)
+        if not path.is_file():
+            raise ProjectOSError(f"File changed during sync: {path}")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
+            raise ProjectOSError(f"File changed during sync: {path}")
+
+    created_files: list[Path] = []
+    created_directories: list[Path] = []
+    replaced: list[tuple[Path, str, str]] = []
+    try:
+        for path, content in creates:
+            create_parent_directories(root, path.parent, created_directories)
+            with path.open("x", encoding="utf-8") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            created_files.append(path)
+        for path, content, expected_sha256 in replacements:
+            original = path.read_text(encoding="utf-8")
+            replacement_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            atomic_write_text(path, content, expected_sha256=expected_sha256)
+            replaced.append((path, original, replacement_sha256))
+    except (OSError, ProjectOSError) as error:
+        rollback_failures: list[str] = []
+        for path, original, replacement_sha256 in reversed(replaced):
+            try:
+                atomic_write_text(path, original, expected_sha256=replacement_sha256)
+            except ProjectOSError as rollback_error:
+                rollback_failures.append(f"{path}: {rollback_error}")
+        for path in reversed(created_files):
+            try:
+                path.unlink()
+            except OSError as rollback_error:
+                rollback_failures.append(f"{path}: {rollback_error}")
+        for path in reversed(created_directories):
+            try:
+                path.rmdir()
+            except OSError:
+                pass
+        note = (
+            " rollback incomplete: " + "; ".join(rollback_failures)
+            if rollback_failures
+            else " changes were rolled back"
+        )
+        raise ProjectOSError(f"Knowledge sync failed;{note}: {error}") from error
+
+
+def init_project(
+    root: Path,
+    mode: str,
+    packs_value: str,
+    overlays_value: str,
+    dry_run: bool,
+    allow_existing_agents: bool = False,
+) -> int:
+    root = root.resolve()
+    detection = detect_repository(root)
+    packs = parse_selection(packs_value, detection["recommended_packs"], PACK_NAMES, "packs")
+    overlays = parse_selection(
+        overlays_value, detection["recommended_overlays"], OVERLAY_NAMES, "overlays"
+    )
+    validate_overlay_dependencies(packs, overlays)
+    system_path = root / ".agents" / "SYSTEM.json"
+    if system_path.exists():
+        raise ProjectOSError("Project OS is already configured; use check instead of reinitializing")
+    agents_path = root / "AGENTS.md"
+    agents_exists = agents_path.exists()
+    if (root / ".agents").exists() or (agents_exists and not allow_existing_agents):
+        raise ProjectOSError(
+            "Existing repository instructions or .agents state detected; use adopt instead of init"
+        )
+    if agents_exists and allow_existing_agents:
+        if not agents_path.is_file() or agents_path.is_symlink():
+            raise ProjectOSError("Existing AGENTS.md must be a regular file")
+        agents_text = agents_path.read_text(encoding="utf-8", errors="ignore")
+        required_routes = (".agents/CONTEXT.md", ".agents/STATE.md")
+        missing_routes = [route for route in required_routes if route not in agents_text]
+        if missing_routes:
+            raise ProjectOSError(
+                "Existing AGENTS.md must route to "
+                + ", ".join(missing_routes)
+                + " before --allow-existing-agents can preserve it"
+            )
+
+    replacements = {
+        "__UPDATED_DATE__": date.today().isoformat(),
+        "__PROJECT_NAME__": root.name,
+        "__DETECTION_LINES__": detection_lines(detection),
+        "__PACK_NAMES__": ", ".join(packs) if packs else "none",
+        "__OVERLAY_NAMES__": ", ".join(overlays) if overlays else "none",
+        "__MODE__": mode,
+    }
+    knowledge = composed_knowledge(packs, overlays)
+    validate_composed_knowledge(knowledge, packs, overlays)
+    operations: list[tuple[str, Path, str | None]] = []
+    template_roots = [CORE_TEMPLATE, *([FULL_TEMPLATE] if mode == "full" else [])]
+    shared_relative = Path(".agents/knowledge/shared/failures.json")
+    for template_root in template_roots:
+        for source in iter_template_files(template_root):
+            relative = source.relative_to(template_root)
+            if relative == shared_relative:
+                continue
+            if relative == Path("AGENTS.md") and agents_exists:
+                continue
+            destination = root / relative
+            operations.append(
+                ("skip", destination, None)
+                if destination.exists()
+                else (
+                    "create",
+                    destination,
+                    render_template(source.read_text(encoding="utf-8"), replacements),
+                )
+            )
+
+    paths = dict(DEFAULT_PATHS)
+    if mode == "full":
+        paths["program"] = ".agents/PROGRAM.md"
+        paths["history"] = ".agents/history"
+    system = default_system(root, mode, "initialized", packs, overlays, paths)
+    operations.extend(guidance_operations(root, packs, overlays))
+    shared_destination = root / str(paths["shared_knowledge"])
+    operations.append(
+        ("skip", shared_destination, None)
+        if shared_destination.exists()
+        else (
+            "create",
+            shared_destination,
+            json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
+        )
+    )
+    operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
+    execute_operations(root, operations, dry_run)
+
+    if agents_exists:
+        print("existing AGENTS.md preserved")
+    if dry_run:
+        print("dry-run: no files written")
+    return 0
+
+
+def scan_markdown_lessons(root: Path, roots: Sequence[str]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    occurrences: dict[tuple[str, str, str], int] = {}
+    for raw_root in roots:
+        lesson_root = safe_relative(root, raw_root)
+        if lesson_root is None or not lesson_root.exists() or lesson_root.is_symlink():
+            continue
+        files = [lesson_root] if lesson_root.is_file() else sorted(lesson_root.rglob("*.md"))
+        for path in files:
+            if path.is_symlink():
+                continue
+            try:
+                path.resolve().relative_to(root.resolve())
+            except ValueError:
+                continue
+            relative = path.relative_to(root).as_posix()
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+            ):
+                match = LESSON_HEADING_PATTERN.match(line)
+                if not match:
+                    continue
+                title = match.group(2)
+                identity = (relative, match.group(1), title)
+                occurrences[identity] = occurrences.get(identity, 0) + 1
+                occurrence = occurrences[identity]
+                fingerprint = hashlib.sha256(
+                    f"{relative}\n{match.group(1)}\n{title}\n{occurrence}".encode("utf-8")
+                ).hexdigest()[:16]
+                records.append(
+                    {
+                        "source": relative,
+                        "line": line_number,
+                        "legacy_id": match.group(1),
+                        "title": title,
+                        "occurrence": occurrence,
+                        "fingerprint": fingerprint,
+                    }
+                )
+    return records
+
+
+def file_sha256(path: Path) -> str:
+    try:
+        return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as error:
+        raise ProjectOSError(f"Could not hash adoption source: {path}: {error}") from error
+
+
+def adoption_precondition_snapshot(
+    root: Path,
+    system: dict[str, Any],
+    inventory: Sequence[dict[str, Any]],
+    detection: dict[str, Any],
+) -> dict[str, Any]:
+    """Capture preserved adoption inputs so validation cannot go stale before mutation."""
+    root = root.resolve()
+    paths = system.get("paths")
+    if not isinstance(paths, dict):
+        raise ProjectOSError("Adoption SYSTEM paths must contain an object")
+
+    tracked_files = {"AGENTS.md"}
+    for key in ("context", "state", "plans", "findings", "program", "knowledge_coverage"):
+        raw_path = paths.get(key)
+        if isinstance(raw_path, str):
+            tracked_files.add(raw_path)
+    project_knowledge = paths.get("project_knowledge", [])
+    if not isinstance(project_knowledge, list):
+        raise ProjectOSError("Adoption project knowledge paths must be an array")
+    tracked_files.update(path for path in project_knowledge if isinstance(path, str))
+
+    file_hashes: dict[str, str] = {}
+    for raw_path in sorted(tracked_files):
+        path = safe_relative(root, raw_path)
+        if path is None:
+            raise ProjectOSError(f"Unsafe adoption source path: {raw_path!r}")
+        reject_symlink_path(root, path)
+        if not path.is_file():
+            raise ProjectOSError(f"Missing adoption source file: {raw_path}")
+        file_hashes[raw_path] = file_sha256(path)
+
+    directory_paths: list[str] = []
+    for key in ("evidence", "history"):
+        raw_path = paths.get(key)
+        if not isinstance(raw_path, str):
+            continue
+        path = safe_relative(root, raw_path)
+        if path is None:
+            raise ProjectOSError(f"Unsafe adoption directory path: {raw_path!r}")
+        reject_symlink_path(root, path)
+        if not path.is_dir():
+            raise ProjectOSError(f"Missing adoption directory: {raw_path}")
+        directory_paths.append(raw_path)
+
+    legacy_roots = paths.get("legacy_knowledge", [])
+    if not isinstance(legacy_roots, list):
+        raise ProjectOSError("Adoption legacy knowledge paths must be an array")
+    legacy_hashes: dict[str, str] = {}
+    for raw_root in legacy_roots:
+        lesson_root = safe_relative(root, raw_root)
+        if lesson_root is None:
+            raise ProjectOSError(f"Unsafe legacy knowledge path: {raw_root!r}")
+        reject_symlink_path(root, lesson_root)
+        if not lesson_root.is_dir():
+            raise ProjectOSError(f"Missing legacy knowledge directory: {raw_root}")
+        directory_paths.append(raw_root)
+        for path in sorted(lesson_root.rglob("*.md")):
+            reject_symlink_path(root, path)
+            if not path.is_file():
+                raise ProjectOSError(f"Legacy knowledge path is not a regular file: {path}")
+            relative = path.relative_to(root).as_posix()
+            legacy_hashes[relative] = file_sha256(path)
+
+    inventory_raw = json.dumps(
+        list(inventory), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    detection_snapshot = {
+        key: detection.get(key)
+        for key in (
+            "toolchain_signals",
+            "recommended_packs",
+            "recommended_overlays",
+            "signals",
+            "package_manager_signal",
+            "package_scripts",
+            "warnings",
+        )
+    }
+    return {
+        "files": file_hashes,
+        "directories": sorted(set(directory_paths)),
+        "legacy_markdown": legacy_hashes,
+        "legacy_inventory_sha256": "sha256:" + hashlib.sha256(inventory_raw).hexdigest(),
+        "detection": detection_snapshot,
+    }
+
+
+def verify_adoption_preconditions(root: Path, report: dict[str, Any]) -> None:
+    expected = report.get("preconditions")
+    system = report.get("proposed_system")
+    if not isinstance(expected, dict) or not isinstance(system, dict):
+        raise ProjectOSError("Adoption report has no valid mutation preconditions")
+    paths = system.get("paths")
+    if not isinstance(paths, dict):
+        raise ProjectOSError("Adoption report has no valid SYSTEM paths")
+    legacy_roots = paths.get("legacy_knowledge", [])
+    if not isinstance(legacy_roots, list):
+        raise ProjectOSError("Adoption report has no valid legacy knowledge paths")
+    current_inventory = scan_markdown_lessons(root, legacy_roots)
+    current = adoption_precondition_snapshot(
+        root,
+        system,
+        current_inventory,
+        detect_repository(root),
+    )
+    if current != expected:
+        changed = sorted(
+            key for key in set(expected).union(current) if expected.get(key) != current.get(key)
+        )
+        raise ProjectOSError(
+            "Adoption sources changed after discovery"
+            + (f" ({', '.join(changed)})" if changed else "")
+            + "; rerun the adoption dry run"
+        )
+
+
+def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, Any]:
+    root = root.resolve()
+    detection = detect_repository(root)
+    errors: list[str] = []
+    warnings: list[str] = []
+    context = unique_existing(root, (".agents/CONTEXT.md",), "file", "context", errors)
+    state = unique_existing(root, (".agents/STATE.md",), "file", "state", errors)
+    plans = unique_existing(
+        root,
+        (".agents/plans/index.json", "docs/plans/index.json"),
+        "file",
+        "plans",
+        errors,
+    )
+    findings = unique_existing(
+        root,
+        (
+            ".agents/findings/findings.json",
+            ".agents/audit/findings.json",
+            "docs/audit/findings.json",
+        ),
+        "file",
+        "findings",
+        errors,
+    )
+    evidence = unique_existing(
+        root,
+        (".agents/evidence", ".agents/audit/evidence", "docs/audit/evidence"),
+        "dir",
+        "evidence",
+        errors,
+        prefer_nonempty=True,
+    )
+    program = unique_existing(root, (".agents/PROGRAM.md",), "file", "program", errors)
+    history = unique_existing(root, (".agents/history",), "dir", "history", errors)
+    coverage = unique_existing(
+        root,
+        (
+            ".agents/adoption/knowledge-map.json",
+            ".agents/knowledge/coverage.json",
+        ),
+        "file",
+        "knowledge coverage",
+        errors,
+    )
+
+    knowledge_root = root / ".agents" / "knowledge"
+    if knowledge_root.is_symlink():
+        errors.append(f"unsafe knowledge root symlink: {knowledge_root}")
+    project_knowledge: list[str] = []
+    canonical_project = knowledge_root / "project" / "failures.json"
+    if canonical_project.is_file():
+        project_knowledge.append(relative_string(root, canonical_project) or "")
+    if knowledge_root.is_dir():
+        for path in sorted(knowledge_root.glob("*.md")):
+            if path.name.lower() != "readme.md":
+                relative = relative_string(root, path)
+                if relative is None:
+                    errors.append(f"unsafe project knowledge path: {path}")
+                else:
+                    project_knowledge.append(relative)
+    project_knowledge = [path for path in project_knowledge if path]
+
+    legacy_knowledge: list[str] = []
+    if knowledge_root.is_dir():
+        for directory in sorted(path for path in knowledge_root.iterdir() if path.is_dir()):
+            if directory.name in {"project", "shared"}:
+                continue
+            if directory.is_symlink():
+                errors.append(f"unsafe legacy knowledge symlink: {directory}")
+                continue
+            if any(directory.rglob("*.md")):
+                relative = relative_string(root, directory)
+                if relative:
+                    legacy_knowledge.append(relative)
+
+    paths = {
+        "context": relative_string(root, context),
+        "state": relative_string(root, state),
+        "plans": relative_string(root, plans),
+        "findings": relative_string(root, findings),
+        "evidence": relative_string(root, evidence),
+        "program": relative_string(root, program),
+        "history": relative_string(root, history),
+        "shared_knowledge": ".agents/knowledge/shared/failures.json",
+        "project_knowledge": project_knowledge,
+        "legacy_knowledge": legacy_knowledge,
+        "knowledge_coverage": relative_string(root, coverage),
+    }
+    mode = "full" if program else "lite"
+    if mode == "full" and history is None:
+        errors.append("full adoption requires an existing history directory")
+    packs = list(detection["recommended_packs"])
+    overlays = list(detection["recommended_overlays"])
+    validate_overlay_dependencies(packs, overlays)
+    system = default_system(root, mode, "adopted", packs, overlays, paths)
+
+    if not (root / "AGENTS.md").is_file():
+        errors.append("missing root AGENTS.md")
+    for owner in ("context", "state", "plans", "findings"):
+        if paths[owner] is None:
+            errors.append(f"could not discover required {owner} owner")
+    if evidence is None:
+        warnings.append("no evidence directory was discovered")
+    agents_text = read_small_text(root / "AGENTS.md")
+    for owner in (context, state):
+        if owner is not None:
+            relative = relative_string(root, owner)
+            if relative and relative not in agents_text:
+                errors.append(f"AGENTS.md does not route to {relative}")
+
+    validate_adoption_records(root, paths, errors)
+    for raw_path in project_knowledge:
+        path = safe_relative(root, raw_path)
+        if path is None or not path.is_file():
+            errors.append(f"invalid project knowledge path: {raw_path}")
+        elif path.suffix == ".json":
+            validate_failure_registry(path, f"project knowledge {raw_path}", errors)
+
+    inventory = scan_markdown_lessons(root, legacy_knowledge)
+    counts: dict[str, int] = {}
+    for record in inventory:
+        counts[record["legacy_id"]] = counts.get(record["legacy_id"], 0) + 1
+    duplicates = sorted(identifier for identifier, count in counts.items() if count > 1)
+    if inventory and coverage is None:
+        errors.append("legacy knowledge requires an explicit complete coverage map")
+    elif coverage is not None:
+        coverage_errors: list[str] = []
+        shared_targets = {
+            entry["id"]: entry["source"]["pack"]
+            for entry in composed_knowledge(packs, overlays)["entries"]
+        }
+        validate_knowledge_coverage(root, inventory, coverage, shared_targets, coverage_errors)
+        errors.extend(coverage_errors)
+    if duplicates:
+        warnings.append("legacy knowledge duplicate ids are resolved only by source fingerprint")
+
+    managed_destinations = [
+        ".agents/packs/README.md",
+        ".agents/knowledge/shared/failures.json",
+        *(f".agents/packs/{name}.md" for name in packs),
+        *(f".agents/packs/overlays/{name}.md" for name in overlays),
+    ]
+    for relative in managed_destinations:
+        if (root / relative).exists():
+            errors.append(f"Project OS-managed adoption destination already exists: {relative}")
+    for relative in [*managed_destinations, ".agents/SYSTEM.json"]:
+        try:
+            reject_symlink_path(root, root / relative)
+        except ProjectOSError as error:
+            errors.append(str(error))
+
+    planned_creates = [".agents/SYSTEM.json"]
+    planned_creates.extend(f".agents/packs/{name}.md" for name in packs)
+    planned_creates.extend(f".agents/packs/overlays/{name}.md" for name in overlays)
+    planned_creates.extend((".agents/packs/README.md", ".agents/knowledge/shared/failures.json"))
+    planned_creates = [relative for relative in planned_creates if not (root / relative).exists()]
+
+    preconditions: dict[str, Any] | None = None
+    if not errors:
+        try:
+            preconditions = adoption_precondition_snapshot(root, system, inventory, detection)
+        except ProjectOSError as error:
+            errors.append(str(error))
+
+    report: dict[str, Any] = {
+        "target": str(root),
+        "safe_to_adopt": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "planned_creates": sorted(set(planned_creates)),
+        "existing_files_modified": [],
+        "legacy_knowledge_count": len(inventory),
+        "legacy_duplicate_ids": duplicates,
+        "proposed_system": system,
+        "preconditions": preconditions,
+    }
+    if include_inventory:
+        report["legacy_knowledge_inventory"] = inventory
+    return report
+
+
+def adopt_project(root: Path, dry_run: bool, include_inventory: bool) -> int:
+    root = root.resolve()
+    system_path = root / ".agents" / "SYSTEM.json"
+    if system_path.exists():
+        raise ProjectOSError("Project OS is already configured; use check instead of adopt")
+    report = discover_adoption(root, include_inventory=include_inventory)
+    proposed = report["proposed_system"]
+    knowledge = composed_knowledge(proposed["packs"], proposed["overlays"])
+    validate_composed_knowledge(knowledge, proposed["packs"], proposed["overlays"])
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    if not report["safe_to_adopt"]:
+        return 1
+    if dry_run:
+        print("dry-run: no files written")
+        return 0
+
+    system = report["proposed_system"]
+    operations = guidance_operations(root, system["packs"], system["overlays"])
+    shared_destination = root / system["paths"]["shared_knowledge"]
+    operations.append(
+        ("skip", shared_destination, None)
+        if shared_destination.exists()
+        else (
+            "create",
+            shared_destination,
+            json.dumps(
+                knowledge,
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
+        )
+    )
+    operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
+    execute_operations(
+        root,
+        operations,
+        dry_run=False,
+        before_write=lambda: verify_adoption_preconditions(root, report),
+    )
+    print("adopted: existing files were preserved")
+    return 0
+
+
+def check_unique_ids(
+    entries: Any,
+    label: str,
+    errors: list[str],
+    required: Iterable[str],
+    allowed_statuses: set[str] | None = None,
+) -> set[str]:
+    identifiers: set[str] = set()
+    if not isinstance(entries, list):
+        errors.append(f"{label} must be an array")
+        return identifiers
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(f"{label}[{index}] must be an object")
+            continue
+        missing = [key for key in required if key not in entry]
+        if missing:
+            errors.append(f"{label}[{index}] is missing: {', '.join(missing)}")
+        entry_id = entry.get("id")
+        if not isinstance(entry_id, str) or not entry_id:
+            errors.append(f"{label}[{index}] has no valid id")
+        elif entry_id in identifiers:
+            errors.append(f"{label} contains duplicate id {entry_id}")
+        else:
+            identifiers.add(entry_id)
+        status = entry.get("status")
+        if allowed_statuses is not None and (
+            not isinstance(status, str) or status not in allowed_statuses
+        ):
+            errors.append(f"{label}[{index}] has invalid status {entry.get('status')!r}")
+    return identifiers
+
+
+def entry_content_hash(entry: dict[str, Any]) -> str:
+    value = copy.deepcopy(entry)
+    source = value.get("source")
+    if isinstance(source, dict):
+        source.pop("content_hash", None)
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def validate_registry_schema(value: dict[str, Any], label: str, errors: list[str]) -> None:
+    versions = [value[key] for key in ("schema_version", "version") if key in value]
+    if not versions:
+        errors.append(f"{label} must declare schema_version or version")
+    elif any(version != 1 for version in versions):
+        errors.append(f"{label} schema version must be 1")
+
+
+def system_path_value(
+    root: Path,
+    paths: dict[str, Any],
+    key: str,
+    errors: list[str],
+    required: bool = False,
+) -> Path | None:
+    raw = paths.get(key)
+    if raw is None:
+        if required:
+            errors.append(f"SYSTEM paths.{key} is required")
+        return None
+    path = safe_relative(root, raw)
+    if path is None:
+        errors.append(f"SYSTEM paths.{key} is not a safe repository-relative path: {raw!r}")
+    return path
+
+
+def validate_failure_registry(
+    path: Path,
+    label: str,
+    errors: list[str],
+    verify_hashes: bool = True,
+    strict_managed: bool = False,
+) -> set[str]:
+    required = (
+        "id",
+        "title",
+        "status",
+        "applies_to",
+        "trigger",
+        "mechanism",
+        "prevention",
+        "verification",
+        "boundaries",
+        "source",
+    )
+    try:
+        value = load_json(path)
+    except ProjectOSError as error:
+        errors.append(str(error))
+        return set()
+    entries = value.get("entries", []) if isinstance(value, dict) else None
+    identifiers = check_unique_ids(entries, label, errors, required, FAILURE_STATUSES)
+    if isinstance(value, dict):
+        validate_registry_schema(value, label, errors)
+    if isinstance(entries, list):
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            source = entry.get("source")
+            source_kind = source.get("kind") if isinstance(source, dict) else None
+            if strict_managed:
+                if not isinstance(source, dict):
+                    errors.append(f"{label}[{index}] source must be an object")
+                    continue
+                if not isinstance(source_kind, str) or source_kind not in {
+                    "project-os-pack",
+                    "incident-derived",
+                }:
+                    errors.append(f"{label}[{index}] has invalid managed source kind")
+                    continue
+                source_pack = source.get("pack")
+                if not isinstance(source_pack, str) or source_pack not in {
+                    "core",
+                    *PACK_NAMES,
+                    *(f"overlay/{name}" for name in OVERLAY_NAMES),
+                }:
+                    errors.append(f"{label}[{index}] has invalid managed source pack")
+                references = source.get("references")
+                if not isinstance(references, list) or any(
+                    not isinstance(reference, str) or not reference.startswith("https://")
+                    for reference in references
+                ):
+                    errors.append(f"{label}[{index}] has invalid source references")
+                if source_kind == "project-os-pack" and not references:
+                    errors.append(f"{label}[{index}] needs a public source reference")
+            if (
+                not verify_hashes
+                or not isinstance(source_kind, str)
+                or source_kind not in {"project-os-pack", "incident-derived"}
+            ):
+                continue
+            stored_hash = source.get("content_hash")
+            if stored_hash != entry_content_hash(entry):
+                errors.append(f"{label}[{index}] content_hash does not match its content")
+    return identifiers
+
+
+def validate_adoption_records(root: Path, paths: dict[str, Any], errors: list[str]) -> None:
+    for key, maximum in (("context", 150), ("state", 80)):
+        path = safe_relative(root, paths.get(key))
+        if path is not None and path.is_file():
+            lines = len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+            if lines > maximum:
+                errors.append(f"{path.relative_to(root)} has {lines} lines; maximum is {maximum}")
+
+    plans_path = safe_relative(root, paths.get("plans"))
+    if plans_path is not None and plans_path.is_file():
+        try:
+            value = load_json(plans_path)
+        except ProjectOSError as error:
+            errors.append(str(error))
+        else:
+            if not isinstance(value, dict):
+                errors.append("plans index must contain an object")
+            else:
+                validate_registry_schema(value, "plans index", errors)
+                plans = value.get("plans", [])
+                check_unique_ids(plans, "plans", errors, ("id", "status", "path", "outcome"))
+                active_ids: list[str] = []
+                if isinstance(plans, list):
+                    for plan in plans:
+                        if not isinstance(plan, dict):
+                            continue
+                        identifier = plan.get("id")
+                        status = plan.get("status")
+                        if not isinstance(status, str) or status not in PLAN_STATUSES:
+                            errors.append(f"plan {identifier!r} has invalid status {status!r}")
+                        if status == "active" and isinstance(identifier, str):
+                            active_ids.append(identifier)
+                        plan_path = safe_relative(root, plan.get("path"))
+                        if plan_path is None or not plan_path.is_file():
+                            errors.append(f"plan {identifier!r} has an invalid or missing path")
+                        else:
+                            lines = len(
+                                plan_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+                            )
+                            if lines > 200:
+                                errors.append(
+                                    f"plan {identifier!r} has {lines} lines; maximum is 200"
+                                )
+                execution_state = value.get("execution_state")
+                if execution_state == "running" and len(active_ids) != 1:
+                    errors.append("running execution requires exactly one active plan")
+                elif execution_state == "idle" and active_ids:
+                    errors.append("idle execution requires no active plan")
+                elif not isinstance(execution_state, str) or execution_state not in {
+                    "running",
+                    "idle",
+                }:
+                    errors.append("execution_state must be idle or running")
+                if "active_plan" in value:
+                    expected_active = active_ids[0] if len(active_ids) == 1 else None
+                    if value.get("active_plan") != expected_active:
+                        errors.append("active_plan must match the derived active plan when present")
+
+    findings_path = safe_relative(root, paths.get("findings"))
+    if findings_path is not None and findings_path.is_file():
+        try:
+            value = load_json(findings_path)
+        except ProjectOSError as error:
+            errors.append(str(error))
+        else:
+            if not isinstance(value, dict):
+                errors.append("findings registry must contain an object")
+            else:
+                validate_registry_schema(value, "findings registry", errors)
+                findings = value.get("findings", [])
+                check_unique_ids(
+                    findings,
+                    "findings",
+                    errors,
+                    ("id", "status", "impact", "evidence", "required_check"),
+                    FINDING_STATUSES,
+                )
+                if isinstance(findings, list):
+                    for finding in findings:
+                        if not isinstance(finding, dict):
+                            continue
+                        evidence = finding.get("evidence", [])
+                        if not isinstance(evidence, list):
+                            errors.append(
+                                f"finding {finding.get('id')!r} evidence must be an array"
+                            )
+                            continue
+                        for raw_path in evidence:
+                            evidence_path = safe_relative(root, raw_path)
+                            if evidence_path is None or not evidence_path.exists():
+                                errors.append(
+                                    f"finding {finding.get('id')!r} has invalid or missing evidence"
+                                )
+
+
+def validate_knowledge_coverage(
+    root: Path,
+    inventory: Sequence[dict[str, Any]],
+    coverage_path: Path,
+    shared_targets: dict[str, str],
+    errors: list[str],
+) -> None:
+    try:
+        value = load_json(coverage_path)
+    except ProjectOSError as error:
+        errors.append(str(error))
+        return
+    if not isinstance(value, dict):
+        errors.append("knowledge coverage must contain an object")
+        return
+    if value.get("schema_version") != 1:
+        errors.append("knowledge coverage schema_version must be 1")
+    entries = value.get("entries", [])
+    if not isinstance(entries, list):
+        errors.append("knowledge coverage entries must be an array")
+        return
+    expected: dict[str, dict[str, Any]] = {}
+    for record in inventory:
+        fingerprint = record["fingerprint"]
+        if fingerprint in expected:
+            errors.append(f"legacy inventory contains duplicate fingerprint {fingerprint}")
+        expected[fingerprint] = record
+    expected_sources = sorted({record["source"] for record in inventory})
+    sources = value.get("sources", [])
+    if not isinstance(sources, list):
+        errors.append("knowledge coverage sources must be an array")
+        sources = []
+    seen_sources: set[str] = set()
+    for index, source in enumerate(sources):
+        if not isinstance(source, dict):
+            errors.append(f"knowledge coverage source {index} must be an object")
+            continue
+        raw_path = source.get("path")
+        path = safe_relative(root, raw_path)
+        if path is None or not path.is_file():
+            errors.append(f"knowledge coverage source {index} has an invalid path")
+            continue
+        if raw_path in seen_sources:
+            errors.append(f"knowledge coverage duplicates source {raw_path}")
+            continue
+        seen_sources.add(raw_path)
+        expected_hash = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        if source.get("sha256") != expected_hash:
+            errors.append(f"knowledge coverage source hash drifted: {raw_path}")
+    if sorted(seen_sources) != expected_sources:
+        missing_sources = sorted(set(expected_sources).difference(seen_sources))
+        extra_sources = sorted(seen_sources.difference(expected_sources))
+        if missing_sources:
+            errors.append(
+                "knowledge coverage is missing source hashes: " + ", ".join(missing_sources)
+            )
+        if extra_sources:
+            errors.append(
+                "knowledge coverage has unrelated source hashes: " + ", ".join(extra_sources)
+            )
+
+    seen: set[str] = set()
+    canonical_seen: set[str] = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(f"knowledge coverage entry {index} must be an object")
+            continue
+        fingerprint = entry.get("fingerprint")
+        if not isinstance(fingerprint, str) or fingerprint not in expected:
+            errors.append(f"knowledge coverage entry {index} has an unknown fingerprint")
+            continue
+        if fingerprint in seen:
+            errors.append(f"knowledge coverage duplicates fingerprint {fingerprint}")
+            continue
+        seen.add(fingerprint)
+        record = expected[fingerprint]
+        for key in ("source", "legacy_id", "title", "occurrence"):
+            if entry.get(key) != record[key]:
+                errors.append(f"knowledge coverage {fingerprint} does not match source {key}")
+        disposition = entry.get("disposition")
+        if not isinstance(disposition, str) or disposition not in COVERAGE_DISPOSITIONS:
+            errors.append(
+                f"knowledge coverage {fingerprint} has invalid disposition {disposition!r}"
+            )
+        canonical_id = entry.get("canonical_id")
+        if isinstance(disposition, str) and disposition in {"promoted", "merged"}:
+            if not isinstance(canonical_id, str) or canonical_id not in shared_targets:
+                errors.append(
+                    f"knowledge coverage {fingerprint} references missing shared id {canonical_id!r}"
+                )
+            else:
+                expected_target = shared_targets[canonical_id]
+                if entry.get("target") != expected_target:
+                    errors.append(
+                        f"knowledge coverage {fingerprint} target must be {expected_target}"
+                    )
+            if isinstance(canonical_id, str) and canonical_id in shared_targets and disposition == "promoted":
+                if canonical_id in canonical_seen:
+                    errors.append(f"knowledge coverage duplicates canonical id {canonical_id}")
+                canonical_seen.add(canonical_id)
+        if disposition == "retained_private" and entry.get("target") != "project":
+            errors.append(
+                f"knowledge coverage {fingerprint} retained_private target must be project"
+            )
+        if disposition == "retired" and not entry.get("reason"):
+            errors.append(f"knowledge coverage {fingerprint} retired entry needs a reason")
+    missing = sorted(set(expected).difference(seen))
+    extra = sorted(seen.difference(expected))
+    if missing:
+        errors.append(f"knowledge coverage is missing {len(missing)} source lessons")
+    if extra:
+        errors.append(f"knowledge coverage has {len(extra)} unknown source lessons")
+    if value.get("source_count") != len(inventory):
+        errors.append("knowledge coverage source_count does not match legacy inventory")
+    if value.get("mapped_source_count") != len(seen):
+        errors.append("knowledge coverage mapped_source_count does not match entries")
+
+
+def check_project(root: Path, config: Path | None = None) -> int:
+    root = root.resolve()
+    errors: list[str] = []
+    warnings: list[str] = []
+    config_path = config.resolve() if config else root / ".agents" / "SYSTEM.json"
+    if config is None:
+        check_no_symlink_path(root, config_path, "SYSTEM manifest", errors)
+    try:
+        loaded_system = load_json(config_path)
+    except ProjectOSError as error:
+        print("Project OS check: FAIL")
+        print(f"error: {error}")
+        return 1
+    if not isinstance(loaded_system, dict):
+        print("Project OS check: FAIL")
+        print("error: SYSTEM configuration must contain an object")
+        return 1
+    system = loaded_system
+
+    if system.get("schema_version") != SCHEMA_VERSION:
+        errors.append(
+            f"SYSTEM schema_version must be {SCHEMA_VERSION}, got {system.get('schema_version')!r}"
+        )
+    mode = system.get("mode")
+    if not isinstance(mode, str) or mode not in {"lite", "full"}:
+        errors.append(f"SYSTEM mode must be lite or full, got {mode!r}")
+    installation = system.get("installation")
+    if not isinstance(installation, str) or installation not in {"initialized", "adopted"}:
+        errors.append(f"SYSTEM installation must be initialized or adopted, got {installation!r}")
+
+    packs = system.get("packs", [])
+    overlays = system.get("overlays", [])
+    if not isinstance(packs, list) or any(pack not in PACK_NAMES for pack in packs):
+        errors.append("SYSTEM packs must be an array of known capability packs")
+        packs = []
+    elif packs != [name for name in PACK_NAMES if name in set(packs)]:
+        errors.append("SYSTEM packs must be unique and in canonical order")
+    if not isinstance(overlays, list) or any(overlay not in OVERLAY_NAMES for overlay in overlays):
+        errors.append("SYSTEM overlays must be an array of known ecosystem overlays")
+        overlays = []
+    elif overlays != [name for name in OVERLAY_NAMES if name in set(overlays)]:
+        errors.append("SYSTEM overlays must be unique and in canonical order")
+    try:
+        validate_overlay_dependencies(packs, overlays)
+    except ProjectOSError as error:
+        errors.append(str(error))
+
+    expected_pack_paths = [f".agents/packs/{name}.md" for name in packs]
+    expected_overlay_paths = [f".agents/packs/overlays/{name}.md" for name in overlays]
+    if system.get("pack_paths", []) != expected_pack_paths:
+        errors.append("SYSTEM pack_paths must match packs in canonical order")
+    if system.get("overlay_paths", []) != expected_overlay_paths:
+        errors.append("SYSTEM overlay_paths must match overlays in canonical order")
+    for raw_path in [*expected_pack_paths, *expected_overlay_paths]:
+        path = safe_relative(root, raw_path)
+        if path is not None:
+            check_no_symlink_path(root, path, f"managed guidance {raw_path}", errors)
+        if path is None or not path.is_file():
+            errors.append(f"missing selected guidance file: {raw_path}")
+
+    managed_guidance = system.get("managed_guidance")
+    expected_managed_paths = [
+        ".agents/packs/README.md",
+        *expected_pack_paths,
+        *expected_overlay_paths,
+    ]
+    if not isinstance(managed_guidance, dict) or list(managed_guidance) != expected_managed_paths:
+        errors.append("SYSTEM managed_guidance must match selected guidance in canonical order")
+        managed_guidance = {}
+    for raw_path, expected_hash in managed_guidance.items():
+        path = safe_relative(root, raw_path)
+        if path is not None:
+            check_no_symlink_path(root, path, f"managed guidance {raw_path}", errors)
+        if path is None or not path.is_file():
+            continue
+        actual_hash = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        if expected_hash != actual_hash:
+            errors.append(f"managed guidance differs from its recorded baseline: {raw_path}")
+
+    managed_knowledge = system.get("managed_knowledge")
+    if not isinstance(managed_knowledge, dict) or any(
+        not isinstance(entry_id, str)
+        or not isinstance(entry_hash, str)
+        or not entry_hash.startswith("sha256:")
+        for entry_id, entry_hash in (
+            managed_knowledge.items() if isinstance(managed_knowledge, dict) else ()
+        )
+    ):
+        errors.append("SYSTEM managed_knowledge must map ids to sha256 baselines")
+        managed_knowledge = {}
+
+    paths = system.get("paths")
+    if not isinstance(paths, dict):
+        errors.append("SYSTEM paths must contain an object")
+        paths = {}
+
+    if not (root / "AGENTS.md").is_file():
+        errors.append("missing required file: AGENTS.md")
+    if installation == "initialized":
+        for relative in (
+            ".agents/README.md",
+            ".agents/plans/README.md",
+            ".agents/findings/README.md",
+            ".agents/evidence/README.md",
+            ".agents/knowledge/README.md",
+            ".agents/packs/README.md",
+        ):
+            if not (root / relative).is_file():
+                errors.append(f"missing required file: {relative}")
+
+    context_path = system_path_value(root, paths, "context", errors, required=True)
+    state_path = system_path_value(root, paths, "state", errors, required=True)
+    plans_path = system_path_value(root, paths, "plans", errors, required=True)
+    findings_path = system_path_value(root, paths, "findings", errors, required=True)
+    evidence_path = system_path_value(root, paths, "evidence", errors)
+    program_path = system_path_value(root, paths, "program", errors, required=mode == "full")
+    history_path = system_path_value(root, paths, "history", errors, required=mode == "full")
+    shared_path = system_path_value(root, paths, "shared_knowledge", errors, required=True)
+
+    for label, path in (
+        ("context", context_path),
+        ("state", state_path),
+        ("plans", plans_path),
+        ("findings", findings_path),
+        ("evidence", evidence_path),
+        ("program", program_path),
+        ("history", history_path),
+        ("shared knowledge", shared_path),
+    ):
+        if path is not None:
+            check_no_symlink_path(root, path, f"SYSTEM path {label}", errors)
+
+    for label, path in (
+        ("context", context_path),
+        ("state", state_path),
+        ("plans", plans_path),
+        ("findings", findings_path),
+        ("shared knowledge", shared_path),
+    ):
+        if path is not None and not path.is_file():
+            errors.append(f"missing {label} file: {path.relative_to(root)}")
+    if evidence_path is not None and not evidence_path.is_dir():
+        errors.append(f"missing evidence directory: {evidence_path.relative_to(root)}")
+    if program_path is not None and not program_path.is_file():
+        errors.append(f"missing program file: {program_path.relative_to(root)}")
+    if history_path is not None and not history_path.is_dir():
+        errors.append(f"missing history directory: {history_path.relative_to(root)}")
+
+    agents_path = root / "AGENTS.md"
+    check_no_symlink_path(root, agents_path, "AGENTS.md", errors)
+    if agents_path.is_file():
+        agents_text = agents_path.read_text(encoding="utf-8", errors="ignore")
+        for routed_path in (context_path, state_path):
+            if routed_path is None:
+                continue
+            relative = routed_path.relative_to(root).as_posix()
+            if relative not in agents_text:
+                errors.append(f"AGENTS.md does not route to {relative}")
+
+    for path, maximum in ((context_path, 150), (state_path, 80)):
+        if path is not None and path.is_file():
+            lines = len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+            if lines > maximum:
+                errors.append(f"{path.relative_to(root)} has {lines} lines; maximum is {maximum}")
+
+    if plans_path is not None and plans_path.is_file():
+        try:
+            plans_value = load_json(plans_path)
+        except ProjectOSError as error:
+            errors.append(str(error))
+        else:
+            if not isinstance(plans_value, dict):
+                errors.append("plans index must contain an object")
+            else:
+                validate_registry_schema(plans_value, "plans index", errors)
+                plans = plans_value.get("plans", [])
+                check_unique_ids(plans, "plans", errors, ("id", "status", "path", "outcome"))
+                active_ids: list[str] = []
+                if isinstance(plans, list):
+                    for plan in plans:
+                        if not isinstance(plan, dict):
+                            continue
+                        if plan.get("status") == "active" and isinstance(plan.get("id"), str):
+                            active_ids.append(plan["id"])
+                        plan_status = plan.get("status")
+                        if not isinstance(plan_status, str) or plan_status not in PLAN_STATUSES:
+                            errors.append(
+                                f"plan {plan.get('id')!r} has invalid status {plan.get('status')!r}"
+                            )
+                        path = safe_relative(root, plan.get("path"))
+                        if path is None:
+                            errors.append(f"plan {plan.get('id')!r} has invalid path")
+                        elif not path.is_file():
+                            errors.append(
+                                f"plan {plan.get('id')!r} path does not exist: {plan.get('path')}"
+                            )
+                        else:
+                            lines = len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+                            if lines > 200:
+                                errors.append(
+                                    f"plan {plan.get('id')!r} has {lines} lines; maximum is 200"
+                                )
+                execution_state = plans_value.get("execution_state")
+                explicit_active = plans_value.get("active_plan")
+                if execution_state == "running":
+                    if len(active_ids) != 1:
+                        errors.append("running execution requires exactly one active plan")
+                    if "active_plan" in plans_value and explicit_active != (
+                        active_ids[0] if len(active_ids) == 1 else None
+                    ):
+                        errors.append("active_plan must match the single active plan when present")
+                elif execution_state == "idle":
+                    if active_ids:
+                        errors.append("idle execution requires no active plan")
+                    if "active_plan" in plans_value and explicit_active is not None:
+                        errors.append("idle execution requires active_plan null when present")
+                else:
+                    errors.append("execution_state must be idle or running")
+
+    if findings_path is not None and findings_path.is_file():
+        try:
+            findings_value = load_json(findings_path)
+        except ProjectOSError as error:
+            errors.append(str(error))
+        else:
+            if isinstance(findings_value, dict):
+                validate_registry_schema(findings_value, "findings registry", errors)
+            findings = findings_value.get("findings", []) if isinstance(findings_value, dict) else None
+            check_unique_ids(
+                findings,
+                "findings",
+                errors,
+                ("id", "status", "impact", "evidence", "required_check"),
+                FINDING_STATUSES,
+            )
+            if isinstance(findings, list):
+                for finding in findings:
+                    if not isinstance(finding, dict):
+                        continue
+                    evidence = finding.get("evidence", [])
+                    if not isinstance(evidence, list):
+                        errors.append(f"finding {finding.get('id')!r} evidence must be an array")
+                        continue
+                    for raw_path in evidence:
+                        path = safe_relative(root, raw_path)
+                        if path is None:
+                            errors.append(f"finding {finding.get('id')!r} has invalid evidence path")
+                        elif not path.exists():
+                            errors.append(
+                                f"finding {finding.get('id')!r} evidence does not exist: {raw_path}"
+                            )
+
+    shared_targets: dict[str, str] = {}
+    if shared_path is not None and shared_path.is_file():
+        valid_shared_ids = validate_failure_registry(
+            shared_path, "shared knowledge", errors, strict_managed=True
+        )
+        try:
+            shared_value = load_json(shared_path)
+        except ProjectOSError:
+            shared_value = None
+        if isinstance(shared_value, dict):
+            if shared_value.get("packs") != ["core", *packs]:
+                errors.append("shared knowledge packs must match SYSTEM packs")
+            if shared_value.get("overlays") != overlays:
+                errors.append("shared knowledge overlays must match SYSTEM overlays")
+            entries = shared_value.get("entries", [])
+            if isinstance(entries, list):
+                entries_by_id = {
+                    entry.get("id"): entry
+                    for entry in entries
+                    if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+                }
+                for entry_id, recorded_hash in managed_knowledge.items():
+                    entry = entries_by_id.get(entry_id)
+                    if entry is None:
+                        errors.append(f"managed knowledge baseline references missing id {entry_id}")
+                    elif entry_content_hash(entry) != recorded_hash:
+                        errors.append(f"managed knowledge differs from its recorded baseline: {entry_id}")
+                for entry in entries:
+                    if not isinstance(entry, dict) or entry.get("id") not in valid_shared_ids:
+                        continue
+                    source = entry.get("source")
+                    source_kind = source.get("kind") if isinstance(source, dict) else None
+                    if (
+                        isinstance(source_kind, str)
+                        and source_kind in {"project-os-pack", "incident-derived"}
+                        and entry["id"] not in managed_knowledge
+                    ):
+                        errors.append(f"managed knowledge baseline is missing id {entry['id']}")
+                    source_pack = source.get("pack") if isinstance(source, dict) else None
+                    if isinstance(source_pack, str):
+                        shared_targets[entry["id"]] = source_pack
+        for label in private_material_labels(shared_value):
+            errors.append(f"shared knowledge contains a {label}")
+
+    project_paths = paths.get("project_knowledge", [])
+    if not isinstance(project_paths, list):
+        errors.append("SYSTEM paths.project_knowledge must be an array")
+        project_paths = []
+    for raw_path in project_paths:
+        path = safe_relative(root, raw_path)
+        if path is None:
+            errors.append(f"invalid project knowledge path: {raw_path!r}")
+        else:
+            check_no_symlink_path(root, path, f"SYSTEM project knowledge {raw_path}", errors)
+            if not path.is_file():
+                errors.append(f"missing project knowledge file: {raw_path}")
+            elif path.suffix == ".json":
+                validate_failure_registry(path, f"project knowledge {raw_path}", errors)
+
+    legacy_roots = paths.get("legacy_knowledge", [])
+    if not isinstance(legacy_roots, list):
+        errors.append("SYSTEM paths.legacy_knowledge must be an array")
+        legacy_roots = []
+    for raw_path in legacy_roots:
+        path = safe_relative(root, raw_path)
+        if path is None:
+            errors.append(f"invalid legacy knowledge path: {raw_path!r}")
+        else:
+            check_no_symlink_path(root, path, f"SYSTEM legacy knowledge {raw_path}", errors)
+            if not path.exists():
+                errors.append(f"missing legacy knowledge path: {raw_path}")
+    inventory = scan_markdown_lessons(root, legacy_roots)
+    counts: dict[str, int] = {}
+    for record in inventory:
+        counts[record["legacy_id"]] = counts.get(record["legacy_id"], 0) + 1
+    duplicate_legacy_ids = sorted(identifier for identifier, count in counts.items() if count > 1)
+    coverage_path = system_path_value(root, paths, "knowledge_coverage", errors)
+    if coverage_path is not None:
+        check_no_symlink_path(root, coverage_path, "SYSTEM knowledge coverage", errors)
+        if not coverage_path.is_file():
+            errors.append(f"missing knowledge coverage file: {coverage_path.relative_to(root)}")
+        else:
+            validate_knowledge_coverage(root, inventory, coverage_path, shared_targets, errors)
+    elif inventory:
+        errors.append(
+            "legacy knowledge requires paths.knowledge_coverage"
+            + (
+                "; duplicate ids: " + ", ".join(duplicate_legacy_ids)
+                if duplicate_legacy_ids
+                else ""
+            )
+        )
+
+    scan_paths: list[Path] = [config_path]
+    scan_paths.extend(
+        path for path in (shared_path, *[safe_relative(root, value) for value in expected_pack_paths])
+        if path is not None
+    )
+    scan_paths.extend(
+        path for path in (safe_relative(root, value) for value in expected_overlay_paths)
+        if path is not None
+    )
+    if installation == "initialized":
+        scan_paths.extend(path for path in (agents_path, context_path, state_path, program_path) if path)
+        scan_paths.extend(
+            root / relative
+            for relative in (
+                ".agents/README.md",
+                ".agents/plans/README.md",
+                ".agents/findings/README.md",
+                ".agents/evidence/README.md",
+                ".agents/knowledge/README.md",
+                ".agents/packs/README.md",
+            )
+        )
+    for path in scan_paths:
+        if path.suffix not in {".md", ".json"} or not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        tokens = sorted(token for token in RESERVED_TEMPLATE_TOKENS if token in text)
+        if tokens:
+            try:
+                label = path.relative_to(root).as_posix()
+            except ValueError:
+                label = str(path)
+            errors.append(
+                f"unresolved template tokens in {label}: {', '.join(tokens)}"
+            )
+
+    if system.get("project_os_version") != VERSION:
+        warnings.append(
+            f"project version is {system.get('project_os_version')!r}; checker version is {VERSION!r}"
+        )
+
+    if errors:
+        print("Project OS check: FAIL")
+        for error in errors:
+            print(f"error: {error}")
+    else:
+        print("Project OS check: PASS")
+    for warning in warnings:
+        print(f"warning: {warning}")
+    return 1 if errors else 0
+
+
+def read_selected_system(root: Path) -> tuple[list[str], list[str], dict[str, Any]]:
+    system_path = root / ".agents" / "SYSTEM.json"
+    reject_symlink_path(root, system_path)
+    system = load_json(system_path)
+    if not isinstance(system, dict):
+        raise ProjectOSError("SYSTEM configuration must contain an object")
+    if system.get("schema_version") != SCHEMA_VERSION:
+        raise ProjectOSError(
+            f"sync requires SYSTEM schema_version {SCHEMA_VERSION}; migrate older state explicitly"
+        )
+    if not isinstance(system.get("mode"), str) or system.get("mode") not in {"lite", "full"}:
+        raise ProjectOSError("SYSTEM mode must be lite or full")
+    if not isinstance(system.get("installation"), str) or system.get("installation") not in {
+        "initialized",
+        "adopted",
+    }:
+        raise ProjectOSError("SYSTEM installation must be initialized or adopted")
+    packs = system.get("packs", [])
+    overlays = system.get("overlays", [])
+    if not isinstance(packs, list) or not isinstance(overlays, list):
+        raise ProjectOSError("SYSTEM packs and overlays must be arrays")
+    if any(not isinstance(name, str) or name not in PACK_NAMES for name in packs):
+        raise ProjectOSError("SYSTEM packs contain an unknown value")
+    if any(not isinstance(name, str) or name not in OVERLAY_NAMES for name in overlays):
+        raise ProjectOSError("SYSTEM overlays contain an unknown value")
+    if packs != [name for name in PACK_NAMES if name in set(packs)]:
+        raise ProjectOSError("SYSTEM packs must be known, unique, and in canonical order")
+    if overlays != [name for name in OVERLAY_NAMES if name in set(overlays)]:
+        raise ProjectOSError("SYSTEM overlays must be known, unique, and in canonical order")
+    validate_overlay_dependencies(packs, overlays)
+    if system.get("pack_paths") != [f".agents/packs/{name}.md" for name in packs]:
+        raise ProjectOSError("SYSTEM pack_paths do not match selected packs")
+    if system.get("overlay_paths") != [
+        f".agents/packs/overlays/{name}.md" for name in overlays
+    ]:
+        raise ProjectOSError("SYSTEM overlay_paths do not match selected overlays")
+    if not isinstance(system.get("paths"), dict):
+        raise ProjectOSError("SYSTEM paths must contain an object")
+    shared_path = safe_relative(root, system["paths"].get("shared_knowledge"))
+    if shared_path is None:
+        raise ProjectOSError("SYSTEM shared knowledge path is unsafe or missing")
+    reject_symlink_path(root, shared_path)
+    return packs, overlays, system
+
+
+def sync_knowledge(
+    root: Path,
+    packs_value: str,
+    overlays_value: str,
+    dry_run: bool,
+) -> int:
+    root = root.resolve()
+    selected_packs, selected_overlays, system = read_selected_system(root)
+    packs = (
+        selected_packs
+        if packs_value.strip().lower() == "selected"
+        else parse_selection(packs_value, selected_packs, PACK_NAMES, "packs")
+    )
+    overlays = (
+        selected_overlays
+        if overlays_value.strip().lower() == "selected"
+        else parse_selection(overlays_value, selected_overlays, OVERLAY_NAMES, "overlays")
+    )
+    validate_overlay_dependencies(packs, overlays)
+    if list(packs) != list(selected_packs):
+        raise ProjectOSError("sync packs must exactly match SYSTEM packs")
+    if list(overlays) != list(selected_overlays):
+        raise ProjectOSError("sync overlays must exactly match SYSTEM overlays")
+    expected_system = default_system(
+        root,
+        str(system.get("mode", "lite")),
+        str(system.get("installation", "initialized")),
+        packs,
+        overlays,
+        system.get("paths", {}),
+    )
+    recorded_guidance = system.get("managed_guidance")
+    expected_guidance = expected_system["managed_guidance"]
+    if not isinstance(recorded_guidance, dict) or list(recorded_guidance) != list(expected_guidance):
+        raise ProjectOSError("SYSTEM managed_guidance is missing or inconsistent")
+    if any(not isinstance(value, str) for value in recorded_guidance.values()):
+        raise ProjectOSError("SYSTEM managed_guidance contains an invalid baseline")
+    recorded_knowledge = system.get("managed_knowledge")
+    if not isinstance(recorded_knowledge, dict) or any(
+        not isinstance(entry_id, str) or not isinstance(entry_hash, str)
+        for entry_id, entry_hash in (
+            recorded_knowledge.items() if isinstance(recorded_knowledge, dict) else ()
+        )
+    ):
+        raise ProjectOSError("SYSTEM managed_knowledge is missing or invalid")
+
+    guidance_contents = guidance_content_map(packs, overlays)
+    guidance_conflicts: list[str] = []
+    guidance_creates: list[tuple[Path, str]] = []
+    guidance_replacements: list[tuple[Path, str, str]] = []
+    for raw_path, recorded_hash in recorded_guidance.items():
+        path = safe_relative(root, raw_path)
+        if path is None:
+            raise ProjectOSError(f"Managed guidance path is unsafe: {raw_path}")
+        reject_symlink_path(root, path)
+        desired_hash = expected_guidance[raw_path]
+        desired_content = guidance_contents[raw_path]
+        if not path.exists():
+            guidance_creates.append((path, desired_content))
+            continue
+        if not path.is_file():
+            raise ProjectOSError(f"Managed guidance is not a regular file: {raw_path}")
+        actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        actual_hash = "sha256:" + actual_digest
+        if actual_hash == desired_hash:
+            continue
+        if actual_hash == recorded_hash:
+            guidance_replacements.append((path, desired_content, actual_digest))
+        else:
+            guidance_conflicts.append(f"{raw_path} differs locally")
+    if guidance_conflicts:
+        for conflict in guidance_conflicts:
+            print(f"guidance conflict: {conflict}")
+        return 1
+    paths = system.get("paths", {})
+    raw_destination = paths.get("shared_knowledge", DEFAULT_PATHS["shared_knowledge"])
+    destination = safe_relative(root, raw_destination)
+    if destination is None:
+        raise ProjectOSError(f"Invalid shared knowledge destination: {raw_destination!r}")
+    require_destination_within_root(root, destination)
+    reject_symlink_path(root, destination)
+    system_path = root / ".agents" / "SYSTEM.json"
+    reject_symlink_path(root, system_path)
+    if destination == system_path or destination in {
+        path for path, _ in guidance_creates
+    } | {path for path, _, _ in guidance_replacements}:
+        raise ProjectOSError("SYSTEM paths collide with Project OS-managed files")
+
+    desired = composed_knowledge(packs, overlays)
+    validate_composed_knowledge(desired, packs, overlays)
+    pre_read_sha256: str | None = None
+    if destination.exists():
+        if not destination.is_file():
+            raise ProjectOSError(f"Shared knowledge destination is not a file: {destination}")
+        pre_read_sha256 = hashlib.sha256(destination.read_bytes()).hexdigest()
+        current = load_json(destination)
+    else:
+        current = {
+            "schema_version": 1,
+            "knowledge_version": "0.0.0",
+            "packs": [],
+            "overlays": [],
+            "entries": [],
+        }
+    if not isinstance(current, dict) or not isinstance(current.get("entries"), list):
+        raise ProjectOSError(f"Invalid shared knowledge structure: {destination}")
+    validation_errors: list[str] = []
+    if destination.exists():
+        validate_failure_registry(
+            destination,
+            "shared knowledge",
+            validation_errors,
+            verify_hashes=True,
+            strict_managed=True,
+        )
+    if destination.exists():
+        if current.get("packs") != ["core", *selected_packs]:
+            validation_errors.append("shared knowledge packs do not match SYSTEM packs")
+        if current.get("overlays") != selected_overlays:
+            validation_errors.append("shared knowledge overlays do not match SYSTEM overlays")
+    for label in private_material_labels(current):
+        validation_errors.append(f"shared knowledge contains a {label}")
+    if validation_errors:
+        for error in validation_errors:
+            print(f"knowledge conflict: {error}")
+        print("knowledge sync aborted: invalid or locally changed knowledge")
+        return 1
+
+    current_by_id: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(current["entries"]):
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            raise ProjectOSError(f"Invalid shared knowledge entry at index {index}")
+        if entry["id"] in current_by_id:
+            raise ProjectOSError(f"Duplicate shared knowledge id: {entry['id']}")
+        current_by_id[entry["id"]] = entry
+
+    desired_by_id = {entry["id"]: entry for entry in desired["entries"]}
+    additions: list[dict[str, Any]] = []
+    updates: list[dict[str, Any]] = []
+    conflicts: list[str] = []
+    for entry in desired["entries"]:
+        existing = current_by_id.get(entry["id"])
+        if existing is None:
+            additions.append(entry)
+        elif existing == entry:
+            continue
+        else:
+            recorded_hash = recorded_knowledge.get(entry["id"])
+            if isinstance(recorded_hash, str) and entry_content_hash(existing) == recorded_hash:
+                updates.append(entry)
+            else:
+                conflicts.append(entry["id"])
+
+    retained = sorted(set(current_by_id).difference(desired_by_id))
+
+    print(f"knowledge additions: {len(additions)}")
+    for entry in additions:
+        print(f"add: {entry['id']} {entry['title']}")
+    print(f"knowledge updates: {len(updates)}")
+    for entry in updates:
+        print(f"update: {entry['id']} {entry['title']}")
+    for entry_id in conflicts:
+        print(f"conflict: {entry_id} differs locally and was not overwritten")
+    for entry_id in retained:
+        print(f"retain: {entry_id} is not in the selected upstream set")
+
+    if conflicts:
+        print("knowledge sync aborted: resolve conflicts before applying any changes")
+        return 1
+
+    next_managed_knowledge = {
+        entry_id: entry_hash
+        for entry_id, entry_hash in recorded_knowledge.items()
+        if entry_id in retained
+    }
+    next_managed_knowledge.update(expected_system["managed_knowledge"])
+    next_system = copy.deepcopy(system)
+    next_system["project_os_version"] = VERSION
+    next_system["generated_on"] = date.today().isoformat()
+    next_system["managed_guidance"] = expected_guidance
+    next_system["managed_knowledge"] = dict(sorted(next_managed_knowledge.items()))
+
+    next_by_id = dict(current_by_id)
+    for entry in additions:
+        next_by_id[entry["id"]] = entry
+    for entry in updates:
+        next_by_id[entry["id"]] = entry
+    current["entries"] = sorted(next_by_id.values(), key=lambda entry: str(entry.get("id", "")))
+    current["knowledge_version"] = VERSION
+    current["packs"] = ["core", *packs]
+    current["overlays"] = list(overlays)
+    serialized = json.dumps(current, indent=2, ensure_ascii=False) + "\n"
+    serialized_system = json.dumps(next_system, indent=2, ensure_ascii=False) + "\n"
+
+    destination_changed = (
+        pre_read_sha256 is None
+        or hashlib.sha256(serialized.encode("utf-8")).hexdigest() != pre_read_sha256
+    )
+    system_pre_read = hashlib.sha256(system_path.read_bytes()).hexdigest()
+    system_changed = hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != system_pre_read
+
+    for path, _ in guidance_creates:
+        print(f"guidance create: {path.relative_to(root)}")
+    for path, _, _ in guidance_replacements:
+        print(f"guidance update: {path.relative_to(root)}")
+    if dry_run:
+        print("dry-run: no files written")
+        return 0
+
+    creates = list(guidance_creates)
+    replacements = list(guidance_replacements)
+    if destination_changed:
+        if pre_read_sha256 is None:
+            creates.append((destination, serialized))
+        else:
+            replacements.append((destination, serialized, pre_read_sha256))
+    if system_changed:
+        replacements.append((system_path, serialized_system, system_pre_read))
+    execute_sync_transaction(root, creates, replacements)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    detect_parser = subparsers.add_parser("detect", help="Inspect toolchain and capability signals")
+    detect_parser.add_argument("--target", required=True, type=Path)
+
+    init_parser = subparsers.add_parser("init", help="Create a new Project OS control plane")
+    init_parser.add_argument("--target", required=True, type=Path)
+    init_parser.add_argument("--mode", choices=("lite", "full"), default="lite")
+    init_parser.add_argument(
+        "--packs", default="auto", help="auto, none, or comma-separated capability packs"
+    )
+    init_parser.add_argument(
+        "--overlays", default="auto", help="auto, none, or comma-separated ecosystem overlays"
+    )
+    init_parser.add_argument("--dry-run", action="store_true")
+    init_parser.add_argument(
+        "--allow-existing-agents",
+        action="store_true",
+        help="preserve an existing AGENTS.md that already routes to CONTEXT.md and STATE.md",
+    )
+
+    adopt_parser = subparsers.add_parser(
+        "adopt", help="Discover and safely attach to an existing Project OS-like layout"
+    )
+    adopt_parser.add_argument("--target", required=True, type=Path)
+    adopt_parser.add_argument("--dry-run", action="store_true")
+    adopt_parser.add_argument(
+        "--inventory", action="store_true", help="include legacy Markdown lesson inventory"
+    )
+
+    check_parser = subparsers.add_parser("check", help="Validate Project OS state and invariants")
+    check_parser.add_argument("--target", required=True, type=Path)
+    check_parser.add_argument("--config", type=Path, help="validate against a proposed SYSTEM manifest")
+
+    sync_parser = subparsers.add_parser(
+        "sync-knowledge", help="Add selected guidance and lessons without overwriting conflicts"
+    )
+    sync_parser.add_argument("--target", required=True, type=Path)
+    sync_parser.add_argument("--packs", default="selected")
+    sync_parser.add_argument("--overlays", default="selected")
+    sync_parser.add_argument("--dry-run", action="store_true")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        if args.command == "detect":
+            print(json.dumps(detect_repository(args.target), indent=2, ensure_ascii=False))
+            return 0
+        if args.command == "init":
+            return init_project(
+                args.target,
+                args.mode,
+                args.packs,
+                args.overlays,
+                args.dry_run,
+                args.allow_existing_agents,
+            )
+        if args.command == "adopt":
+            return adopt_project(args.target, args.dry_run, args.inventory)
+        if args.command == "check":
+            return check_project(args.target, args.config)
+        if args.command == "sync-knowledge":
+            return sync_knowledge(args.target, args.packs, args.overlays, args.dry_run)
+    except ProjectOSError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    parser.error(f"Unsupported command: {args.command}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

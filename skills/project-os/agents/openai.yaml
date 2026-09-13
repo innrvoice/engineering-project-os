@@ -1,0 +1,6 @@
+interface:
+  display_name: "Project OS"
+  short_description: "Bootstrap and maintain repository work state"
+  default_prompt: "Use $project-os to bootstrap a safe project operating system in this repository."
+policy:
+  allow_implicit_invocation: false

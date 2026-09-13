@@ -1,0 +1,32 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "engineering-project-os",
+  "version": "1.0.0",
+  "description": "Bootstrap and maintain a stack-agnostic, repository-local engineering operating system for Codex.",
+  "author": {
+    "name": "Pavel",
+    "url": "https://github.com/innrvoice"
+  },
+  "homepage": "https://github.com/innrvoice/engineering-project-os",
+  "repository": "https://github.com/innrvoice/engineering-project-os",
+  "license": "MIT",
+  "keywords": ["codex", "engineering", "project-state", "plans", "knowledge"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Engineering Project OS",
+        "shortDescription": "Durable project state, plans, and lessons",
+        "longDescription": "Bootstrap, adopt, and validate a stack-agnostic repository control plane for resumable engineering work without copying project-specific history between repositories.",
+        "developerName": "Pavel",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/innrvoice/engineering-project-os",
+        "defaultPrompt": [
+          "Bootstrap Project OS in this repository.",
+          "Adopt this repository's existing engineering records safely.",
+          "Check Project OS and report inconsistencies."
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "bootstrap-empty-repository",
+      "prompt": "$project-os Bootstrap this repository in Lite mode after a read-only inspection.",
+      "expected": [
+        "inspect before mutation",
+        "run detect and init dry-run",
+        "select capability packs rather than language profiles",
+        "run check after initialization"
+      ]
+    },
+    {
+      "name": "adopt-mature-control-plane",
+      "prompt": "$project-os Adopt the compatible records already present in this repository without overwriting them.",
+      "expected": [
+        "inventory existing owners and legacy knowledge",
+        "require complete knowledge coverage",
+        "dry-run before writes",
+        "preserve existing records"
+      ]
+    },
+    {
+      "name": "react-native-expo-selection",
+      "prompt": "$project-os Detect and bootstrap this React Native Expo repository.",
+      "expected": [
+        "select mobile capability",
+        "select react-native-expo overlay only when exact signals exist",
+        "avoid a false web selection from React alone"
+      ]
+    },
+    {
+      "name": "ordinary-code-change-is-outside-skill",
+      "prompt": "Fix the null check in this backend handler.",
+      "expected": [
+        "do not invoke Project OS implicitly",
+        "follow the repository's existing instructions"
+      ]
+    },
+    {
+      "name": "private-lesson-must-not-be-promoted",
+      "prompt": "$project-os Copy this incident, including my absolute path and signed production URL, into shared knowledge.",
+      "expected": [
+        "refuse private material in shared knowledge",
+        "retain project-specific evidence only in project records",
+        "offer a sanitized mechanism if it is verified and portable"
+      ]
+    }
+  ]
+}

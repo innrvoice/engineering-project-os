@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "execution_state": "running",
+  "plans": [
+    {
+      "id": "001",
+      "status": "active",
+      "path": ".agents/plans/001-active.md",
+      "outcome": "Prove safe adoption without rewriting existing records."
+    }
+  ]
+}

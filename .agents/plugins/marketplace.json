@@ -1,0 +1,21 @@
+{
+  "name": "engineering-project-os",
+  "interface": {
+    "displayName": "Engineering Project OS"
+  },
+  "plugins": [
+    {
+      "name": "engineering-project-os",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/innrvoice/engineering-project-os.git",
+        "ref": "v1.0.0"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

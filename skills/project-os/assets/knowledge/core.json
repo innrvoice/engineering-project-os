@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "CORE-ASYNC-001",
+      "title": "Completion belongs to the initiating scope",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "an operation can outlive its effect, route, account, draft or request selection.",
+      "mechanism": "a late response updates the new scope, navigates after leaving a screen, or recreates state that a reset already removed.",
+      "prevention": "identify the owner before starting work and verify it before publishing a result. Use supported cancellation where available; cancellation of UI interest does not undo remote work. Reuse an existing identity/generation mechanism instead of adding a new global coordinator. A shared confirmation sheet may outlive its requesting screen. Recheck the owner on confirmation, then between dependent commands. A profile-update helper that captures the current actor cannot validate a response that originated under an earlier actor; the initiating operation must do so. A failed submission may restore its old form only while it still owns that form. Track accepted edits, including deliberate clearing and a changed reply/selection; checking only for empty text can overwrite a newer user choice. An asynchronous preflight such as query cancellation can yield before the command starts. Recheck its captured entity and account afterward; mutation callbacks may otherwise read replacement props. Keep shared canonical cache reconciliation independent of the initiating view's continued presence. A retained screen can lose focus without unmounting. Use the framework's focus lifecycle when completion would navigate; distinguish a later visit to the same route from the original visit. For optimistic preferences, keep the confirmed value separate from the previous optimistic value. Two overlapping failures must not restore a choice that never persisted. An obsolete failure must not roll back the latest choice or announce an error for a later successful attempt.",
+      "verification": [
+        "hold a response, leave/re-enter the route or change account, then release it. Assert that the old result cannot change the new scope, while durable work still reconciles correctly. Exercise setup-cleanup-setup without relying on an exact number of renders."
+      ],
+      "boundaries": [
+        "Validated 2026-09-07 across view lifecycle, asynchronous preflight, optimistic preference, and canonical-store regressions. Ownership identity and cancellation semantics remain implementation-specific."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://react.dev/reference/react/useEffect"
+        ],
+        "content_hash": "sha256:71e15e1bb12c18c6f0e92f4e7c7808a36acbafcd3988eb1c6fa93bd0f36bf41e"
+      }
+    },
+    {
+      "id": "CORE-ASYNC-002",
+      "title": "Reset must account for in-flight writes",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "logout/reset/delete clears data while an upload, restore or cache write can finish.",
+      "mechanism": "clearing first lets an already-started writer recreate old-account files afterward.",
+      "prevention": "stop scheduling, cancel supported work, and coordinate outstanding writes with the existing reset barrier. Decide separately how remote committed results are reconciled. Check the pinned filesystem API: a guard after an async copy/move cannot undo the native write. Wait for entered writes before cleanup, and guard the final placement of delayed downloads. Keep the wait at the owner lifecycle boundary. A screen-only wait misses startup reconciliation and externally deleted-account recovery. The barrier must outlive providers it may be waiting for. An entered SQLite transaction may also retain a write lock after unmount. Owner predicates protect which rows it changes; they do not prevent concurrent cleanup from failing with a locked database.",
+      "verification": [
+        "pause immediately before the write, start reset, then allow completion. Assert exact old-scope residue and new-scope isolation, including files or native caches when those are involved."
+      ],
+      "boundaries": [
+        "Validated 2026-09-07 with real filesystem placement and SQL writer-lock cleanup regressions. Runtime scheduling and storage behavior require evidence at their actual boundary; a mocked promise establishes ordering only."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://docs.expo.dev/versions/latest/sdk/filesystem/",
+          "https://react.dev/reference/react/useEffect"
+        ],
+        "content_hash": "sha256:fb6a2efa00ce5939535f96d206d93ef75ae7fb6cafc3fd7d0959937c29be4458"
+      }
+    },
+    {
+      "id": "CORE-ASYNC-003",
+      "title": "Recovery reads can fail too",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "a lifecycle handler reads a durable intent and starts its recovery operation.",
+      "mechanism": "catching only the nested recovery operation leaves a rejected durable-store read unhandled before recovery starts.",
+      "prevention": "cover the entire promise chain and retain the intent when its read fails. Keep an existing explicit retry or lifecycle retry path; do not infer successful cleanup from a failed read. For optional presentation preferences, a failed read must not leave unrelated screens permanently loading. Preserve successful independent reads, use the existing safe default and avoid overwriting unknown persisted state. Handle rejected best-effort writes as well as initialization reads.",
+      "verification": [
+        "reject the receipt read once, then repeat the foreground/retry event. No unhandled rejection or receipt loss is allowed, and the later successful read must converge. Reject optional preference reads/writes and verify that navigation remains usable without inventing a first-run flag or clearing stored user data."
+      ],
+      "boundaries": [
+        "Validated 2026-09-07 with a controlled lifecycle and durable-store read regression; retry triggers and safe defaults remain project-specific."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://react.dev/reference/react/useEffect"
+        ],
+        "content_hash": "sha256:3601cd59b81e584eeef230229c0f66870f0fcfe4ac4ed446581167d9d95dc1d3"
+      }
+    },
+    {
+      "id": "CORE-DIAG-001",
+      "title": "A recovery shield is not a root-cause repair",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "a native/file/media operation intermittently stalls, ordinary retries later succeed, and presentation changes appear to improve the problem without explaining the blocked producer.",
+      "mechanism": "adding deadlines and accepting manually emitted native callbacks left the actual shared-resource dependency intact. Production first-session attempts repeatedly timed out, while warm-session device checks and isolated component tests had passed. Temporary recovery was wrongly allowed to stand in for verification of the failing scenario.",
+      "prevention": "record the exact observable sequence before editing: producer completion, consumer start and completion, visibility, timeout, and explicit recovery. Preserve distinctions in the observed symptom and let corrected observations replace earlier hypotheses. Trace dependencies across runtime boundaries, not just top-level promises: background execution does not imply resource isolation, and a local resource does not prove that a consumer bypasses shared queues, slots, caches, locks, or lifecycle owners. Keep diagnosis, bounded user recovery, and removal of the causal dependency as separate deliverables. Prefer a supported isolated path with bounded resource use and existing ownership cleanup; pausing all background activity is a last-resort tradeoff. Report confirmed facts, remaining uncertainty, and the next decisive check instead of repeating an invalidated experiment.",
+      "verification": [
+        "keep the suspected competing work blocked and require the critical operation to finish. Prove that the old path fails under that condition and the repair passes without freeing the shared resource, changing connectivity, or suppressing unrelated work.",
+        "exercise the actual producer-to-consumer-to-next-stage transition, cancellation, retry, and late completion. A test that emits its own success callback proves response handling, not the runtime's ability to produce success.",
+        "preserve separate evidence for clean install, first permission, cold process, warm cache, and lifecycle recovery. Recovery after a lifecycle action is correlation until a no-action control or runtime timeline establishes causality. A timeout can provide an exit without cancelling or completing underlying work, and repeated retries against the same occupied resource are not independent experiments."
+      ],
+      "boundaries": [
+        "Incident-derived verification method confirmed on 2026-09-11 with a real shared-queue counterfactual. This is not a requirement to cache every file. Inspect the installed implementation before adopting a workaround, revalidate on upgrades, and keep released-artifact acceptance separate."
+      ],
+      "source": {
+        "kind": "incident-derived",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [],
+        "content_hash": "sha256:f6d2daa501bd95732994bd492d8c84ce1cfb4b743b92d7849f2027286fd66377"
+      }
+    },
+    {
+      "id": "CORE-IDENTITY-001",
+      "title": "Cached data has an authorization owner",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "multiple accounts can use one installation and some cached data is access-dependent.",
+      "mechanism": "reused keys, late requests or persistent media survive an account handoff and appear under the next account. Remounting the UI alone does not necessarily clear shared caches.",
+      "prevention": "classify each cache by owner and lifetime. Include authorization-relevant scope in remote query identity and invalidate old-scope work at handoff. Preserve deliberately account-neutral preferences. Do not use a signed URL as a substitute for the data's identity or authorization. For immutable media, keep its entity cache key and settled presentation identity stable while a renewable signed URL changes. Background credential refresh must not cover already displayed bytes with an initial-load placeholder; actual absence, display failure and recovery remain loading states. Tombstones and negative lookup results also need ownership scope: an account-local deletion marker must not suppress another account's entity merely because both records contain the same entity ID. Recovery paths must join the same supported query cancellation as initial loads. A direct repair promise can otherwise recreate removed cache entries. Check the initiating account before invoking retained error callbacks; account-scoped keys alone do not prevent old-scope residue after cleanup.",
+      "verification": [
+        "account A loads restricted data, account B signs in while A has a pending response, then resume/relaunch. Assert that B cannot consume A's data, URLs or late state. Rotate an immutable image's signed URL after native display and assert that the stable cached bytes remain visible without a loading placeholder. Inspect the actual native/disk boundary in addition to the query mock. Exercise a foreign deletion intent through the actual command, then verify the owner's reads and pending mutations still work while its own deletion continues to block resurrection."
+      ],
+      "boundaries": [
+        "Validated 2026-09-08 with real two-account cache, media, and database scenarios. Required key dimensions depend on the product's authorization model."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://tanstack.com/query/latest/docs/framework/react/guides/query-keys",
+          "https://www.postgresql.org/docs/17/ddl-constraints.html"
+        ],
+        "content_hash": "sha256:d39f9527c8035cfc15d3c1080b9ef8e52f0f1d100b7864241740d0e23748f910"
+      }
+    },
+    {
+      "id": "CORE-OUTCOME-008",
+      "title": "A failed best-effort write must not become a permanent local success",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "ephemeral client batching deduplicates a low-priority idempotent write such as a first-view receipt, and the network can fail before the server accepts it.",
+      "mechanism": "a failed view-recording batch left its IDs in the session's attempted set. Reopening the same entity many times could never enqueue another request, so unstable connectivity turned one transient failure into a session-long false success.",
+      "prevention": "deduplicate queued, in-flight and successfully accepted work, but release failed IDs for a later genuine qualifying event. Do not create an immediate retry loop or treat this as durable delivery unless the product contract requires one.",
+      "verification": [
+        "fail the first batch, wait beyond every timer and prove there is no automatic retry; qualify the same item again and prove exactly one later batch is sent. Keep account replacement and one-request-at-a-time coverage."
+      ],
+      "boundaries": [
+        "Incident-derived on 2026-09-08 from an account-owned in-memory best-effort batcher. Durable delivery requires a separate contract."
+      ],
+      "source": {
+        "kind": "incident-derived",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [],
+        "content_hash": "sha256:35a057cb39525f4631221e7a9c8f32a0d9ce11169c54e93a807e8252aff79a66"
+      }
+    },
+    {
+      "id": "CORE-DIAG-002",
+      "title": "Locate the failed boundary before replacing transport",
+      "status": "active",
+      "applies_to": [
+        "engineering"
+      ],
+      "trigger": "a device spinner or image failure coincides with apparently successful backend logs.",
+      "mechanism": "logs describe a different request or success at only one layer; the failing request may never reach the gateway, or the client may fail after the response.",
+      "prevention": "correlate the exact operation, time, platform and environment. Separate reachability, provider rejection, authorization, response consumption and media display. Test the supported default before expanding custom boundary code. A VPN comparison must route the application itself.",
+      "verification": [
+        "reproduce on the reported platform and network; correlate client and service evidence without retaining tokens or private payloads. Document what was not observed."
+      ],
+      "boundaries": [
+        "2026-09-06. This is a diagnostic method, not a permanent transport or VPN workaround."
+      ],
+      "source": {
+        "kind": "project-os-pack",
+        "pack": "core",
+        "project_os_version": "1.0.0",
+        "references": [
+          "https://reactnative.dev/docs/0.86/network"
+        ],
+        "content_hash": "sha256:52afef931486f556d641fe31a6a312a3df6ea34ce09187b5aac3c32865e8b1ef"
+      }
+    }
+  ]
+}
