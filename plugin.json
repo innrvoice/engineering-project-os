@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "engineering-project-os",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Bootstrap and maintain a stack-agnostic, repository-local engineering operating system for Codex.",
   "author": {
     "name": "Pavel",
@@ -22,10 +22,13 @@
         "capabilities": ["Read", "Write"],
         "websiteURL": "https://github.com/innrvoice/engineering-project-os",
         "defaultPrompt": [
-          "$project-os Inspect this repository and recommend a safe setup without changing files.",
-          "$project-os Adopt existing engineering records without overwriting project-owned files.",
-          "$project-os Upgrade this repository: preview managed changes, apply a clean sync and run the checker."
-        ]
+          "$project-os help",
+          "$project-os inspect",
+          "$project-os upgrade"
+        ],
+        "brandColor": "#B7F34A",
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/logo.svg"
       }
     }
   }

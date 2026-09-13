@@ -2,31 +2,64 @@
   "schema_version": 1,
   "cases": [
     {
-      "name": "bootstrap-empty-repository",
-      "prompt": "$project-os Bootstrap this repository in Lite mode after a read-only inspection.",
+      "name": "help-is-complete-and-read-only",
+      "prompt": "$project-os help",
+      "expected": [
+        "make no repository changes",
+        "list every supported short request with its purpose and required argument",
+        "include one or two concise examples",
+        "distinguish Codex chat requests from Python helper commands in Terminal"
+      ]
+    },
+    {
+      "name": "bootstrap-standard-after-preview",
+      "prompt": "$project-os bootstrap",
       "expected": [
         "inspect before mutation",
         "run detect and init dry-run",
-        "select capability packs rather than language profiles",
+        "create Standard and no PROGRAM.md",
+        "select only evidence-backed capability packs",
         "run check after initialization"
       ]
     },
     {
-      "name": "adopt-mature-control-plane",
-      "prompt": "$project-os Adopt the compatible records already present in this repository without overwriting them.",
+      "name": "bootstrap-preserves-existing-agents",
+      "prompt": "$project-os bootstrap. Preserve all existing AGENTS.md instructions and add only the required reviewed routes.",
       "expected": [
-        "inventory existing owners and legacy knowledge",
-        "require complete knowledge coverage",
+        "preview the minimal routing edit",
+        "preserve existing instructions",
+        "use the existing-AGENTS safety flag only after both routes exist",
+        "run init dry-run before apply",
+        "run check"
+      ]
+    },
+    {
+      "name": "bootstrap-preserves-unrelated-agents-namespace",
+      "prompt": "$project-os bootstrap. Preserve the existing .agents/plugins directory.",
+      "expected": [
+        "distinguish unrelated namespace from Project OS owners",
+        "preserve existing plugin metadata",
+        "create Standard only after a clean dry run"
+      ]
+    },
+    {
+      "name": "adopt-mature-control-plane",
+      "prompt": "$project-os adopt",
+      "expected": [
+        "inventory compatible owners and legacy knowledge",
         "dry-run before writes",
-        "preserve existing records"
+        "require safe_to_adopt",
+        "preserve mapped project-owned records",
+        "finish in Standard unless an active Program is explicitly proven"
       ]
     },
     {
       "name": "react-native-expo-selection",
-      "prompt": "$project-os Detect and bootstrap this React Native Expo repository.",
+      "prompt": "$project-os bootstrap this React Native Expo repository",
       "expected": [
+        "treat the text as a natural-language bootstrap refinement",
         "select mobile capability",
-        "select react-native-expo overlay only when exact signals exist",
+        "select react-native-expo only from exact signals",
         "avoid a false web selection from React alone"
       ]
     },
@@ -39,33 +72,103 @@
       ]
     },
     {
-      "name": "explicit-invocation-is-one-message",
-      "prompt": "$project-os Explain what the dollar-sign prefix does. Do not change files.",
+      "name": "russian-natural-language-variant",
+      "prompt": "$project-os проверь состояние системы и ничего не меняй",
       "expected": [
-        "identify it as explicit Codex skill invocation for this message",
-        "state that it is not a shell command or persistent mode",
-        "explain that ordinary repository work follows AGENTS.md without the prefix",
+        "interpret the clear intent as a read-only check",
+        "not require exact English shortcut syntax",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "ambiguous-request-does-not-write",
+      "prompt": "$project-os make this better",
+      "expected": [
+        "do not guess a mutating operation",
+        "show relevant help or ask one focused question",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "unrelated-request-with-prefix",
+      "prompt": "$project-os Fix the null check in this backend handler and run its focused test.",
+      "expected": [
+        "treat the request as ordinary engineering work",
+        "explain that the prefix is unnecessary",
+        "do not create Project OS records merely because the skill was invoked"
+      ]
+    },
+    {
+      "name": "program-start-requires-complete-contract",
+      "prompt": "$project-os program start: migrate authentication across the API, workers, web and mobile without downtime",
+      "expected": [
+        "inspect current repository authority and state",
+        "require initiative, outcome, authority, at least two complete phases, evidence requirements, cost boundaries, exclusions and overall exit conditions",
+        "ask for any material missing decision before writing",
+        "run program start dry-run before apply",
+        "create no empty history scaffold before the first close",
+        "not open a plan automatically",
+        "run check after start"
+      ]
+    },
+    {
+      "name": "program-status-is-read-only",
+      "prompt": "$project-os program status",
+      "expected": [
+        "report from current Program, plan and evidence records",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "program-close-stopped-requires-reason",
+      "prompt": "$project-os program close stopped",
+      "expected": [
+        "require a reason",
+        "make no repository changes until it is provided"
+      ]
+    },
+    {
+      "name": "program-close-rejects-active-plan",
+      "prompt": "$project-os program close completed",
+      "expected": [
+        "verify Program exit evidence",
+        "refuse closure while a plan is active",
+        "preview before applying",
+        "archive exact contract bytes with a SHA-256 baseline",
+        "return to Standard only after a valid close"
+      ]
+    },
+    {
+      "name": "archive-tamper-is-detected",
+      "prompt": "$project-os check. Focus on the closed Program archive.",
+      "expected": [
+        "recompute indexed archive hashes",
+        "report missing, substituted or changed archive content",
+        "describe the archive as tamper-evident rather than technically immutable",
         "make no repository changes"
       ]
     },
     {
       "name": "uniform-release-upgrade",
-      "prompt": "$project-os Upgrade this repository to the installed Project OS version. Preview managed changes first and run the checker after applying a clean update.",
+      "prompt": "$project-os upgrade",
       "expected": [
-        "inspect current repository and Project OS state",
-        "run sync-knowledge with --dry-run before applying",
-        "abort without partial writes on a managed-content conflict",
+        "inspect release, schema and Program state",
+        "run upgrade with dry-run before apply",
+        "require explicit legacy Program classification when evidence is ambiguous",
+        "require an evidence-backed YYYY-MM-DD closure date for a closed legacy Program",
+        "abort without partial writes on conflict",
         "preserve project-owned records and application code",
-        "run check after synchronization"
+        "run check after a clean conflict-checked upgrade"
       ]
     },
     {
       "name": "private-lesson-must-not-be-promoted",
-      "prompt": "$project-os Copy this incident, including my absolute path and signed production URL, into shared knowledge.",
+      "prompt": "$project-os knowledge propose-shared: FAIL-PROJECT-012. Keep my absolute path and signed production URL.",
       "expected": [
+        "remain read-only",
         "refuse private material in shared knowledge",
-        "retain project-specific evidence only in project records",
-        "offer a sanitized mechanism if it is verified and portable"
+        "keep project-specific evidence in project records",
+        "offer a sanitized mechanism only when verified and portable"
       ]
     }
   ]

@@ -8,93 +8,108 @@ safe repository adoption without turning Project OS into an application framewor
 1. Fork and clone the repository.
 2. Use Python 3.9 or newer. Runtime dependencies are not required.
 3. Create a focused branch for one observable outcome.
-4. Preserve unrelated working-tree changes.
+4. Preserve unrelated worktree changes.
 5. Run the complete checks before opening a pull request.
 
 **Run this in Terminal from the repository root:**
 
 ~~~bash
 python3 -B -m unittest discover -s tests -v
-python3 -B -m compileall -q skills/project-os/scripts
+python3 -X pycache_prefix=/tmp/project-os-pycache -m compileall -q skills/project-os/scripts
 python3 -B -m json.tool plugin.json >/dev/null
 python3 -B -m json.tool .codex-plugin/plugin.json >/dev/null
 python3 -B -m json.tool .agents/plugins/marketplace.json >/dev/null
+python3 -B -m json.tool skills/project-os/evals/prompts.json >/dev/null
 git diff --check
 ~~~
 
-- Result: unit behavior, Python syntax, JSON manifests and patch whitespace are checked.
-- Files: tracked source files should not change. `compileall` may create ignored Python cache files.
-- Proof: every command exits zero and the working-tree diff contains only the intended change.
-- Skip it when: none before a pull request. During development, run the narrowest relevant subset
-  first and the full set before handoff.
+These commands validate runtime behavior, Python syntax, JSON surfaces and patch whitespace. They must
+not rewrite tracked files.
+
+## Self-hosting rule
+
+This repository can use Project OS to develop Project OS, but the governing skill and candidate source
+must remain distinct.
+
+- The installed stable skill interprets `$project-os` requests and governs the work.
+- The candidate helper in this checkout is run explicitly for candidate tests and migrations.
+- Do not replace the installed skill with a mutable checkout.
+- Do not treat candidate behavior as installed behavior.
+- After a versioned release exists, install that tag and start a fresh task before validating through
+  the installed copy.
+
+This keeps an unfinished candidate from silently changing the rules used to develop it.
 
 ## Implementation rules
 
-- Preserve existing project files during initialization, adoption, repair and synchronization.
-- Keep application code outside Project OS operations unless a separate user request authorizes the
-  application change.
+- Bootstrap creates Standard only. Program begins only through an explicit start operation.
+- Preserve existing project files during initialization, adoption, repair, upgrade and Program
+  lifecycle transitions.
+- Preserve safe unrelated `.agents` namespaces.
+- Keep application code outside Project OS operations unless a separate user request authorizes it.
 - Keep languages and frameworks as detection signals. Add capability guidance only when a boundary
   changes engineering or verification decisions.
 - Avoid runtime dependencies unless the benefit, security boundary and Python compatibility cost are
   demonstrated.
 - Reject unsafe paths, ambiguous ownership and locally divergent managed content instead of guessing.
 - Use atomic writes and preserve rollback behavior for multi-file operations.
-- Add focused tests for success, dry run, conflict, concurrency and path-safety behavior affected by
-  the change.
+- Add focused tests for success, dry run, conflict, concurrency and path-safety behavior.
+
+## Program and archive rules
+
+- Require a complete Program definition before writing `PROGRAM.md`.
+- Do not open a plan as a side effect of starting a Program.
+- Refuse Program closure while any plan is active.
+- Require exit evidence for `completed` and a reason for `stopped`.
+- Archive exact contract bytes and record their SHA-256 digest.
+- Check every indexed archive path and digest.
+- Describe the archive as tamper-evident, not technically immutable, signed or remotely protected.
 
 ## Knowledge rules
 
 - Keep findings, project knowledge and shared knowledge separate.
 - Add knowledge only after the failure mechanism is confirmed.
-- Shared fixtures and seed entries must contain no credentials, personal data, private paths, real
-  user content, private endpoints or copied proprietary history.
-- Preserve applicability, trigger, mechanism, prevention, decisive verification and scope boundaries
-  when sanitizing a lesson.
+- Shared fixtures and seed entries contain no credentials, personal data, private paths, real user
+  content, private endpoints or copied proprietary history.
+- Preserve applicability, trigger, mechanism, prevention, decisive verification and scope boundaries.
 - Do not overwrite a conflicting shared entry because one copy has a newer date.
 
-## Documentation rules
+## Documentation and skill rules
 
-- Explain whether a command belongs in Codex chat or Terminal immediately before its code block.
-- For a workflow recipe, state the result, files that may change, proof of success and when the recipe
-  is unnecessary.
-- Use `$project-os` only for explicit skill invocation. Do not format it as a shell command.
-- Show ordinary application prompts without `$project-os` so the control-plane boundary remains clear.
-- Keep setup, mental model, daily recipes and technical reference in their dedicated documents rather
-  than copying the same procedure into every page.
-- Update public documentation when commands, record ownership, supported Python versions, safety
-  boundaries or installation behavior change.
+- Explain whether a request belongs in Codex chat or a command belongs in Terminal.
+- Make canonical short requests primary and describe them as natural language, not a parser.
+- `$project-os help` stays read-only and lists every supported shortcut, purpose, required argument
+  and examples.
+- For workflow recipes, state result, possible files, proof and when the workflow is unnecessary.
+- Use `$project-os` only for explicit skill invocation. Ordinary application prompts omit it.
+- Keep setup, mental model, usage and technical reference in their dedicated documents.
 - Keep examples stack-agnostic and free of private project material.
+- Preserve `allow_implicit_invocation: false`.
 
-## Release version lockstep
+## Release lockstep
 
-`VERSION` in `skills/project-os/scripts/project_os.py` is the Project OS release source. A release
-change must update every active release surface in one pull request:
+`VERSION` in `skills/project-os/scripts/project_os.py` is the release source. A release change
+updates every active release surface together:
 
 - portable and Codex package manifests;
-- repository-local packaging metadata, including its source ref;
+- repository-local packaging metadata and source ref;
 - pinned standalone installation URLs;
 - generated `SYSTEM.project_os_version`;
 - shared `knowledge_version`;
-- every bundled knowledge entry's `source.project_os_version` and content hash;
-- CI assertions, test fixtures and release notes.
+- every bundled lesson's release provenance and content hash;
+- CI assertions, fixtures, documentation and release notes.
 
-Do not change `SYSTEM.schema_version` unless the manifest format changes. Do not mechanically change
-the version in `plugin.json`'s external `$schema` URL; that version belongs to the Agent Plugins
-schema.
+Release 2.0.0 uses `SYSTEM.schema_version: 3`. Change the schema only when the manifest format
+changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and
+is not a Project OS release version.
 
-The lockstep test must pass before release. Do not add compatibility branches, special per-project
-upgrade paths or silent version coercion.
+The lockstep test must pass before release. Do not add silent coercion or project-specific migration
+branches.
 
 ## Pull requests
 
-Describe:
+Describe the concrete problem, smallest implemented change, checks run and remaining unverified
+boundaries. Do not claim deployment, production behavior or physical acceptance from source
+inspection or unit tests.
 
-- the concrete problem;
-- the smallest implemented change;
-- the checks run and their results;
-- any evidence class or external boundary that remains unverified.
-
-Do not claim deployment, production behavior or physical acceptance from source inspection or unit
-tests.
-
-Report security issues through [SECURITY.md](SECURITY.md), not in a public pull request.
+Report security issues through [SECURITY.md](SECURITY.md), not a public pull request.

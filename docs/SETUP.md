@@ -2,258 +2,267 @@
 
 Project OS has two separate setup layers:
 
-1. Install the reusable `project-os` skill for Codex.
+1. Install the reusable standalone skill for one Codex profile.
 2. Connect Project OS to each repository that should keep durable engineering state.
 
 Installing the skill does not create `AGENTS.md` or `.agents`. Connecting one repository does not
-change any other repository.
+change another repository.
 
 ## Requirements
 
 - A Codex client with standalone skill support.
-- Python 3.9 or newer for the deterministic helper.
-- A local checkout of every repository you want to connect.
+- Python 3.9 or newer.
+- A local checkout of each target repository.
 
 The helper uses only the Python standard library.
 
-## 1. Install the skill
-
-### Recommended: standalone skill from GitHub
+## 1. Install the standalone skill
 
 `$skill-installer` is Codex skill syntax. Send this message inside Codex, not in Terminal.
 
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v1.0.1/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.0/skills/project-os
 ~~~
 
-- Result: Codex installs the complete versioned skill in the local Codex profile.
-- Files: the user-level Codex skill directory changes; the open repository does not.
-- Proof: start a new Codex task and confirm that `project-os` appears in the available skills.
-- Skip it when: release 1.0.1 is already installed for this Codex profile.
+- Result: Codex installs the complete versioned skill in the local profile.
+- Files: the user-level skill directory changes; the open repository does not.
+- Proof: start a new Codex task and confirm that `project-os` is available.
+- Skip it when: release 2.0.0 is already installed in this profile.
 
-The URL is pinned to a release tag. It does not follow the repository's `main` branch automatically.
+The URL is pinned to a release tag. It does not follow `main` automatically. The standalone skill is
+the documented installation route.
 
-### Updating an installed standalone skill
+### Update an installed skill
 
 An installed skill is replaced as one directory. It is not merged file by file.
 
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Update my installed project-os skill to the copy at
-https://github.com/innrvoice/engineering-project-os/tree/v1.0.1/skills/project-os. Inspect the
-existing installation, show the exact replacement path and replace that skill directory as one unit.
-Do not change any repository.
+$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.0.0/skills/project-os and replace only that installed skill; do not change any repository.
 ~~~
 
-- Result: Codex replaces the installed skill with release 1.0.1.
-- Files: only the installed `project-os` skill directory changes.
-- Proof: start a new Codex task so Codex rebuilds its skill list, then upgrade and check each connected
-  repository as described below.
-- Skip it when: the installed skill already comes from the v1.0.1 tag.
+- Result: Codex replaces the installed `project-os` directory with release 2.0.0.
+- Files: only the user-level skill installation changes.
+- Proof: start a new Codex task so Codex rebuilds its available-skill list.
+- Skip it when: the installed skill already comes from the same tag.
 
-Updating the installed skill still does not update repositories. Repository upgrades are deliberate
-and use the same workflow for every connected project.
+Updating the skill does not update connected repositories. Upgrade each repository explicitly after
+starting a fresh task with the new skill.
 
 ## 2. Open the target repository in a new task
 
-Codex loads available skills and repository instructions when a task starts. Open the target
-repository as the task workspace after installation.
+Use the target repository as the Codex task workspace. Codex loads available skills and applicable
+`AGENTS.md` files when a task starts.
 
-Do not copy `AGENTS.md`, `.agents/STATE.md`, plans, findings or project knowledge from another
-repository. The reusable pieces are already inside the skill. Project-specific truth must come from
-the target repository itself.
+Do not copy `AGENTS.md`, state, plans, findings, evidence or project knowledge from another
+repository. The reusable system is already inside the skill. Project truth must come from the target
+repository.
 
 ## 3. Inspect before changing files
 
-This is the safe first prompt for every repository shape.
+**Type this in Codex chat:**
+
+~~~text
+$project-os inspect
+~~~
+
+- Result: Codex reads Git state, applicable instructions, documentation, CI, task runners, lockfiles,
+  tool configuration and existing engineering records. It recommends one connection path and only
+  evidence-backed packs or overlays.
+- Files: none change.
+- Proof: the response names clean bootstrap, an `AGENTS.md`-preserving bootstrap or adoption and
+  previews the affected files.
+- Skip it when: the repository is already connected and currently passes `$project-os check`.
+
+You may add ordinary language without memorizing an exact sentence.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Inspect this repository for Project OS setup. Do not change files. Decide whether it
-needs a clean bootstrap, an AGENTS-preserving bootstrap or adoption. Recommend Lite or Full, the
-applicable capability packs and overlays and the exact files you would create or map.
+$project-os inspect. Pay particular attention to the monorepo instructions and do not change files.
 ~~~
 
-- Result: Codex reads Git state, existing instructions, documentation, CI, task runners, lockfiles,
-  tool configuration and existing engineering records.
-- Files: none should change.
-- Proof: the response names one setup path, the evidence for each selected pack or overlay and a dry
-  run or mapping preview.
-- Skip it when: the repository is already connected, passes the checker and only needs ordinary
-  engineering work.
+This narrows the same read-only operation. Short requests are recommended prompts, not a parser.
 
-Detection is a recommendation, not project truth. It can find stack and capability signals, but it
-cannot prove authority, architecture, ownership, exact commands or release procedure by filename
-alone.
+## 4. Choose one connection path
 
-## 4. Apply exactly one setup path
+Bootstrap always creates the Standard system. A Program is never created during repository setup.
 
 ### A. Clean bootstrap
 
-Use this when the repository has neither a root `AGENTS.md` nor an existing `.agents` control plane.
-Lite mode is the default for ordinary work.
+Use this when there is no Project OS control plane. A safe unrelated namespace such as
+`.agents/plugins` may already exist; initialization preserves it.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Bootstrap this repository in Lite mode using the reviewed capability packs and overlays.
-Preserve existing files, record only verified authority and commands and do not change application
-code. Run a final initialization dry run, apply only if it matches the reviewed proposal and finish by
-running the Project OS checker.
+$project-os bootstrap
 ~~~
 
-- Result: Codex runs detection and a dry run, creates the missing Project OS records, fills durable
-  context only from verified repository evidence and checks the result.
-- Files: a root `AGENTS.md` and the new `.agents` control plane may be created. Application files do
-  not change.
-- Proof: review the complete diff, confirm the selected packs and require `Project OS check: PASS`.
-- Skip it when: root `AGENTS.md` or `.agents` already exists.
+- Result: Codex inspects again, runs detection, previews `init --dry-run`, reviews every proposed
+  create, applies only a clean preview and runs the checker.
+- Files: root `AGENTS.md` and Project OS records under `.agents` may be created. Safe unrelated
+  `.agents` content is preserved. Application code does not change.
+- Proof: review the complete diff, confirm the selected packs and require
+  `Project OS check: PASS`.
+- Skip it when: a compatible Project OS control plane already exists; use adoption instead.
 
-Use Full mode only for an approved multi-phase audit, migration, release program or another initiative
-that genuinely needs a durable program contract and history boundary. Replace `Lite` with `Full` in
-the prompt only after that decision is made.
+To constrain the operation, extend the same short request.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os bootstrap. Select only packs justified by tracked configuration, preserve .agents/plugins and do not change application code.
+~~~
+
+The extra sentence refines the natural-language request. It does not select a different bootstrap
+mode; Standard is the only bootstrap result.
 
 ### B. Preserve an existing `AGENTS.md`
 
-Use this when the repository has root instructions but no `.agents` directory. Project OS must not
-replace those instructions. First review the minimal routing addition.
+Use this when root instructions already exist but Project OS does not. The existing file remains
+project-owned.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Prepare an AGENTS-preserving Lite bootstrap for this repository. Do not change files.
-Inspect the current AGENTS.md, propose only the routing needed for .agents/CONTEXT.md and
-.agents/STATE.md, then show the complete initialization dry run with justified packs and overlays.
+$project-os bootstrap. Preserve every existing AGENTS.md instruction and add only the minimum reviewed routes to .agents/CONTEXT.md and .agents/STATE.md.
 ~~~
 
-- Result: Codex proposes the smallest routing edit and previews the remaining control-plane files.
-- Files: none should change.
-- Proof: the preview preserves every existing instruction and names both required routes exactly.
-- Skip it when: `.agents` already contains compatible project state; use adoption instead.
+- Result: Codex inspects the current instructions, previews the minimal routing edit, adds it only
+  after the proposal is safe, runs `init --allow-existing-agents --dry-run`, applies the matching
+  initialization and checks the result.
+- Files: existing `AGENTS.md` receives only the required reviewed routes. Missing Project OS records
+  are created. Application code does not change.
+- Proof: the prior instructions remain intact, both routes are present and the checker passes.
+- Skip it when: the repository already has compatible context, state, plans and findings; use
+  adoption.
 
-After reviewing that preview, apply it.
+The helper accepts `--allow-existing-agents` only when both routes already exist. It is a narrow
+preservation gate, not an overwrite flag.
+
+### C. Adopt compatible existing records
+
+Use adoption when the repository already has compatible owners for context, state, plans and
+findings. Adoption maps those records rather than initializing over them.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Apply the reviewed AGENTS-preserving Lite bootstrap. Preserve all existing AGENTS.md
-instructions, add only the reviewed routes to .agents/CONTEXT.md and .agents/STATE.md, initialize with
-the existing-AGENTS safety flag, do not change application code and run the checker.
+$project-os adopt
 ~~~
 
-- Result: Codex adds the reviewed routes, uses `--allow-existing-agents` and creates the missing
-  Project OS records.
-- Files: root `AGENTS.md` receives only the approved routing change and new `.agents` files are
-  created. Application files do not change.
-- Proof: the diff preserves the prior instructions, both routes are present and the checker passes.
-- Skip it when: the routing preview has not been reviewed or the repository already has a compatible
-  `.agents` control plane.
+- Result: Codex inventories existing owners and legacy knowledge, runs an adoption dry-run and
+  presents its mappings and conflicts. It applies only a reviewed result with
+  `safe_to_adopt: true`, then runs the checker.
+- Files: the Project OS manifest, managed guidance and shared seed knowledge may be created. Mapped
+  project-owned records remain byte-for-byte unchanged.
+- Proof: the applied mapping matches the preview, no existing owner was overwritten and the checker
+  passes.
+- Skip it when: required owners are missing, ambiguous or incompatible. Repair the named structural
+  problem rather than forcing adoption.
 
-The helper accepts `--allow-existing-agents` only when `AGENTS.md` already mentions both required
-paths. It is not a general overwrite flag.
-
-### C. Adopt an existing control plane
-
-Use this when compatible context, state, plans and findings already exist. Adoption maps those owners
-instead of initializing over them.
-
-**Type this in Codex chat:**
-
-~~~text
-$project-os Adopt this repository's existing engineering records. Inventory current paths and legacy
-knowledge, preserve project-specific authority and existing records, report every conflict and show a
-complete dry run without writing files.
-~~~
-
-- Result: Codex discovers compatible record owners, validates them and proposes a `SYSTEM.json`
-  mapping plus managed packs and shared knowledge.
-- Files: none should change during this preview.
-- Proof: the report says the repository is safe to adopt, lists every planned create and lists no
-  existing file as modified.
-- Skip it when: required owners are missing or incompatible. Resolve the named structural problem
-  instead of forcing adoption.
-
-Apply only the reviewed adoption proposal.
-
-**Type this in Codex chat:**
-
-~~~text
-$project-os Apply the adoption proposal exactly as reviewed. Preserve every mapped project-owned
-record, create only the Project OS manifest and managed guidance or knowledge files from the preview,
-then run the checker.
-~~~
-
-- Result: Codex attaches Project OS to the existing layout without rewriting mapped records.
-- Files: `.agents/SYSTEM.json`, selected managed guidance and shared seed knowledge may be created.
-  Existing context, state, plans, findings and evidence remain unchanged.
-- Proof: compare the applied diff with the preview and require `Project OS check: PASS`.
-- Skip it when: the dry run reported conflicts, incomplete knowledge coverage or unsafe paths.
+A pre-existing `PROGRAM.md` is not enough to infer whether a Program is active. Adoption fails
+closed in this case. Resolve the lifecycle explicitly instead of forcing an adoption.
 
 ## 5. Review repository truth
 
 After bootstrap or adoption, confirm that:
 
-- `AGENTS.md` preserves the project's actual authority and routes to current records.
-- `.agents/CONTEXT.md` contains only durable, verified facts and exact commands.
+- `AGENTS.md` preserves actual authority and routes to the current records.
+- `.agents/CONTEXT.md` contains verified durable facts and exact commands.
 - `.agents/STATE.md` is a compact checkpoint, not a task diary.
-- `.agents/SYSTEM.json` selects only justified packs and overlays.
+- `.agents/SYSTEM.json` reports schema 3, Standard mode and only justified packs and overlays.
 - plans, findings, evidence and project knowledge were not copied from another product.
 - shared knowledge contains no credentials, personal data, private paths, signed URLs or private
-  project history.
+  project history. The helper rejects common detectable patterns, but this is not exhaustive; human
+  review is mandatory.
 
 Project OS does not replace product, API, architecture, security, legal or release sources of truth.
-Record the real authority hierarchy found in the repository.
 
 ## 6. Validate and restart
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Check this repository's Project OS state and report errors without changing files.
+$project-os check
 ~~~
 
-- Result: Codex runs the deterministic checker against the repository control plane.
-- Files: none should change.
+- Result: Codex runs the deterministic checker without changing files.
+- Files: none change.
 - Proof: the helper prints `Project OS check: PASS`.
-- Skip it when: never after setup. A first successful check is the setup exit gate.
+- Skip it when: never after setup. This is the setup exit gate.
 
-Start a fresh Codex task in the connected repository. The new task will load the root `AGENTS.md` as
-startup guidance. From that point, ordinary code requests do not need `$project-os`.
+Start a fresh Codex task in the connected repository. The new task loads the new or updated
+`AGENTS.md` into its instruction chain. Ordinary code work now uses those instructions without
+`$project-os`.
 
-A structural pass proves the records are internally consistent. It does not prove application
-behavior, deployment, artifact identity, production state or manual and physical acceptance.
+A passing checker proves structural consistency. It does not prove application behavior, artifact
+identity, deployment, production state or manual and physical acceptance.
 
-## 7. Upgrade every connected repository the same way
+## 7. Upgrade a connected repository
 
-First update the installed skill to v1.0.1 and start a new Codex task. Then open each connected
-repository and use one upgrade prompt.
+First update the installed skill and start a new Codex task. Then open each connected repository.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Upgrade this repository to the installed Project OS version. Inspect first,
-preview all managed changes, preserve project-owned files, apply the update only when
-the preview is clean, then run the Project OS checker.
+$project-os upgrade
 ~~~
 
-- Result: the skill follows `inspect -> sync-knowledge --dry-run -> sync-knowledge -> check`. There is
-  no separate Python `upgrade` command.
-- Files: Project OS version metadata, managed capability guidance and managed shared knowledge may
-  change. Project-owned context, state, plans, findings, evidence and application code are preserved.
-- Proof: the final checker passes and `.agents/SYSTEM.json` plus shared knowledge report v1.0.1.
-- Skip it when: the repository already passes the v1.0.1 checker.
+- Result: Codex inspects the current schema and Program state, runs the helper upgrade as a dry run,
+  reviews every managed change, applies only a clean transaction and runs the checker.
+- Files: Project OS version and schema metadata, managed guidance, managed shared knowledge and any
+  explicitly required lifecycle migration may change. Project-owned context, state, plans, findings,
+  evidence and application code are preserved.
+- Proof: the final checker passes, the repository reports release 2.0.0 and a repeated dry run has no
+  pending changes.
+- Skip it when: the repository already passes the installed 2.0.0 checker.
 
-The checker rejects a repository release version that differs from the installed helper. This is an
-upgrade signal, not a reason to invent a repository-specific migration path. Resolve managed-content
-conflicts first, then run the same upgrade workflow again.
+A schema 2 repository with the former basic setup upgrades directly to Standard. If a legacy
+`PROGRAM.md` exists, Codex must determine whether it is active or already closed from repository
+evidence. It does not guess. A closed contract is archived with an explicit `completed` or `stopped`
+disposition and its verified actual closure date; an active contract remains active in Program mode.
+If repository evidence does not establish the closure date, Codex stops for that decision instead of
+using the migration date.
+
+Managed-content conflicts abort the transaction without partial changes. Resolve the ownership
+conflict, then run the same `$project-os upgrade` request again.
+
+## Program is a later, explicit decision
+
+Connecting a repository does not start a Program. Start one only for a real multi-phase initiative.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os program start: migrate authentication across the API, workers, web and mobile without downtime
+~~~
+
+Codex creates `.agents/PROGRAM.md` only after the contract is complete enough to validate. See
+[Usage](USAGE.md) for start, status and close examples.
+
+## Developing Project OS itself
+
+The repository can use its own control plane, but the stable installed skill and the candidate source
+have different jobs:
+
+1. Use the installed stable skill to govern the work and interpret `$project-os` requests.
+2. Develop and test the candidate helper from this checkout.
+3. Do not replace the installed skill with the mutable checkout.
+4. Validate candidate fixtures and candidate repository state with the source helper explicitly.
+5. After a versioned release is published, install that tag and start a fresh task before validating
+   through the installed copy.
+
+This prevents an unfinished candidate from silently redefining the workflow that governs its own
+development.
 
 ## Next
 
 - [How Project OS works inside Codex](HOW_IT_WORKS.md)
-- [Daily usage and copy-paste recipes](USAGE.md)
-- [Records, modes, packs and helper CLI reference](REFERENCE.md)
+- [Daily usage and short requests](USAGE.md)
+- [Records, Program lifecycle, packs and helper CLI](REFERENCE.md)
 - [Security boundary](../SECURITY.md)

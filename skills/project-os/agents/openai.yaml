@@ -1,6 +1,9 @@
 interface:
   display_name: "Project OS"
-  short_description: "Bootstrap and maintain repository work state"
-  default_prompt: "Use $project-os to inspect this repository without changing files and recommend the correct setup."
+  short_description: "Maintain durable repository work state"
+  icon_small: "./assets/icon-small.svg"
+  icon_large: "./assets/icon-large.svg"
+  brand_color: "#B7F34A"
+  default_prompt: "$project-os help"
 policy:
   allow_implicit_invocation: false

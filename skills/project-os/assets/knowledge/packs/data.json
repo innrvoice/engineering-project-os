@@ -20,11 +20,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.postgresql.org/docs/17/functions-window.html"
         ],
-        "content_hash": "sha256:386e51706df2776259850b16d7d37ed2d44397a678354eb8330bb3481548aaee"
+        "content_hash": "sha256:47cbdb67f2a6d00be4c884da56bd1a2ab3067969a50055207ae1614feb3507b5"
       }
     },
     {
@@ -46,11 +46,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.postgresql.org/docs/17/functions-datetime.html"
         ],
-        "content_hash": "sha256:5e2cb491ac165ffd678301e07fa99a2092be9c81a6e5ef7d9a0100ccd25ad1c2"
+        "content_hash": "sha256:1fb43e575d222c886631c5e0e25f8c293ed7af4eb6dffef18b0b4e8c61131c3c"
       }
     },
     {
@@ -72,11 +72,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries"
         ],
-        "content_hash": "sha256:9d73017f802b99ac43b1f9de3c1afc14ec777ecf438cf7087b1f36961e3fe4f0"
+        "content_hash": "sha256:ab8633a930e3990d90a2d6045c8282e4cdaad22fbbb64b2379f9adda78b40775"
       }
     },
     {
@@ -98,12 +98,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://tc39.es/ecma262/2024/multipage/numbers-and-dates.html",
           "https://tc39.es/proposal-temporal/docs/instant.html"
         ],
-        "content_hash": "sha256:ebde877ef1aabb99c34ef819d581f5f51e8ab257a7e67349bb2b1c690451b2f2"
+        "content_hash": "sha256:cf47b2f78ba3d1242bcb06c1f27d5f4ced318313c00d33ce01e00468693e3c5f"
       }
     },
     {
@@ -125,13 +125,13 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/",
           "https://supabase.com/docs/reference/javascript/file-buckets-createsignedurl",
           "https://www.sqlite.org/lang_upsert.html"
         ],
-        "content_hash": "sha256:7d3c910248dd5a2c9ad1046be5e4a920193b339e3d0df56ae72e2619835af2a3"
+        "content_hash": "sha256:3bbebf6f3f462b495282f8e5ce4a36e42fbe3ade9957748d4f7cbf61e584a532"
       }
     },
     {
@@ -153,11 +153,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.postgresql.org/docs/17/transaction-iso.html"
         ],
-        "content_hash": "sha256:e0dd52bb2a1e7ed3b72af6b188c06f9b96eb852b9c6c0b374b686e177d500231"
+        "content_hash": "sha256:5ceb40bbd2db25512bf3cf7a5710badbea82a44aa93a6c1e0de3ae037e09df97"
       }
     },
     {
@@ -179,12 +179,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.postgresql.org/docs/17/explicit-locking.html",
           "https://www.postgresql.org/docs/17/xfunc-volatility.html"
         ],
-        "content_hash": "sha256:4d9c4b2d49295377eec106d30ddeaa75eed44e789fcd29c09e93622ab7c296e8"
+        "content_hash": "sha256:c222838b53737482a65e5ae5acfa3041b52b62b6d96b86beaaf19deb7f7f94d9"
       }
     },
     {
@@ -206,12 +206,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/",
           "https://www.sqlite.org/atomiccommit.html"
         ],
-        "content_hash": "sha256:58501fa92067befc765c354f3f347d6c95de113a5dfbe14bcab1fc494cc1292c"
+        "content_hash": "sha256:68b03d81be75d6e4c2b5fa50365449be781ca1c2e0d8509af2d41ebcd17377a7"
       }
     },
     {
@@ -233,11 +233,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.sqlite.org/lang_transaction.html"
         ],
-        "content_hash": "sha256:0770d71283e8609aa422170ce0c1b1d6efbf0b79b14355c3832f09243f7ebaff"
+        "content_hash": "sha256:4c18e766a57be5f6d09f5761b315c127ec5bbe6f91a8c8f7bdd0eca6bef790ac"
       }
     },
     {
@@ -259,11 +259,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.postgresql.org/docs/17/trigger-definition.html"
         ],
-        "content_hash": "sha256:30a5bfa711bd647f4df3a6e0adf2740494fe4c3ee80f6706d1ec22dfca7306d3"
+        "content_hash": "sha256:ffe6b2abc9bbc05fd4d806bec024251f614ea2f23056a4c13d435bd17a6a14fd"
       }
     },
     {
@@ -285,13 +285,13 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://docs.expo.dev/versions/latest/sdk/sqlite/",
           "https://www.sqlite.org/foreignkeys.html",
           "https://www.sqlite.org/json1.html"
         ],
-        "content_hash": "sha256:068ab706eed314584bed89662b2cd22c354c33adcdf003072766c3f5f5723524"
+        "content_hash": "sha256:89ca3b480e1fe1a6970bdb9de33c7bf487ae7a77f3ae6e28733847fcf713c3f3"
       }
     },
     {
@@ -313,11 +313,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "data",
-        "project_os_version": "1.0.1",
+        "project_os_version": "2.0.0",
         "references": [
           "https://www.postgresql.org/docs/17/explicit-locking.html"
         ],
-        "content_hash": "sha256:aeeacc2961a14db0a42cb1ce7097e8d93a8ab16962031459c0e3a5ff1447dc8c"
+        "content_hash": "sha256:242935468a4a916d41c2aeee5888cbe065bcc756e5a90c89c839090adb0a85c1"
       }
     }
   ]

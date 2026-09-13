@@ -1,117 +1,180 @@
-# Technical reference
+# Reference
 
-This page is the compact contract for Project OS 1.0.1. Start with [README](../README.md) if
-`$project-os`, installation and repository connection are still new concepts.
+This is the technical contract for Project OS 2.0.0. Start with the [README](../README.md) if
+installation, `$project-os` or repository connection is still new.
 
-## Public interfaces
-
-Project OS exposes three interfaces:
+## Interfaces
 
 | Interface | Used for | Invocation |
 | --- | --- | --- |
-| Codex skill | Reasoned bootstrap, maintenance and knowledge workflows | `$project-os` in Codex chat |
-| Python helper | Deterministic detect, init, adopt, check and sync operations | `project_os.py` in Terminal |
-| Repository records | Durable context, state, plans, findings, evidence and knowledge | Files under `AGENTS.md` and `.agents/` |
+| Codex skill | Reasoned setup, maintenance, Program, plan and knowledge workflows | `$project-os ...` in Codex chat |
+| Python helper | Deterministic detect, init, adopt, check, sync, upgrade and Program transitions | `project_os.py ...` in Terminal |
+| Repository records | Durable context, state, plans, findings, evidence and knowledge | `AGENTS.md` and `.agents/` files |
 
-`$project-os` is an explicit skill mention for one user message. It is not a shell command and it does
-not put Codex into a permanent mode. This release sets implicit invocation to false.
+`$project-os` selects the skill for one message. Text after it is natural language, not a helper
+command line or rigid parser. This release disables implicit invocation.
 
-The Python helper lives inside the installed skill at `scripts/project_os.py`. Paths in the examples
-below are placeholders for that installed skill path or a checkout of this repository.
+The helper lives at `scripts/project_os.py` inside the installed skill. Terminal examples use an
+absolute placeholder path so the target repository does not need its own helper copy.
 
-## Modes
+## Codex chat shortcuts
 
-| Mode | Use it for | Adds |
+| Shortcut | Required argument | Behavior |
 | --- | --- | --- |
-| Lite | Default engineering work | Routing, context, checkpoint, just-in-time plans, findings, evidence, packs and knowledge |
-| Full | An approved multi-phase audit, migration, release program or similar initiative | Everything in Lite plus `PROGRAM.md` and an immutable history boundary |
+| `help` | None | Read-only menu of every shortcut and Terminal distinction |
+| `inspect` | None | Read-only repository and control-plane inspection |
+| `bootstrap` | None | Create Standard after a clean dry run |
+| `adopt` | None | Map compatible existing records after a clean dry run |
+| `check` | None | Read-only deterministic validation |
+| `repair` | Error or scope if not already known | Repair only verified Project OS inconsistency |
+| `upgrade` | None | Upgrade to the installed release with conflict checks |
+| `program start: <initiative>` | Initiative | Start one complete multi-phase contract |
+| `program status` | None | Read-only Program status |
+| `program close completed` | None | Close after all exit evidence exists |
+| `program close stopped: <reason>` | Reason | Stop and archive an incomplete Program |
+| `plan open: <outcome>` | Outcome | Open one resumable execution package |
+| `plan checkpoint` | None | Save a reconciled checkpoint |
+| `plan resume` | None | Reconcile and continue the active plan |
+| `plan complete` | None | Complete only with required evidence |
+| `plan block: <reason>` | Reason | Preserve a precise blocker and resume point |
+| `plan supersede: <reason>` | Reason | Retire a plan whose route or outcome was replaced |
+| `finding add: <observation>` | Observation | Record evidence without inventing a mechanism |
+| `knowledge capture: <finding-id>` | Confirmed finding ID | Create project-specific failure knowledge |
+| `knowledge propose-shared: <lesson-id>` | Project lesson ID | Draft a sanitized portable lesson without writing |
 
-Full mode is not a more powerful default. Choose it only when the program contract and history have a
-real owner and exit condition.
+`$project-os help` always returns this class of concise menu, with purpose, required arguments and
+one or two examples. It never writes files. See [Usage](USAGE.md) for complete examples.
 
-## Capability packs and overlays
+## Standard and Program
 
-Core Project OS owns state, plans, findings, evidence and knowledge lifecycle. Packs add guidance only
-for boundaries that change implementation or verification decisions.
+| State | Use it for | Contents |
+| --- | --- | --- |
+| Standard | Every connected repository's normal operation | Routing, context, state, plans, findings, evidence, knowledge, packs and overlays |
+| Program | One explicitly started multi-phase initiative | All Standard capabilities plus one active `PROGRAM.md` contract |
 
-| Pack | Boundary |
+Bootstrap and adoption finish in Standard. A long task can remain in Standard with a plan. Program is
+not a larger installation profile and is not created automatically.
+
+A Program is justified when multiple distinct phases or plans require one shared authority and exit
+contract. It is temporary:
+
+`standard -> program -> standard`
+
+### Program definition
+
+The helper accepts a JSON definition whose top-level fields are:
+
+| Field | Requirement |
 | --- | --- |
-| `service` | APIs, workers, queues, authentication, external integrations and distributed outcomes |
-| `web` | Browser UI, routing, accessibility, responsive behavior and browser-owned state |
-| `mobile` | Application lifecycle, permissions, native handoffs, persistence and device evidence |
-| `data` | Schemas, migrations, transactions, storage, deletion and restore |
-| `delivery` | Builds, artifacts, deployment, runtime compatibility and release gates |
+| `initiative` | Non-empty Program name |
+| `outcome` | One observable overall outcome |
+| `authority` | Non-empty array of controlling sources or decisions |
+| `phases` | At least two phase objects |
+| `phases[].name` | Non-empty phase name |
+| `phases[].outcome` | Observable phase outcome |
+| `phases[].exit_conditions` | Non-empty array of phase exit conditions |
+| `evidence_requirements` | Non-empty array of required evidence classes or checks |
+| `cost_boundary` | Non-empty array of time, money, operational or scope limits |
+| `exclusions` | Non-empty array of work outside the Program |
+| `exit_conditions` | Non-empty array governing completion of the whole Program |
 
-The `react-native-expo` overlay refines the `mobile` pack for matching repositories. It requires the
-mobile pack. An overlay never replaces pinned dependencies, platform behavior, official documentation
-or current runtime evidence.
+The helper rejects an incomplete definition. It generates a stable
+`program-YYYYMMDD-NNN` identifier and renders the active contract to `.agents/PROGRAM.md`.
+Starting a Program does not open a plan.
 
-Languages and frameworks are detection signals, not behavioral profiles. A repository can select any
-combination of packs justified by its actual boundaries.
+Closing requires no active plan. Use `completed` only after Program exit evidence has been evaluated
+by Codex and the user. The helper enforces structural lifecycle rules but cannot judge whether that
+evidence proves the outcome. `stopped` requires a reason and preserves unresolved obligations.
 
 ## Record ownership
 
 | Path | Owns |
 | --- | --- |
 | `AGENTS.md` | Startup routing, authority, working method, safety and verification expectations |
-| `.agents/SYSTEM.json` | Project OS release, schema, mode, installation type, mappings, selections and managed baselines |
+| `.agents/SYSTEM.json` | Release, schema, state, active Program, mappings, selections and managed baselines |
 | `.agents/CONTEXT.md` | Durable verified facts, authority, architecture and exact commands |
 | `.agents/STATE.md` | Current scope, verified progress, exact next action and blockers |
 | `.agents/plans/index.json` | Canonical execution state and plan statuses |
 | `.agents/plans/NNN-*.md` | One observable outcome, its work and acceptance evidence |
 | `.agents/findings/findings.json` | Concrete defects, candidates and accepted risks |
 | `.agents/evidence/` | Sanitized, dated evidence linked from plans or findings |
-| `.agents/knowledge/project/` | Confirmed lessons that remain repository or environment specific |
-| `.agents/knowledge/shared/failures.json` | Sanitized failure mechanisms that can be reused |
-| `.agents/packs/` | Managed capability and ecosystem guidance selected for this repository |
-| `.agents/PROGRAM.md` | Approved Full-mode multi-phase contract |
-| `.agents/history/` | Full-mode immutable snapshots, never current authority |
+| `.agents/knowledge/project/` | Confirmed repository-specific lessons |
+| `.agents/knowledge/shared/failures.json` | Sanitized portable failure mechanisms |
+| `.agents/packs/` | Managed capability and ecosystem guidance selected for the repository |
+| `.agents/PROGRAM.md` | The one active multi-phase Program contract |
+| `.agents/history/index.json` | Closed Program disposition, canonical closure date, archive path and SHA-256 digest |
+| `.agents/history/programs/<id>/PROGRAM.md` | Exact closed Program contract bytes |
 
-Do not duplicate one status across several records. `STATE.md` is a handoff, not a diary. `CONTEXT.md`
-is not an active task list. Evidence is linked from the record whose claim it supports.
+`.agents/history/` is optional until the first Program closes or compatible indexed history is
+adopted. Starting the first Program creates no empty history directory or index. History is valid
+while the repository is in Standard or Program. Archived records are never current authority.
 
-## State invariants
+## Archive integrity boundary
 
-Plan statuses are:
+On Program close, the helper copies the exact active contract bytes and records their SHA-256 digest.
+The checker requires every indexed archive to exist, match its digest and have a canonical closure
+date. Stopped entries also require a non-empty reason. An uncoordinated edit, deletion or substitution
+fails the check.
 
-- `planned`
-- `active`
-- `blocked`
-- `done`
-- `superseded`
+This is tamper-evident, not technically immutable. It is not signed, it does not prevent a deliberate
+rewrite of both archive and index and it does not replace Git access controls or review.
 
-When `execution_state` is `running`, exactly one plan is `active`. If `active_plan` is present, it must
-name that plan. When no plan is active, execution state is `idle` and `active_plan`, when present, is
-`null`.
+An archive mismatch requires an authority decision. Do not automatically rehash changed content to
+make the checker pass.
 
-Finding statuses are:
+## Plan and finding invariants
 
-- `candidate`
-- `confirmed`
-- `fixed_unverified`
-- `verified`
-- `accepted_risk`
-- `deferred`
-- `rejected`
-- `merged`
+Plan statuses are `planned`, `active`, `blocked`, `done` and `superseded`.
+
+When `execution_state` is `running`, exactly one plan is `active`. If `active_plan` is present,
+it names that plan. When no plan is active, execution state is `idle` and `active_plan`, when
+present, is `null`.
+
+Finding statuses are `candidate`, `confirmed`, `fixed_unverified`, `verified`,
+`accepted_risk`, `deferred`, `rejected` and `merged`.
 
 Failure knowledge statuses are `active`, `retired` and `replaced`.
 
-A status transition does not manufacture evidence. In particular, `done` and `verified` require the
-evidence class named by the owning record.
+A status transition does not manufacture evidence. `done`, `verified` and completed Program closure
+require the evidence class named by the owning record.
 
-## Helper command summary
+## Capability packs and overlays
+
+Core Project OS owns lifecycle and state. Packs add guidance only where a boundary changes
+implementation or verification decisions.
+
+| Pack | Boundary |
+| --- | --- |
+| `service` | APIs, workers, queues, authentication, integrations and distributed outcomes |
+| `web` | Browser UI, routing, accessibility, responsive behavior and browser-owned state |
+| `mobile` | Application lifecycle, permissions, native handoffs, persistence and device evidence |
+| `data` | Schemas, migrations, transactions, storage, deletion and restore |
+| `delivery` | Builds, artifacts, deployment, runtime compatibility and release gates |
+
+The `react-native-expo` overlay refines the `mobile` pack when exact repository signals exist. It
+does not replace pinned dependencies, platform behavior, official documentation or runtime evidence.
+
+Languages and frameworks are detection signals, not behavioral profiles. Any justified pack
+combination is valid. Concrete dependency and configuration signals may recommend capabilities in
+any ecosystem: for example, recognized Clojure HTTP and database libraries can select `service` and
+`data`, while a bare Clojure manifest selects neither pack merely because the language is present.
+
+## Helper summary
 
 | Command | Writes | Purpose |
 | --- | --- | --- |
 | `detect` | No | Inspect toolchain and capability signals |
-| `init` | Yes, unless `--dry-run` | Create a new Lite or Full control plane |
-| `adopt` | Yes, unless `--dry-run` | Map and attach to compatible existing records |
-| `check` | No | Validate structure, mappings, registries, paths, managed baselines and release alignment |
-| `sync-knowledge` | Yes, unless `--dry-run` | Synchronize selected managed guidance and seed knowledge without overwriting conflicts |
+| `init` | Unless `--dry-run` | Create Standard |
+| `adopt` | Unless `--dry-run` | Attach to compatible existing owners |
+| `check` | No | Validate structure, lifecycle, archive hashes and release alignment |
+| `sync-knowledge` | Unless `--dry-run` | Synchronize managed guidance and seed knowledge |
+| `upgrade` | Unless `--dry-run` | Migrate to the installed release with caught-failure rollback |
+| `program start` | Unless `--dry-run` | Validate a definition and start one Program |
+| `program status` | No | Report active Program state |
+| `program close` | Unless `--dry-run` | Close and archive one Program |
 
-Every command requires `--target`. Use an absolute repository path in automation. `.` is convenient
-only when Terminal is already at the intended repository root.
+Every command requires `--target`. Prefer an absolute repository path in automation. `.` is
+convenient only when Terminal is already at the intended repository root.
 
 ### Detect
 
@@ -121,97 +184,53 @@ only when Terminal is already at the intended repository root.
 python3 /absolute/path/to/project-os/scripts/project_os.py detect --target /path/to/repository
 ~~~
 
-- Result: the helper reports detected toolchain signals plus recommended packs and overlays.
-- Files: none change.
-- Proof: review the structured output and confirm each recommendation against repository evidence.
-- Skip it when: a recent reviewed detection already exists and relevant tool configuration has not
-  changed.
+Detection reports toolchain signals plus recommended packs and overlays. It changes no files and never
+proves commands, authority, architecture or product requirements.
 
-Detection never proves commands, authority, architecture or product requirements.
-
-### Initialize a clean repository
+### Initialize Standard
 
 Preview first.
 
 **Run this in Terminal:**
 
 ~~~bash
-python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --mode lite --packs auto --overlays auto --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto --dry-run
 ~~~
 
-- Result: the command lists the proposed Lite-mode files and automatic selections without writing.
-- Files: none change.
-- Proof: review every proposed create and confirm the pack and overlay selections.
-- Skip it when: `AGENTS.md` or `.agents` already exists.
-
-Apply the exact reviewed selection by removing only `--dry-run`.
+Apply only the identical reviewed operation without `--dry-run`.
 
 **Run this in Terminal:**
 
 ~~~bash
-python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --mode lite --packs auto --overlays auto
+python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto
 ~~~
 
-- Result: the helper creates the missing Lite-mode records.
-- Files: root `AGENTS.md` and `.agents` are created. Application files do not change.
-- Proof: compare the applied files with the dry run, fill repository-specific truth and run `check`.
-- Skip it when: the preview was not reviewed or repository state changed after the preview.
+`init` always creates Standard and never creates `PROGRAM.md`. It refuses an existing Project OS
+owner, but preserves non-conflicting unrelated content such as `.agents/plugins`.
 
-`init` refuses any existing `.agents` tree. It also refuses an existing root `AGENTS.md` unless the
-file already routes to `.agents/CONTEXT.md` and `.agents/STATE.md` and the explicit preservation flag
-is supplied.
-
-### Initialize while preserving `AGENTS.md`
-
-Review and add the two required routes before running this command.
+For an existing root `AGENTS.md`, first add and review the minimum routes to
+`.agents/CONTEXT.md` and `.agents/STATE.md`, then preview with the narrow preservation flag.
 
 **Run this in Terminal:**
 
 ~~~bash
-python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --mode lite --packs auto --overlays auto --allow-existing-agents --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto --allow-existing-agents --dry-run
 ~~~
 
-- Result: the helper validates that existing root instructions route to both required records, then
-  previews creation of the remaining control plane.
-- Files: none change.
-- Proof: review every proposed create and confirm that `AGENTS.md` is preserved.
-- Skip it when: `.agents` already exists or either required route is absent.
+Apply the same command without `--dry-run`. The flag never permits overwriting instructions.
 
-`--allow-existing-agents` is a narrow preservation gate, not permission to overwrite instructions.
+### Adopt
 
-Apply the same reviewed command without `--dry-run`.
+Include `--inventory` when older Markdown lessons need explicit coverage.
 
 **Run this in Terminal:**
 
 ~~~bash
-python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --mode lite --packs auto --overlays auto --allow-existing-agents
+python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory --dry-run
 ~~~
 
-- Result: the helper preserves the routed root instructions and creates the remaining control plane.
-- Files: `AGENTS.md` is unchanged and missing `.agents` records are created.
-- Proof: the output says `existing AGENTS.md preserved`, then `check` passes.
-- Skip it when: the preview was not reviewed or repository state changed after the preview.
-
-### Adopt compatible existing records
-
-Include `--inventory` when the repository contains older Markdown lessons that need explicit coverage.
-
-**Run this in Terminal:**
-
-~~~bash
-python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --dry-run --inventory
-~~~
-
-- Result: the helper discovers candidate record owners, validates them and reports mappings,
-  conflicts, planned creates and legacy knowledge inventory.
-- Files: none change.
-- Proof: require `safe_to_adopt: true` and no existing files listed as modified.
-- Skip it when: the repository has no compatible context, state, plan or finding owners.
-
-Adoption fails closed on ambiguous owners, missing required routing, unsafe paths, incomplete legacy
-knowledge coverage and occupied managed destinations.
-
-Apply the reviewed adoption without `--dry-run`.
+Apply only when the output reports `safe_to_adopt: true`, the mapping is correct and no project-owned
+destination is listed for modification.
 
 **Run this in Terminal:**
 
@@ -219,10 +238,8 @@ Apply the reviewed adoption without `--dry-run`.
 python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory
 ~~~
 
-- Result: the helper rechecks its adoption preconditions and attaches Project OS to the mapped owners.
-- Files: only the reviewed manifest, managed guidance and shared knowledge files are created.
-- Proof: existing records are unchanged and `check` passes.
-- Skip it when: the preview reported an error or repository state changed after the preview.
+Adoption fails closed on ambiguous owners, unsafe paths, incomplete legacy knowledge coverage and
+occupied managed destinations.
 
 ### Check
 
@@ -232,18 +249,10 @@ python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/
 python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
 ~~~
 
-- Result: the helper validates the active repository control plane without changing it.
-- Files: none change.
-- Proof: successful output is exactly headed by `Project OS check: PASS` and the process exits zero.
-- Skip it when: do not skip after Project OS changes. It is optional after application-only work that
-  leaves all control-plane records untouched.
-
-Use `--config /path/to/proposed-SYSTEM.json` to validate an adoption manifest before placing it at
-`.agents/SYSTEM.json`.
+The command is read-only. Success prints `Project OS check: PASS` and exits zero. Use
+`--config /path/to/proposed-SYSTEM.json` to validate an adoption manifest before installing it.
 
 ### Synchronize managed guidance and knowledge
-
-Always preview.
 
 **Run this in Terminal:**
 
@@ -251,13 +260,9 @@ Always preview.
 python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository --dry-run
 ~~~
 
-- Result: the helper previews the installed release's managed guidance and shared seed knowledge.
-- Files: none change.
-- Proof: the output reports additions and updates with no guidance or knowledge conflicts.
-- Skip it when: the connected repository already matches the installed release and its selected
-  managed content.
-
-Apply and validate only after reviewing the clean preview.
+A locally divergent managed file or knowledge entry is a conflict. Synchronization aborts before
+partial writes. The repository must already match the helper's Project OS release; synchronization
+does not perform an upgrade. Apply only a clean preview.
 
 **Run this in Terminal:**
 
@@ -266,15 +271,98 @@ python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --targ
 python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
 ~~~
 
-- Result: the helper applies the reviewed managed update and immediately validates the repository.
-- Files: managed pack or overlay files, shared knowledge and managed metadata in `SYSTEM.json` may
-  change. Project-owned records remain untouched.
-- Proof: the final command prints `Project OS check: PASS`.
-- Skip it when: the preview reported any conflict or repository state changed after the preview.
+Project-owned context, state, plans, findings, evidence and project knowledge are never replaced by
+this command.
 
-An existing managed file is updated only when it still matches its recorded baseline. A locally
-divergent managed file or entry produces a conflict and aborts synchronization before partial writes.
-Entries outside the selected upstream set are retained when their structure and provenance are valid.
+### Upgrade
+
+**Run this in Terminal:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
+~~~
+
+For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade
+combines schema migration, managed guidance, shared knowledge and `SYSTEM.json` changes in one
+conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures
+roll back completed changes. Applying a clean upgrade finishes by running the checker.
+
+A schema 2 repository with a legacy `PROGRAM.md` requires explicit classification.
+
+**Run this in Terminal for an active legacy Program:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --legacy-program-state active --dry-run
+~~~
+
+The applying form preserves the active editable contract, records its legacy origin and migration
+date, leaves the unprovable Program start date null and enters Program mode.
+
+**Run this in Terminal for a closed legacy Program:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --legacy-program-state closed --disposition stopped --closed-on 2026-09-07 --reason "Initiative ended before this migration" --dry-run
+~~~
+
+Use `--disposition completed` only when completion evidence exists. `stopped` requires
+`--reason`. Every closed legacy migration requires `--closed-on YYYY-MM-DD`. This is the actual
+historical closure date, not the upgrade date. Codex derives it only from repository evidence and
+stops if it cannot be established. A closed migration archives the exact legacy Program bytes.
+Remove only `--dry-run` after reviewing the complete preview.
+
+`--closed-on` is valid only with `--legacy-program-state closed`. Current-schema upgrades and
+active legacy migrations reject it.
+
+The Codex shortcut `$project-os upgrade` inspects repository evidence and selects these flags. If
+legacy state cannot be determined, it stops for a decision.
+
+### Start a Program
+
+Codex normally prepares the definition file from verified repository evidence. Direct helper use
+requires a JSON file matching the Program definition table above.
+
+**Run this in Terminal:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py program start --target /path/to/repository --definition /path/to/program-definition.json --dry-run
+~~~
+
+Apply the same reviewed command without `--dry-run`. The helper requires Standard mode, no active
+Program and a complete definition. It creates no plan and no empty history scaffold. History appears
+when the first Program is archived.
+
+### Program status
+
+**Run this in Terminal:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py program status --target /path/to/repository
+~~~
+
+This command is read-only.
+
+### Close a Program
+
+Preview a completed closure.
+
+**Run this in Terminal:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py program close --target /path/to/repository --disposition completed --dry-run
+~~~
+
+Preview a stopped closure with its required reason.
+
+**Run this in Terminal:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py program close --target /path/to/repository --disposition stopped --reason "Initiative replaced by another approach" --dry-run
+~~~
+
+Closure fails while any plan is active. Apply only the reviewed command without `--dry-run`. The
+helper archives exact bytes, creates the history README on first closure, updates the history index
+and returns the repository to Standard as one transaction. It does not semantically validate
+completion evidence.
 
 ## Selection values
 
@@ -283,62 +371,38 @@ For `init`:
 - `--packs auto` uses detected recommendations.
 - `--packs none` selects no capability packs.
 - `--packs service,web` selects an explicit comma-separated set.
-- `--overlays auto` uses detected recommendations compatible with selected packs.
+- `--overlays auto` uses recommendations compatible with selected packs.
 - `--overlays none` selects no overlays.
-- `--overlays react-native-expo` selects the current explicit overlay and requires `mobile`.
+- `--overlays react-native-expo` requires `mobile`.
 
-For `sync-knowledge`, omitted selection flags use the selections already stored in `SYSTEM.json`.
-Explicit sync selections must exactly match that manifest.
+For `sync-knowledge`, omitted selection flags use `SYSTEM.json`. Explicit selections must match it.
 
-## Release version and schema version
+## Release and schema versions
 
-Project OS release version and file-format schema version are different values:
+Release and file-format versions are separate:
 
-- Release `1.0.1` identifies the installed skill, helper, package metadata, connected
+- Release 2.0.0 identifies the installed skill, helper, package metadata, connected
   `project_os_version` and managed knowledge provenance.
-- `SYSTEM.schema_version` remains `2` until the manifest format itself changes.
-- Knowledge registries currently use their own `schema_version: 1`.
-- The version in the external `$schema` URL inside `plugin.json` belongs to the Agent Plugins schema,
+- `SYSTEM.schema_version` is 3.
+- Knowledge registries retain their own `schema_version: 1`.
+- The version in the external `$schema` URL inside `plugin.json` belongs to that external schema,
   not to the Project OS release.
 
-The helper's release constant is authoritative for generated and checked Project OS versions. The
-checker rejects a connected repository whose `project_os_version` or managed `knowledge_version` does
-not match it.
+The checker requires the repository release and shared knowledge version to match the installed
+helper. Do not edit version fields manually to silence it.
 
-## Managed and project-owned content
+## Safety
 
-Project OS records hashes for managed pack guidance and managed seed knowledge. This lets the helper
-update an unchanged baseline and refuse a locally divergent one.
-
-These records remain project-owned and are never replaced by synchronization:
-
-- `AGENTS.md`
-- `CONTEXT.md`
-- `STATE.md`
-- plans and plan index
-- findings
-- evidence
-- project knowledge
-- Full-mode program and history
-
-Resolve a managed conflict by deciding whether the local content belongs in project-owned guidance,
-should be contributed upstream or should be deliberately restored to the release baseline. Do not
-choose text merely because it has a newer date.
-
-## Evidence classes
-
-Project OS keeps source, static, unit, local integration, hosted, artifact, production,
-owner-reported, manual and physical evidence distinct. A passing checker proves Project OS structural
-consistency only.
-
-## Safety constraints
-
-- Managed paths must remain safe, repository-relative and free of symlink replacement boundaries.
-- Writes use conflict and concurrency checks and fail closed where ownership is unclear.
-- Shared knowledge must not contain credentials, personal data, private machine paths, private URLs,
-  signed URLs or copied project history.
+- Managed paths remain repository-relative and free of symlink replacement boundaries.
+- Multi-file operations use conflict and concurrency checks and fail closed.
+- An abrupt process termination or power loss can interrupt a multi-file operation. Run the checker
+  afterward and repair from Git or another reviewed source if it reports partial state.
+- Shared knowledge policy excludes credentials, personal data, private paths, private URLs, signed
+  URLs and copied project history. The helper rejects common detectable patterns; human review is
+  still required because a denylist cannot prove arbitrary text is sanitized.
 - The helper initiates no network request and uses only the Python standard library.
 - Project OS grants no authority for application changes, dependency installation, deletion, Git
   operations, deployment, publication or external communication.
+- A passing checker proves Project OS structural consistency, not application or production behavior.
 
-See [Security](../SECURITY.md) for reporting and supported-version policy.
+See [Security](../SECURITY.md) for the reporting policy.

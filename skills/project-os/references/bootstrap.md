@@ -1,104 +1,106 @@
 # Connect a repository
 
-Use this procedure when Project OS has not yet been connected to the target repository. Installing the
-skill and connecting a repository are separate operations.
+Use this workflow for `inspect`, `bootstrap` and `adopt`. Installing the skill and connecting a
+repository are separate operations.
 
-Resolve `scripts/project_os.py` relative to the installed Project OS skill directory in every command
-below. Do not assume the target repository contains the helper.
+Resolve `scripts/project_os.py` relative to the installed Project OS skill directory. Do not assume
+the target repository contains the helper.
 
 ## Inspect first
 
 1. Resolve the repository root and inspect Git status without modifying files.
-2. Read every applicable existing `AGENTS.md` or `AGENTS.override.md` from the root to the working
-   directory.
-3. Inspect the real stack and commands from tracked configuration, lockfiles, CI, Makefiles, task
-   runners, and existing documentation.
-4. Identify authoritative product, architecture, API, security, and operational documents. Do not
-   infer authority from a filename alone.
+2. Read applicable `AGENTS.md` or `AGENTS.override.md` files from the root to the working directory.
+3. Inspect tracked configuration, lockfiles, CI, Makefiles, task runners and current documentation.
+4. Identify authoritative product, architecture, API, security and operational sources. A filename
+   alone does not prove authority.
+5. Detect capability signals, then justify each selected pack and overlay from repository evidence.
+6. Classify the connection path: clean bootstrap, preservation of an existing root `AGENTS.md` or
+   adoption of compatible existing owners.
 
-If the user asked only for an inspection, stop after reporting the recommended setup, mode, packs,
-overlays, files, and exact next command. Do not initialize or adopt anything.
+For `inspect`, report that classification, evidence, proposed files and exact next request, then
+stop without writing.
 
-## Choose a mode
+## Bootstrap means Standard
 
-- `lite`: default. Creates routing, durable context, a compact checkpoint, just-in-time plans,
-  findings, evidence, capability guidance, and project/shared knowledge.
-- `full`: adds a program contract and history boundary for an approved multi-phase audit, migration,
-  release program, or other long-running initiative.
+Bootstrap always creates Standard. It never creates `PROGRAM.md` or guesses that a repository needs
+a Program. Program is a separate lifecycle decision after connection.
 
-Capability packs can be auto-detected or explicitly selected from `service`, `web`, `mobile`,
-`data`, and `delivery`. Ecosystem overlays refine a matching pack; `react-native-expo` requires
-`mobile`. Languages are toolchain signals only and never select behavioral profiles.
+Capability packs are `service`, `web`, `mobile`, `data` and `delivery`. The
+`react-native-expo` overlay requires `mobile`. Languages and frameworks are signals, not behavior
+profiles.
 
-## Choose the repository path
+## Clean bootstrap
 
-### Clean repository
+Use `init` when Project OS owners do not exist. A safe unrelated `.agents` namespace such as
+`.agents/plugins` may remain in place and must be preserved.
 
-Use `init` when neither `.agents` nor a root `AGENTS.md` exists.
+Run this in Terminal with the installed helper path resolved:
 
-Run in Terminal with the installed helper path resolved:
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py detect --target /path/to/repository
+python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto --dry-run
+~~~
 
-```shell
-python3 <project-os-skill-directory>/scripts/project_os.py detect --target <repository>
-python3 <project-os-skill-directory>/scripts/project_os.py init --target <repository> --mode lite --packs auto --overlays auto --dry-run
-python3 <project-os-skill-directory>/scripts/project_os.py init --target <repository> --mode lite --packs auto --overlays auto
-```
+Review every proposed create and selection. Apply only the identical clean operation:
 
-Change `--mode lite` to `--mode full` only when Full mode was selected deliberately. Review the dry-run
-output before applying the identical command without `--dry-run`.
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto
+~~~
 
-### Existing root AGENTS.md only
+Do not initialize when the dry run reports a Project OS owner, unsafe path or occupied destination.
 
-Preserve the file. Add the smallest explicit routing needed for Codex to read `.agents/CONTEXT.md` and
-`.agents/STATE.md`, review that edit, then run `init` with `--allow-existing-agents`. The helper refuses
-this flag until both routes are present.
+## Existing root AGENTS.md
 
-Run in Terminal with the installed helper path resolved:
+Preserve the file. Propose the smallest explicit routing needed for
+`.agents/CONTEXT.md` and `.agents/STATE.md`. Apply that reviewed routing without replacing existing
+instructions, then use the narrow preservation flag.
 
-```shell
-python3 <project-os-skill-directory>/scripts/project_os.py init --target <repository> --mode lite --packs auto --overlays auto --allow-existing-agents --dry-run
-python3 <project-os-skill-directory>/scripts/project_os.py init --target <repository> --mode lite --packs auto --overlays auto --allow-existing-agents
-```
+Run this in Terminal with the installed helper path resolved:
 
-Do not replace the existing `AGENTS.md` with the bundled template. Merge only compatible routing and
-lifecycle rules.
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto --allow-existing-agents --dry-run
+~~~
 
-### Existing compatible control plane
+The helper refuses the flag until both routes are present. Apply the same command without
+`--dry-run` only after confirming that `AGENTS.md` will be preserved.
 
-Use `adopt` when the repository already has compatible `.agents` owners for context, state, plans, and
-findings. Adoption discovers the existing owners and adds managed Project OS metadata, guidance, and
-shared knowledge without rewriting those owners.
+## Existing compatible control plane
 
-Run in Terminal with the installed helper path resolved:
+Use `adopt` when compatible owners already exist for context, state, plans and findings. Adoption
+maps them and adds managed metadata, guidance and shared knowledge without rewriting those owners.
 
-```shell
-python3 <project-os-skill-directory>/scripts/project_os.py adopt --target <repository> --inventory --dry-run
-python3 <project-os-skill-directory>/scripts/project_os.py adopt --target <repository> --inventory
-```
+Run this in Terminal with the installed helper path resolved:
 
-Apply only when the dry run reports `safe_to_adopt: true`, the mapping is correct, and planned creates
-contain no project-owned destination. If existing state is incomplete or incompatible, report the exact
-missing owner or conflict instead of initializing over it.
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory --dry-run
+~~~
+
+Apply only when the preview reports `safe_to_adopt: true`, every mapping is correct and no
+project-owned destination is listed for modification:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory
+~~~
+
+Adoption fails closed on ambiguous owners, unsafe paths, incomplete legacy knowledge coverage and
+occupied managed destinations.
+
+Do not infer an active Program merely because `PROGRAM.md` exists. Adoption fails closed in this
+case. Resolve the lifecycle explicitly instead of forcing adoption.
 
 ## Finish the connection
 
-After scaffolding:
+1. Merge only routing and lifecycle rules compatible with the existing `AGENTS.md`.
+2. Fill `.agents/CONTEXT.md` with verified authority, architecture, commands and boundaries.
+3. Remove unjustified packs or overlays. Add nested instructions only for genuinely different scopes.
+4. Keep `.agents/STATE.md` idle until a concrete resumable plan is opened.
+5. Run the checker:
 
-1. Merge only the routing and lifecycle rules that fit the existing `AGENTS.md`.
-2. Fill `.agents/CONTEXT.md` with verified authority, architecture, commands, and boundaries found in
-   the repository.
-3. Remove unjustified packs or overlays. Add nested `AGENTS.md` only where a subtree genuinely needs
-   different rules or commands.
-4. Keep `.agents/STATE.md` at `idle` until a concrete long-running package is opened.
-5. Run the checker with the installed helper:
+   ~~~shell
+   python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
+   ~~~
 
-   ```shell
-   python3 <project-os-skill-directory>/scripts/project_os.py check --target <repository>
-   ```
+6. Report created or adopted files, checker result and unverified boundaries.
+7. Recommend a new Codex task so new startup instructions enter the instruction chain.
 
-6. Report the created or adopted files, checker result, and anything still unverified.
-7. Recommend opening a new Codex task in the target repository so its new or updated `AGENTS.md` is
-   loaded as startup instruction context.
-
-Do not copy another project's state, plan registry, findings, history, absolute paths, private
-evidence, or product rules into the new repository.
+Do not copy another project's state, plans, findings, history, paths, evidence or product rules.

@@ -16,7 +16,8 @@ routes Codex to the relevant records; it does not load every file for every requ
   select behavior.
 
 Do not put credentials, personal data, generated task diaries, or application runtime assets here.
-History and broad program files are optional Full-mode additions.
+`PROGRAM.md` exists only while an explicitly started multi-phase Program is active. `history/` is an
+optional tamper-evident archive whose indexed snapshots are verified by SHA-256.
 
 Installing the Project OS skill, connecting this repository, and opening a plan are separate actions.
 Ordinary engineering requests do not require `$project-os`; that prefix explicitly selects the skill

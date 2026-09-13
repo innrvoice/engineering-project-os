@@ -2,287 +2,379 @@
 
 Most engineering work in a connected repository does not need `$project-os`.
 
-Use ordinary chat for the product and its code. Invoke `$project-os` when the thing you want to
-create, check or change is the repository's Project OS control plane.
+Use ordinary chat for the product and its code. Invoke `$project-os` when the object you want to
+create, inspect or change is the repository's Project OS control plane.
 
-| Your intent | How to ask |
-| --- | --- |
-| Explain, debug, implement, test or review application work | Write a normal Codex message |
-| Bootstrap, adopt, check, repair or upgrade Project OS | Start the message with `$project-os` |
-| Make a long outcome resumable across tasks | Ask `$project-os` to open one plan |
-| Record a checkpoint, finding or confirmed lesson | Use the matching `$project-os` recipe below |
-| Run a deterministic operation manually or in CI | Run the Python helper in Terminal |
+## Ask for the menu
 
-`$project-os` applies to the current message. It is not a mode you leave running.
+**Type this in Codex chat:**
+
+~~~text
+$project-os help
+~~~
+
+- Result: Codex returns a concise, read-only menu of every supported short request, its purpose,
+  required argument and one or two examples. It also separates Codex chat requests from Python helper
+  commands that belong in Terminal.
+- Files: none change.
+- Proof: the response is explanatory only and contains no attempted mutation.
+- Skip it when: you already know the request you need.
+
+Help itself never inspects in order to mutate, never runs an applying helper command and never changes
+repository files.
+
+## Short request menu
+
+These are recommended natural-language shortcuts. They are not a strict command grammar.
+
+| Short request | Purpose | Required text |
+| --- | --- | --- |
+| `$project-os help` | Show the read-only menu | None |
+| `$project-os inspect` | Inspect repository and recommend setup or maintenance | None |
+| `$project-os bootstrap` | Create a Standard control plane | None |
+| `$project-os adopt` | Attach to compatible existing records | None |
+| `$project-os check` | Validate Project OS without writes | None |
+| `$project-os repair` | Repair verified Project OS errors | Error or scope when it is not already clear |
+| `$project-os upgrade` | Upgrade to the installed release | None |
+| `$project-os program start: <initiative>` | Start one temporary multi-phase Program | Initiative |
+| `$project-os program status` | Report active Program state without writes | None |
+| `$project-os program close completed` | Close a Program whose exit evidence is complete | None |
+| `$project-os program close stopped: <reason>` | Stop and archive an incomplete Program | Reason |
+| `$project-os plan open: <outcome>` | Open one resumable outcome plan | Outcome |
+| `$project-os plan checkpoint` | Reconcile and save the active plan checkpoint | None |
+| `$project-os plan resume` | Reconcile and continue the active plan | None |
+| `$project-os plan complete` | Complete the active plan when evidence permits | None |
+| `$project-os plan block: <reason>` | Preserve a blocked plan and resume condition | Reason |
+| `$project-os plan supersede: <reason>` | Retire a replaced plan | Reason |
+| `$project-os finding add: <observation>` | Record a concrete finding without inventing cause | Observation |
+| `$project-os knowledge capture: <finding-id>` | Convert a confirmed finding into project knowledge | Finding ID |
+| `$project-os knowledge propose-shared: <lesson-id>` | Draft a sanitized portable lesson for review | Project lesson ID |
+
+Text after a shortcut may add boundaries in any language.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os check. Focus on archive hashes and do not change files.
+~~~
+
+That is still a check. If the intent is ambiguous, Codex shows relevant help or asks one focused
+question before any write. If the request is unrelated to Project OS, Codex treats it as ordinary
+work and does not manufacture control-plane records.
 
 ## Do ordinary work
 
 **Type this in Codex chat:**
 
 ~~~text
-Find why the orders endpoint returns the same final item on two cursor pages. Fix the verified cause
+Find why the orders endpoint repeats the final item on two cursor pages. Fix the verified cause
 without changing the response schema and run the focused tests.
 ~~~
 
-- Result: Codex follows the repository's `AGENTS.md`, reads the relevant current records and works on
-  the application normally.
-- Files: code, tests and only those durable records whose truth changed may be updated.
-- Proof: review the diff, the focused test result and every stated unverified boundary.
+- Result: Codex follows the repository's `AGENTS.md`, reads only relevant records and works on the
+  application normally.
+- Files: code, tests and only durable records whose truth changed may be updated.
+- Proof: review the diff, focused checks and every stated unverified boundary.
 - Skip it when: the request is specifically about Project OS setup or state.
 
-For a small task, stop there. Do not open a plan only to create paperwork.
+A small task does not need a plan. A long task does not automatically need a Program.
+
+## Inspect, bootstrap, adopt, check and repair
+
+Use the shortest clear request. Add constraints only when they matter.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os inspect
+~~~
+
+This is read-only and recommends a repository connection or maintenance path.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os bootstrap
+~~~
+
+This creates Standard after inspection and a clean initialization dry run. It never creates
+`PROGRAM.md`.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os adopt
+~~~
+
+This maps compatible existing owners after a clean adoption dry run. It never overwrites those owners.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os check
+~~~
+
+This is always read-only.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os repair: fix only the active_plan mismatch reported by the last check
+~~~
+
+A repair inspects current state, previews the exact Project OS changes, applies only when ownership is
+clear and finishes with the checker. It does not repair application code under the same request.
+
+See [Setup](SETUP.md) for the three repository connection shapes.
 
 ## Open a durable plan
 
-Use a plan when one observable outcome must survive several checkpoints, has several evidence gates or
-cannot safely be reconstructed from one chat.
+Use one plan when an observable outcome must survive several checkpoints or has evidence gates that
+cannot safely be reconstructed from one conversation.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Open one plan to make password reset requests idempotent across API retries and worker
-redelivery. Inspect current Git state and relevant callers first. Record the interfaces, compatibility
-boundary, acceptance evidence and exact first action. Do not implement the application change yet.
+$project-os plan open: make password reset idempotent across API retries and worker redelivery
 ~~~
 
-- Result: Codex creates one outcome-focused plan, marks it active and rewrites the current checkpoint.
-- Files: `.agents/plans/index.json`, one `.agents/plans/NNN-*.md` file and `.agents/STATE.md` may
-  change.
-- Proof: exactly one plan is active, execution state is `running`, acceptance items are observable and
-  the checker passes.
-- Skip it when: the task is bounded enough to complete and verify in the current working session.
+- Result: Codex inspects current state, drafts one outcome-focused plan, previews the state transition,
+  creates it only when its boundaries and acceptance evidence are clear and runs the checker.
+- Files: `.agents/plans/index.json`, one plan file and `.agents/STATE.md` may change.
+- Proof: exactly one plan is active, execution state is `running`, acceptance items are observable
+  and the checker passes.
+- Skip it when: the task can be completed and verified in the current working session.
 
-A plan is not a transcript. It records the outcome, boundaries, interfaces, work, acceptance evidence
-and unresolved obligations.
-
-## Checkpoint active work
-
-Checkpoint when another task must be able to continue without the current conversation.
+Extra text can preserve a specific interface or prevent implementation in the same turn.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Checkpoint the active plan. Reconcile it with the current Git diff and verification
-results, update only acceptance items whose evidence exists and leave one exact next action. Keep
-durable facts in CONTEXT and do not append a work diary.
+$project-os plan open: make password reset idempotent. Preserve the public API and only create the plan; do not implement it yet.
 ~~~
 
-- Result: Codex reconciles the active plan with current repository evidence and leaves a compact
-  resumable state.
-- Files: the active plan and `.agents/STATE.md` may change. Findings, evidence or `CONTEXT.md` change
-  only when their owned truth changed.
-- Proof: the next action is executable, completed items cite evidence and the checker passes.
-- Skip it when: the task is complete and can be closed immediately or no durable plan is active.
+A plan is not a transcript. It owns one outcome, boundaries, interfaces, work, evidence and unresolved
+obligations.
 
-## Resume from repository state
-
-Start a new Codex task in the same repository, then ask Project OS to resume the active plan.
+## Checkpoint, resume and complete a plan
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Resume the active plan from repository state. Compare the checkpoint with current HEAD,
-Git status and relevant files, revalidate anything made stale by later changes and continue the exact
-next action.
+$project-os plan checkpoint
 ~~~
 
-- Result: Codex treats current repository state as authority, checks whether the checkpoint is stale
-  and continues the plan.
+- Result: Codex reconciles the active plan with Git state and current evidence, updates only supported
+  acceptance items and leaves one exact next action.
+- Files: the active plan and `.agents/STATE.md` may change. Other records change only when their owned
+  truth changed.
+- Proof: completed items cite evidence, the next action is executable and the checker passes.
+- Skip it when: no plan is active or the plan can be completed immediately.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os plan resume
+~~~
+
+- Result: Codex compares the checkpoint with current HEAD, worktree state and relevant files before
+  continuing the exact next action.
 - Files: application files named by the plan and relevant Project OS records may change within the
   authority of the request.
-- Proof: Codex states the reconciled baseline, work performed, verification and new next action.
-- Skip it when: there is no active plan or you only need a read-only status summary.
-
-For a read-only resume assessment, add `Do not change files or continue implementation.`
-
-## Complete a plan
-
-Completion requires the evidence named by the plan. A source change does not prove a deployment and a
-green test does not prove a manual, hosted, artifact or physical gate.
+- Proof: Codex reports the reconciled baseline, work performed, verification and next action.
+- Skip it when: no plan is active. Add `do not continue implementation` for a read-only assessment.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Complete the active plan only if every acceptance item has its required evidence.
-Reconcile the plan, evidence links and findings, set execution to idle and leave a compact final
-checkpoint. Preserve every missing evidence class as an explicit open obligation.
+$project-os plan complete
 ~~~
 
-- Result: Codex marks the plan `done` only when its acceptance contract is satisfied.
-- Files: the active plan, plan index and `.agents/STATE.md` change. Linked findings or evidence may
-  change when supported by new proof.
-- Proof: no plan remains active, execution state is `idle`, evidence links resolve and the checker
-  passes.
-- Skip it when: any required gate is still missing. Block the plan instead of declaring it done.
+- Result: Codex marks the plan `done` only when every acceptance item has its required evidence, then
+  returns execution state to `idle`.
+- Files: the plan, plan index and `.agents/STATE.md` change. Linked evidence or findings change only
+  when supported by new proof.
+- Proof: no plan remains active, evidence links resolve and the checker passes.
+- Skip it when: any required gate is missing.
 
-## Block a plan
+A source edit does not prove deployment. A unit test does not prove a hosted, artifact, production,
+manual or physical gate.
 
-Blocking preserves work. It does not erase unfinished obligations.
+### Block or supersede
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Block the active plan on the missing staging credential. Preserve completed evidence,
-record the exact unmet condition and the first action available after access is restored, then run the
-checker.
+$project-os plan block: staging credentials are unavailable
 ~~~
 
-- Result: Codex changes the plan status to `blocked` and records a precise blocker and resume point.
-- Files: the plan, plan index and `.agents/STATE.md` change.
-- Proof: no plan is marked active, the blocker is testable and completed work remains recorded.
-- Skip it when: meaningful in-scope work can still continue without resolving the stated condition.
-
-## Supersede a plan
-
-Use supersession when the intended outcome or route has been replaced, not merely postponed.
+This preserves completed evidence, the exact unmet condition and the first action available after the
+blocker clears.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Supersede the active plan because the repository now uses the replacement payments API.
-Preserve unfinished obligations, identify the replacement plan or next decision and keep the old plan
-as history rather than rewriting it.
+$project-os plan supersede: the repository now uses the replacement payments API
 ~~~
 
-- Result: Codex marks the old plan `superseded` and records why it no longer governs the work.
-- Files: the old plan, plan index and `.agents/STATE.md` change. A replacement plan is created only if
-  the prompt or current decision requires one.
-- Proof: the superseded plan names its replacement or next decision and the checker passes.
-- Skip it when: the same plan remains valid and is only waiting on a blocker.
+This preserves the old plan as history and identifies the replacement or next decision. Postponement
+alone is not supersession.
 
-## Record a finding
+## Start a Program
 
-Findings are concrete repository problems, candidates and accepted risks. Hypotheses stay findings
-until evidence confirms a mechanism.
+Use a Program only when several plans or outcomes need one temporary multi-phase contract.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Record the observed duplicate password-reset email as a project finding. Use the current
-logs and reproduction as evidence, distinguish observation from inference, assign a stable ID and
-state the decisive next check. Do not claim a root cause that is not verified.
+$project-os program start: migrate authentication across the API, workers, web and mobile without downtime
 ~~~
 
-- Result: Codex creates or updates one finding with status, impact, evidence and a required check.
-- Files: `.agents/findings/findings.json` and sanitized linked evidence may change. The active plan
-  changes only when the finding affects it.
-- Proof: the finding has a stable ID, evidence references and a check that can confirm or reject it.
-- Skip it when: the note is merely temporary debugging output or the issue is already represented by
-  an existing finding.
+- Result: Codex inspects the repository, derives only verified contract fields and asks for any
+  material missing decision. Once complete, it previews and starts the Program, then runs the checker.
+- Files: `.agents/PROGRAM.md` and Program metadata in `.agents/SYSTEM.json` may change. Starting
+  the first Program does not create an empty history archive, a plan or application code.
+- Proof: the contract has explicit authority, at least two phases with exit conditions, evidence
+  requirements, cost boundaries, exclusions and overall exit conditions; `SYSTEM.mode` is
+  `program`; the checker passes.
+- Skip it when: one plan can own the work or phases do not share a meaningful governing contract.
 
-## Turn a confirmed failure into knowledge
+A concise request is enough to begin the workflow. It is not permission to invent missing authority,
+budget, evidence or exclusions.
 
-Project knowledge may retain repository, dependency and environment context. It still requires a
-confirmed mechanism.
+### Program status
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Convert finding FIND-012 into a confirmed project failure lesson. Preserve the mechanism,
-trigger, prevention, decisive verification and version boundaries. Link the evidence and do not add
-unverified conclusions.
+$project-os program status
 ~~~
 
-- Result: Codex converts confirmed evidence into a reusable lesson for this repository.
-- Files: `.agents/knowledge/project/failures.json` changes. The source finding may be linked or updated.
-- Proof: the lesson states when it applies, how the failure happens and which check decisively catches
-  it.
-- Skip it when: the mechanism remains a hypothesis or the finding contains no decisive evidence.
+- Result: Codex reports the active Program, current phase evidence, plan state and unresolved exit
+  conditions.
+- Files: none change.
+- Proof: the report is derived from current repository records and Git state.
+- Skip it when: no Program is active.
 
-Review portability separately before adding anything to shared knowledge.
+### Close a completed Program
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Review the confirmed project lesson for shared use. If the mechanism is genuinely
-portable, propose a sanitized shared entry that removes project names, private paths, credentials,
-user data, private URLs and product history. Do not write or publish it until I review the proposal.
+$project-os program close completed
 ~~~
 
-- Result: Codex proposes a mechanism-focused shared lesson or explains why it should remain local.
-- Files: none should change during the proposal.
-- Proof: the proposed lesson retains applicability, trigger, prevention, decisive verification and
-  limits without retaining private project context.
-- Skip it when: the lesson depends on this repository's product contract or environment.
+- Result: Codex verifies exit evidence and the absence of an active plan, previews closure, archives
+  the exact contract with its SHA-256 digest and returns the repository to Standard.
+- Files: active `PROGRAM.md` is removed, `.agents/SYSTEM.json` changes and a Program snapshot plus
+  `.agents/history/index.json` are created or updated. The first close also creates
+  `.agents/history/README.md`.
+- Proof: `SYSTEM.mode` is `standard`, no active Program remains, the archived digest verifies and
+  the checker passes.
+- Skip it when: any exit condition lacks evidence or a plan remains active.
 
-After review, ask `$project-os` to add the exact approved entry. Shared knowledge does not travel to
-other repositories automatically. To distribute it, add the sanitized lesson to a reviewed Project OS
-release, then run the normal repository upgrade workflow where it applies.
+The helper can enforce the structural lifecycle and the absence of an active plan. It cannot decide
+whether repository or external evidence truly proves the Program outcome; Codex and the user make
+that judgment before the close command is applied.
 
-## Check consistency
-
-Run the checker after structural, mapping, plan-registry, finding-registry, managed-guidance or
-knowledge changes.
+### Stop a Program
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Check this repository's Project OS state and report errors without changing files.
+$project-os program close stopped: the migration was replaced by the vendor-managed rollout
 ~~~
 
-- Result: Codex runs the deterministic checker against the current control plane.
-- Files: none should change.
-- Proof: the helper prints `Project OS check: PASS` or returns concrete errors to repair.
-- Skip it when: do not skip it after a Project OS state change. It is unnecessary after ordinary code
-  work that did not alter Project OS records.
+- Result: Codex preserves the stated reason and unresolved obligations, archives the exact contract
+  with disposition `stopped` and returns to Standard.
+- Files and proof: the same lifecycle records change and the same archive hash is checked as for a
+  completed close.
+- Skip it when: the Program met its exit contract; use `completed` instead.
 
-## Repair inconsistent state
+The archive is tamper-evident, not technically immutable. The checker catches uncoordinated archive
+changes but cannot prevent a deliberate rewrite of both content and index.
+Treat an archive hash mismatch as an integrity event. Determine which content is authoritative before
+repairing anything; never silence it by automatically recording the changed bytes.
 
-Check first. Repair only the named source of truth instead of creating duplicate state to silence an
-error.
+## Record a finding and failure knowledge
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Repair only the Project OS consistency errors from the last check. Inspect current Git
-state, preserve project-owned content and unrelated work, preview every managed-file change and run
-the checker again after applying the reviewed repair.
+$project-os finding add: password reset produced two emails for one accepted request
 ~~~
 
-- Result: Codex fixes the smallest verified control-plane inconsistency and rechecks it.
-- Files: only records or managed files named by the errors may change.
-- Proof: compare the preview with the diff and require a final checker pass.
-- Skip it when: no check has identified an error or the proposed repair would erase project-owned
-  truth.
+- Result: Codex records the observation, evidence, impact and decisive next check without claiming an
+  unverified root cause.
+- Files: `.agents/findings/findings.json` and sanitized linked evidence may change.
+- Proof: the finding has a stable ID and distinguishes observation from inference.
+- Skip it when: the note is temporary debugging output or already has an owner.
 
-## Upgrade a connected repository
-
-Update the installed skill first and start a new Codex task. Then use the same prompt in every
-connected repository.
+After the mechanism is confirmed:
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os Upgrade this repository to the installed Project OS version. Inspect first,
-preview all managed changes, preserve project-owned files, apply the update only when
-the preview is clean, then run the Project OS checker.
+$project-os knowledge capture: FIND-012
 ~~~
 
-- Result: the skill runs `inspect -> sync-knowledge --dry-run -> sync-knowledge -> check`. There is no
-  separate Python `upgrade` command.
-- Files: release metadata, managed packs or overlays and managed shared knowledge may change.
-  Project-owned context, state, plans, findings, evidence and application code are preserved.
-- Proof: the checker passes and the repository release matches the installed helper.
-- Skip it when: the repository already passes with the installed release.
+- Result: Codex creates a project-specific lesson with applicability, trigger, mechanism, prevention,
+  decisive verification and boundaries.
+- Files: `.agents/knowledge/project/failures.json` may change.
+- Proof: the lesson links decisive evidence and contains no unverified mechanism.
+- Skip it when: the finding is still a hypothesis.
 
-If the preview reports locally divergent managed guidance or a shared-entry conflict, no update should
-be applied. Review ownership and provenance, resolve the conflict deliberately and run the same
-workflow again.
+Review portability separately.
 
-## Evidence still has boundaries
+**Type this in Codex chat:**
 
-Keep these claims separate:
+~~~text
+$project-os knowledge propose-shared: FAIL-PROJECT-012
+~~~
 
-- source inspection;
-- static or unit verification;
-- local integration behavior;
-- a built artifact;
-- hosted or deployed behavior;
-- production availability;
-- owner-reported or manual acceptance;
-- physical-device acceptance.
+- Result: Codex proposes a sanitized portable entry or explains why the lesson must remain local.
+- Files: none change during the proposal.
+- Proof: project names, credentials, personal data, private paths, private URLs and product history are
+  absent while the mechanism and limits remain intact.
+- Skip it when: the lesson depends on a repository-specific contract.
 
-Project OS records the evidence you have. It must not promote one class into another.
+Shared knowledge never travels to another repository automatically.
 
-For direct helper commands, record schemas, modes, packs and status invariants, see
-[Reference](REFERENCE.md). For first-time setup, see [Setup](SETUP.md).
+## Upgrade
+
+Update the installed skill, start a fresh task and open the connected repository.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os upgrade
+~~~
+
+- Result: Codex inspects release, schema and Program state, previews every managed file change,
+  applies only a conflict-free result with caught-failure rollback and runs the checker.
+- Files: version and schema metadata, managed guidance, managed shared knowledge and an explicitly
+  required lifecycle migration may change. Project-owned state and application code remain intact.
+- Proof: the checker passes at release 2.0.0 and a repeated dry run reports no pending changes.
+- Skip it when: the installed checker already passes and the repository is current.
+
+A legacy Program whose state cannot be proved is a decision boundary, not something Codex guesses.
+For a closed legacy Program, Codex also requires the actual closure date in `YYYY-MM-DD` form and
+derives it only from repository evidence.
+
+## Terminal commands are different
+
+The short requests above belong in Codex chat. The deterministic helper belongs in Terminal.
+
+**Run this in Terminal:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
+~~~
+
+- Result: Python runs exactly the helper check. It does not invoke the Codex skill or interpret
+  natural language.
+- Files: none change.
+- Proof: the process exits zero and prints `Project OS check: PASS`.
+- Skip it when: you want Codex to inspect context, choose a workflow or explain the result.
+
+See [Reference](REFERENCE.md) for every helper command and flag.

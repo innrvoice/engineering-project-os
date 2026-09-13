@@ -6,7 +6,7 @@ Active plan: none.
 
 ## Current scope
 
-- Project OS is initialized in __MODE__ mode.
+- Project OS is initialized in Standard mode.
 - No engineering task is active in this checkpoint.
 
 ## Verified state

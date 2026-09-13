@@ -1,47 +1,59 @@
 # Failure knowledge
 
-Project OS deliberately separates incidents from reusable lessons.
+Project OS separates project observations from reusable engineering lessons. Knowledge is stored in
+repository files. Nothing uploads or synchronizes between projects in the background.
 
-Knowledge is stored in repository files. Nothing is uploaded or synchronized between projects in the
-background. Promotion and synchronization happen only when explicitly requested.
+## Add a finding
 
-## Project findings
+For `finding add: <observation>`, inspect current evidence and search for an existing owner first.
+Record a stable ID, status, impact, evidence, required next check and optional active plan. Keep
+observations separate from inference and do not claim an unverified mechanism.
 
-`.agents/findings/findings.json` records concrete project problems and candidates. A finding keeps a
-stable ID, status, impact, evidence, required next check, and optional active plan. Candidates and
-hypotheses stay here.
+Preview the intended registry and evidence changes, preserve unrelated entries and run the checker
+after writing.
 
-## Project failure knowledge
+## Capture project knowledge
 
-`.agents/knowledge/project/failures.json` records confirmed mechanisms that remain specific to the
-repository, stack versions, infrastructure, or product contract.
+For `knowledge capture: <finding-id>`, require a confirmed mechanism and decisive evidence.
+Project-specific knowledge may retain repository, dependency and environment context.
 
-## Shared failure knowledge
+Record applicability, trigger, mechanism, prevention, decisive verification and version or scope
+boundaries. Link the source finding. Do not turn a candidate or hypothesis into a failure lesson.
 
-`.agents/knowledge/shared/failures.json` contains sanitized lessons that can travel between projects.
-Each entry needs:
+## Propose shared knowledge
 
-- a stable ID and active/retired/replaced status;
-- applicability and trigger;
-- the observed mechanism;
-- prevention and decisive verification;
-- version, platform, or scope boundaries;
-- a non-sensitive source and date.
+For `knowledge propose-shared: <lesson-id>`, remain read-only. Decide whether the mechanism is
+portable. Remove project names, credentials, personal data, absolute machine paths, private URLs,
+signed URLs, deployment identifiers and product history.
 
-Promote a lesson only after the failure is confirmed. Remove project names, user data, credentials,
-absolute machine paths, private URLs, deployment identifiers, and claims that depend on unverified
-infrastructure. Generalize the mechanism, not the story.
+The helper rejects common detectable patterns and explicit sensitive field names. That screening is
+not exhaustive, so human review remains mandatory before any lesson becomes shared knowledge.
 
-Use the helper to import or update managed seed lessons without overwriting local edits. Resolve
-`scripts/project_os.py` relative to the installed Project OS skill directory.
+If sanitization would make the lesson misleading, keep it project-specific. Otherwise present the
+complete proposed entry for human review. Do not write or publish it merely because it was proposed.
 
-Run in Terminal with the installed helper path resolved:
+## Synchronize managed knowledge
 
-```shell
-python3 <project-os-skill-directory>/scripts/project_os.py sync-knowledge --target <repository> --dry-run
-python3 <project-os-skill-directory>/scripts/project_os.py sync-knowledge --target <repository>
-```
+Use the helper only after an explicit bootstrap, adoption, synchronization or upgrade workflow.
+Resolve it relative to the installed skill.
 
-If an existing managed ID differs locally from the installed seed, the helper reports a conflict and
-aborts before applying any changes. Resolve that conflict by reviewing scope and provenance, not by
-selecting the newest text automatically. Project-specific knowledge is never replaced by this command.
+Run this in Terminal:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository --dry-run
+~~~
+
+If an existing managed ID or guidance file differs from its recorded baseline, report a conflict and
+abort before applying any changes. The repository must already match the helper's Project OS release;
+use the upgrade workflow for a version change. Resolve ownership and provenance rather than preferring
+newer text.
+
+Apply only a clean preview:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository
+python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
+~~~
+
+Project-specific knowledge is never replaced by synchronization. Shared knowledge travels to another
+repository only through deliberate inclusion in a reviewed Project OS release and an explicit upgrade.
