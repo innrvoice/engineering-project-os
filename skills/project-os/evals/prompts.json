@@ -2,6 +2,26 @@
   "schema_version": 1,
   "cases": [
     {
+      "name": "chatgpt-missing-repository-input-stops",
+      "prompt": "@Engineering Project OS Review my existing Project OS setup and tell me what to fix.",
+      "expected": [
+        "when the existing Project OS files are unavailable, ask the user to attach AGENTS.md and .agents or another relevant project bundle",
+        "do not inspect an empty host workspace as a substitute",
+        "do not claim that the installed plugin is unavailable",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "chatgpt-project-description-can-start-setup",
+      "prompt": "@Engineering Project OS Help me choose the right Project OS setup for a Python service with GitHub Actions and no existing AGENTS.md.",
+      "expected": [
+        "use the supplied project description to begin setup advice",
+        "mark conclusions that are not backed by repository files as unverified",
+        "ask only for project details or files needed for the next safe decision",
+        "do not inspect an empty host workspace"
+      ]
+    },
+    {
       "name": "help-is-complete-and-read-only",
       "prompt": "$project-os help",
       "expected": [

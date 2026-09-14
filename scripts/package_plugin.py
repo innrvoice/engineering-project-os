@@ -22,6 +22,42 @@ MAX_COMPRESSED = 100 * 1024 * 1024
 MAX_EXTRACTED = 512 * 1024 * 1024
 
 
+def markdown_layout_errors(name: str, text: str) -> list[str]:
+    """Return prose lines that continue a Markdown paragraph or list item."""
+    errors = []
+    previous_plain = False
+    in_fence = False
+    in_frontmatter = False
+    for number, line in enumerate(text.splitlines(), 1):
+        stripped = line.strip()
+        if number == 1 and stripped == "---":
+            in_frontmatter = True
+            previous_plain = False
+            continue
+        if in_frontmatter:
+            if stripped == "---":
+                in_frontmatter = False
+            continue
+        if re.match(r"^\s*(```|~~~)", line):
+            in_fence = not in_fence
+            previous_plain = False
+            continue
+        if in_fence or not stripped:
+            previous_plain = False
+            continue
+        structural = bool(
+            re.match(r"^\s{0,3}(#{1,6}\s|[-*_]{3,}\s*$|(?:[-+*]|\d+[.)])\s+)", line)
+            or re.match(r"^\s*(\|.*|\[[^]]+\]:\s|<[^>]+>|[A-Z][A-Za-z -]+:\s)", line)
+        )
+        indented_prose = bool(re.match(r"^\s{2,}\S", line)) and not bool(
+            re.match(r"^\s+(?:[-+*]|\d+[.)])\s+", line)
+        )
+        if previous_plain or indented_prose:
+            errors.append(f"{name}:{number}")
+        previous_plain = not structural
+    return errors
+
+
 def source_files(root: Path) -> list[Path]:
     paths = [root / name for name in FILES]
     for name in TREES:
@@ -73,6 +109,11 @@ def validate_zip(path: Path) -> dict[str, object]:
         # Relative public-document links must also work in the extracted artifact.
         public_docs = [name for name in names if name.endswith(".md")
                        and ("/" not in name or name.startswith("docs/"))]
+        layout_errors = []
+        for name in sorted(item for item in names if item.endswith(".md")):
+            layout_errors.extend(markdown_layout_errors(name, archive.read(name).decode("utf-8")))
+        if layout_errors:
+            raise ValueError("Hard-wrapped Markdown prose: " + ", ".join(layout_errors[:10]))
         for name in public_docs:
             text = archive.read(name).decode("utf-8")
             links = re.findall(r"\[[^\]\n]*\]\(([^\s)]+)(?:\s+[^)]*)?\)", text)

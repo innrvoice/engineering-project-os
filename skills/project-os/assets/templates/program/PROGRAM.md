@@ -32,5 +32,4 @@ __PROGRAM_COST_BOUNDARY__
 
 __PROGRAM_EXCLUSIONS__
 
-Current phase, active execution and the next action remain owned by `.agents/STATE.md` and the plans
-registry. Starting a Program does not open a plan automatically.
+Current phase, active execution and the next action remain owned by `.agents/STATE.md` and the plans registry. Starting a Program does not open a plan automatically.

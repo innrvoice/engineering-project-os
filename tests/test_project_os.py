@@ -90,7 +90,7 @@ class KnowledgeAssetTest(unittest.TestCase):
             )
         )
         cases = submission["cases"]
-        self.assertEqual(submission["product"], "CODEX")
+        self.assertEqual(submission["products"], ["CHATGPT", "CODEX"])
         self.assertGreaterEqual(
             sum(case["classification"] == "positive" for case in cases), 5
         )
@@ -157,7 +157,7 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.0.1")
+        self.assertEqual(PROJECT_OS.VERSION, "2.0.4")
         self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 3)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
@@ -218,17 +218,28 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertIn('icon_small: "./assets/icon-small.svg"', skill_interface)
         self.assertIn('icon_large: "./assets/icon-large.svg"', skill_interface)
         self.assertIn('brand_color: "#789F25"', skill_interface)
-        self.assertIn('    - "CODEX"', skill_interface)
+        self.assertNotIn("products:", skill_interface)
+        self.assertIn("allow_implicit_invocation: true", skill_interface)
         self.assertTrue(
             all(len(prompt) <= 128 for prompt in portable_interface["defaultPrompt"])
         )
-        self.assertTrue(
-            all(
-                "$project-os" in prompt
-                for prompt in portable_interface["defaultPrompt"]
-            )
+        self.assertTrue(all("$project-os" not in prompt for prompt in portable_interface["defaultPrompt"]))
+        self.assertEqual(
+            portable_interface["defaultPrompt"],
+            [
+                "Help me choose the right Project OS setup for my project.",
+                "Create a safe Project OS starter package for my project.",
+                "Review my existing Project OS setup and tell me what to fix.",
+            ],
         )
-        self.assertEqual(marketplace["plugins"][0]["policy"]["products"], ["CODEX"])
+        self.assertEqual(compatibility["interface"]["defaultPrompt"], portable_interface["defaultPrompt"])
+        skill_text = (ROOT / "skills" / "project-os" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("@Engineering Project OS", skill_text)
+        self.assertIn("never inspect an empty host workspace", skill_text.lower())
+        self.assertIn("may begin from the user's project description", skill_text)
+        self.assertNotIn("products", marketplace["plugins"][0]["policy"])
         self.assertEqual(
             marketplace["plugins"][0]["source"]["ref"],
             f"v{PROJECT_OS.VERSION}",
@@ -250,7 +261,7 @@ class KnowledgeAssetTest(unittest.TestCase):
         markdown_paths = [
             ROOT / "README.md",
             ROOT / "SECURITY.md",
-            *(ROOT / "docs").glob("*.md"),
+            *(path for path in (ROOT / "docs").glob("*.md") if path.name != "PACKAGING.md"),
         ]
         for path in markdown_paths:
             active_release_versions.update(
@@ -259,6 +270,20 @@ class KnowledgeAssetTest(unittest.TestCase):
                 )
             )
         self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
+        packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
+        self.assertIn(f"Project OS {PROJECT_OS.VERSION}", packaging)
+        self.assertIn("Directory version 2.0.4 is public", packaging)
+        self.assertIn("Versions 2.0.2 and 2.0.3 were intermediate Directory-only releases", packaging)
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [2.0.4] - 2026-09-14", changelog)
+        self.assertIn("## 2.0.3 - 2026-09-14 - Universal Plugin Directory only", changelog)
+        self.assertIn("## 2.0.2 - 2026-09-14 - Universal Plugin Directory only", changelog)
+        self.assertNotIn("[2.0.3]:", changelog)
+        self.assertIn(
+            "[2.0.4]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.1...v2.0.4",
+            changelog,
+        )
+        self.assertNotIn("GitHub 2.0.3 release line", changelog)
 
 
 class DetectionTest(unittest.TestCase):
@@ -1822,7 +1847,7 @@ class UpgradeTest(unittest.TestCase):
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
             self.assertEqual(system["schema_version"], 3)
             self.assertEqual(system["mode"], "standard")
-            self.assertEqual(system["project_os_version"], "2.0.1")
+            self.assertEqual(system["project_os_version"], "2.0.4")
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)
 
     def test_current_upgrade_is_byte_preserving_even_with_an_old_generated_date(self) -> None:
