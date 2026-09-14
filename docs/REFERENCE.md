@@ -1,23 +1,31 @@
 # Reference
 
-This is the technical contract for Project OS 2.0.1. Start with the [README](../README.md) if
-installation, `$project-os` or repository connection is still new.
+This is the technical contract for Project OS 2.0.4. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
 | Interface | Used for | Invocation |
 | --- | --- | --- |
-| Codex skill | Reasoned setup, maintenance, Program, plan and knowledge workflows | `$project-os ...` in Codex chat |
+| ChatGPT plugin | Setup advice from a project description and workflows over files supplied in the conversation | `@Engineering Project OS ...` with the needed project context |
+| Codex plugin or standalone skill | Reasoned workflows in the selected local workspace | `$project-os ...` in Codex chat |
 | Python helper | Deterministic detect, init, adopt, check, sync, upgrade and Program transitions | `project_os.py ...` in Terminal |
 | Repository records | Durable context, state, plans, findings, evidence and knowledge | `AGENTS.md` and `.agents/` files |
 
-`$project-os` selects the skill for one message. Text after it is natural language, not a helper
-command line or rigid parser. This release disables implicit invocation.
+`@Engineering Project OS` in ChatGPT and `$project-os` in Codex select the same bundled skill for one message. Text after the selector is natural language, not a helper command line or rigid parser. This release enables implicit invocation so the selected plugin can expose the skill for a clear Project OS request.
 
-The helper lives at `scripts/project_os.py` inside the installed skill. Terminal examples use an
-absolute placeholder path so the target repository does not need its own helper copy.
+Installation and repository access are separate. ChatGPT can use only the project description and files available in the chat. Choosing a setup or creating a starter package can begin from a description. Reviewing an existing setup requires its actual Project OS files. Codex can use the local workspace selected for the task. Neither surface gains repository access from installation alone.
 
-## Codex chat shortcuts
+The ChatGPT Directory listing exposes three outcome-focused starter prompts:
+
+| Starter prompt | Required initial context |
+| --- | --- |
+| `Help me choose the right Project OS setup for my project.` | Project description or relevant files |
+| `Create a safe Project OS starter package for my project.` | Project description and any existing authority files |
+| `Review my existing Project OS setup and tell me what to fix.` | Existing `AGENTS.md` and `.agents/` files or a relevant project bundle |
+
+The helper lives at `scripts/project_os.py` inside the installed skill. Terminal examples use an absolute placeholder path so the target repository does not need its own helper copy.
+
+## Project OS requests
 
 | Shortcut | Required argument | Behavior |
 | --- | --- | --- |
@@ -42,8 +50,7 @@ absolute placeholder path so the target repository does not need its own helper 
 | `knowledge capture: <finding-id>` | Confirmed finding ID | Create project-specific failure knowledge |
 | `knowledge propose-shared: <lesson-id>` | Project lesson ID | Draft a sanitized portable lesson without writing |
 
-`$project-os help` always returns this class of concise menu, with purpose, required arguments and
-one or two examples. It never writes files. See [Usage](USAGE.md) for complete examples.
+The table shows the intent words used after `$project-os` in Codex. In ChatGPT, select `@Engineering Project OS` and express the same intent in ordinary language. `$project-os help` always returns this class of concise menu, with purpose, required arguments and one or two examples. It never writes files. See [Usage](USAGE.md) for complete examples.
 
 ## Standard and Program
 
@@ -52,11 +59,9 @@ one or two examples. It never writes files. See [Usage](USAGE.md) for complete e
 | Standard | Every connected repository's normal operation | Routing, context, state, plans, findings, evidence, knowledge, packs and overlays |
 | Program | One explicitly started multi-phase initiative | All Standard capabilities plus one active `PROGRAM.md` contract |
 
-Bootstrap and adoption finish in Standard. A long task can remain in Standard with a plan. Program is
-not a larger installation profile and is not created automatically.
+Bootstrap and adoption finish in Standard. A long task can remain in Standard with a plan. Program is not a larger installation profile and is not created automatically.
 
-A Program is justified when multiple distinct phases or plans require one shared authority and exit
-contract. It is temporary:
+A Program is justified when multiple distinct phases or plans require one shared authority and exit contract. It is temporary:
 
 `standard -> program -> standard`
 
@@ -78,13 +83,9 @@ The helper accepts a JSON definition whose top-level fields are:
 | `exclusions` | Non-empty array of work outside the Program |
 | `exit_conditions` | Non-empty array governing completion of the whole Program |
 
-The helper rejects an incomplete definition. It generates a stable
-`program-YYYYMMDD-NNN` identifier and renders the active contract to `.agents/PROGRAM.md`.
-Starting a Program does not open a plan.
+The helper rejects an incomplete definition. It generates a stable `program-YYYYMMDD-NNN` identifier and renders the active contract to `.agents/PROGRAM.md`. Starting a Program does not open a plan.
 
-Closing requires no active plan. Use `completed` only after Program exit evidence has been evaluated
-by Codex and the user. The helper enforces structural lifecycle rules but cannot judge whether that
-evidence proves the outcome. `stopped` requires a reason and preserves unresolved obligations.
+Closing requires no active plan. Use `completed` only after Program exit evidence has been evaluated by Codex and the user. The helper enforces structural lifecycle rules but cannot judge whether that evidence proves the outcome. `stopped` requires a reason and preserves unresolved obligations.
 
 ## Record ownership
 
@@ -105,43 +106,31 @@ evidence proves the outcome. `stopped` requires a reason and preserves unresolve
 | `.agents/history/index.json` | Closed Program disposition, canonical closure date, archive path and SHA-256 digest |
 | `.agents/history/programs/<id>/PROGRAM.md` | Exact closed Program contract bytes |
 
-`.agents/history/` is optional until the first Program closes or compatible indexed history is
-adopted. Starting the first Program creates no empty history directory or index. History is valid
-while the repository is in Standard or Program. Archived records are never current authority.
+`.agents/history/` is optional until the first Program closes or compatible indexed history is adopted. Starting the first Program creates no empty history directory or index. History is valid while the repository is in Standard or Program. Archived records are never current authority.
 
 ## Archive integrity boundary
 
-On Program close, the helper copies the exact active contract bytes and records their SHA-256 digest.
-The checker requires every indexed archive to exist, match its digest and have a canonical closure
-date. Stopped entries also require a non-empty reason. An uncoordinated edit, deletion or substitution
-fails the check.
+On Program close, the helper copies the exact active contract bytes and records their SHA-256 digest. The checker requires every indexed archive to exist, match its digest and have a canonical closure date. Stopped entries also require a non-empty reason. An uncoordinated edit, deletion or substitution fails the check.
 
-This is tamper-evident, not technically immutable. It is not signed, it does not prevent a deliberate
-rewrite of both archive and index and it does not replace Git access controls or review.
+This is tamper-evident, not technically immutable. It is not signed, it does not prevent a deliberate rewrite of both archive and index and it does not replace Git access controls or review.
 
-An archive mismatch requires an authority decision. Do not automatically rehash changed content to
-make the checker pass.
+An archive mismatch requires an authority decision. Do not automatically rehash changed content to make the checker pass.
 
 ## Plan and finding invariants
 
 Plan statuses are `planned`, `active`, `blocked`, `done` and `superseded`.
 
-When `execution_state` is `running`, exactly one plan is `active`. If `active_plan` is present,
-it names that plan. When no plan is active, execution state is `idle` and `active_plan`, when
-present, is `null`.
+When `execution_state` is `running`, exactly one plan is `active`. If `active_plan` is present, it names that plan. When no plan is active, execution state is `idle` and `active_plan`, when present, is `null`.
 
-Finding statuses are `candidate`, `confirmed`, `fixed_unverified`, `verified`,
-`accepted_risk`, `deferred`, `rejected` and `merged`.
+Finding statuses are `candidate`, `confirmed`, `fixed_unverified`, `verified`, `accepted_risk`, `deferred`, `rejected` and `merged`.
 
 Failure knowledge statuses are `active`, `retired` and `replaced`.
 
-A status transition does not manufacture evidence. `done`, `verified` and completed Program closure
-require the evidence class named by the owning record.
+A status transition does not manufacture evidence. `done`, `verified` and completed Program closure require the evidence class named by the owning record.
 
 ## Capability packs and overlays
 
-Core Project OS owns lifecycle and state. Packs add guidance only where a boundary changes
-implementation or verification decisions.
+Core Project OS owns lifecycle and state. Packs add guidance only where a boundary changes implementation or verification decisions.
 
 | Pack | Boundary |
 | --- | --- |
@@ -151,13 +140,9 @@ implementation or verification decisions.
 | `data` | Schemas, migrations, transactions, storage, deletion and restore |
 | `delivery` | Builds, artifacts, deployment, runtime compatibility and release gates |
 
-The `react-native-expo` overlay refines the `mobile` pack when exact repository signals exist. It
-does not replace pinned dependencies, platform behavior, official documentation or runtime evidence.
+The `react-native-expo` overlay refines the `mobile` pack when exact repository signals exist. It does not replace pinned dependencies, platform behavior, official documentation or runtime evidence.
 
-Languages and frameworks are detection signals, not behavioral profiles. Any justified pack
-combination is valid. Concrete dependency and configuration signals may recommend capabilities in
-any ecosystem: for example, recognized Clojure HTTP and database libraries can select `service` and
-`data`, while a bare Clojure manifest selects neither pack merely because the language is present.
+Languages and frameworks are detection signals, not behavioral profiles. Any justified pack combination is valid. Concrete dependency and configuration signals may recommend capabilities in any ecosystem: for example, recognized Clojure HTTP and database libraries can select `service` and `data`, while a bare Clojure manifest selects neither pack merely because the language is present.
 
 ## Helper summary
 
@@ -173,8 +158,7 @@ any ecosystem: for example, recognized Clojure HTTP and database libraries can s
 | `program status` | No | Report active Program state |
 | `program close` | Unless `--dry-run` | Close and archive one Program |
 
-Every command requires `--target`. Prefer an absolute repository path in automation. `.` is
-convenient only when Terminal is already at the intended repository root.
+Every command requires `--target`. Prefer an absolute repository path in automation. `.` is convenient only when Terminal is already at the intended repository root.
 
 ### Detect
 
@@ -184,8 +168,7 @@ convenient only when Terminal is already at the intended repository root.
 python3 /absolute/path/to/project-os/scripts/project_os.py detect --target /path/to/repository
 ~~~
 
-Detection reports toolchain signals plus recommended packs and overlays. It changes no files and never
-proves commands, authority, architecture or product requirements.
+Detection reports toolchain signals plus recommended packs and overlays. It changes no files and never proves commands, authority, architecture or product requirements.
 
 ### Initialize Standard
 
@@ -205,11 +188,9 @@ Apply only the identical reviewed operation without `--dry-run`.
 python3 /absolute/path/to/project-os/scripts/project_os.py init --target /path/to/repository --packs auto --overlays auto
 ~~~
 
-`init` always creates Standard and never creates `PROGRAM.md`. It refuses an existing Project OS
-owner, but preserves non-conflicting unrelated content such as `.agents/plugins`.
+`init` always creates Standard and never creates `PROGRAM.md`. It refuses an existing Project OS owner, but preserves non-conflicting unrelated content such as `.agents/plugins`.
 
-For an existing root `AGENTS.md`, first add and review the minimum routes to
-`.agents/CONTEXT.md` and `.agents/STATE.md`, then preview with the narrow preservation flag.
+For an existing root `AGENTS.md`, first add and review the minimum routes to `.agents/CONTEXT.md` and `.agents/STATE.md`, then preview with the narrow preservation flag.
 
 **Run this in Terminal:**
 
@@ -229,8 +210,7 @@ Include `--inventory` when older Markdown lessons need explicit coverage.
 python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory --dry-run
 ~~~
 
-Apply only when the output reports `safe_to_adopt: true`, the mapping is correct and no project-owned
-destination is listed for modification.
+Apply only when the output reports `safe_to_adopt: true`, the mapping is correct and no project-owned destination is listed for modification.
 
 **Run this in Terminal:**
 
@@ -238,8 +218,7 @@ destination is listed for modification.
 python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory
 ~~~
 
-Adoption fails closed on ambiguous owners, unsafe paths, incomplete legacy knowledge coverage and
-occupied managed destinations.
+Adoption fails closed on ambiguous owners, unsafe paths, incomplete legacy knowledge coverage and occupied managed destinations.
 
 ### Check
 
@@ -249,8 +228,7 @@ occupied managed destinations.
 python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
 ~~~
 
-The command is read-only. Success prints `Project OS check: PASS` and exits zero. Use
-`--config /path/to/proposed-SYSTEM.json` to validate an adoption manifest before installing it.
+The command is read-only. Success prints `Project OS check: PASS` and exits zero. Use `--config /path/to/proposed-SYSTEM.json` to validate an adoption manifest before installing it.
 
 ### Synchronize managed guidance and knowledge
 
@@ -260,9 +238,7 @@ The command is read-only. Success prints `Project OS check: PASS` and exits zero
 python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository --dry-run
 ~~~
 
-A locally divergent managed file or knowledge entry is a conflict. Synchronization aborts before
-partial writes. The repository must already match the helper's Project OS release; synchronization
-does not perform an upgrade. Apply only a clean preview.
+A locally divergent managed file or knowledge entry is a conflict. Synchronization aborts before partial writes. The repository must already match the helper's Project OS release; synchronization does not perform an upgrade. Apply only a clean preview.
 
 **Run this in Terminal:**
 
@@ -271,8 +247,7 @@ python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --targ
 python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
 ~~~
 
-Project-owned context, state, plans, findings, evidence and project knowledge are never replaced by
-this command.
+Project-owned context, state, plans, findings, evidence and project knowledge are never replaced by this command.
 
 ### Upgrade
 
@@ -282,10 +257,7 @@ this command.
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
 ~~~
 
-For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade
-combines schema migration, managed guidance, shared knowledge and `SYSTEM.json` changes in one
-conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures
-roll back completed changes. Applying a clean upgrade finishes by running the checker.
+For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade combines schema migration, managed guidance, shared knowledge and `SYSTEM.json` changes in one conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures roll back completed changes. Applying a clean upgrade finishes by running the checker.
 
 A schema 2 repository with a legacy `PROGRAM.md` requires explicit classification.
 
@@ -295,8 +267,7 @@ A schema 2 repository with a legacy `PROGRAM.md` requires explicit classificatio
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --legacy-program-state active --dry-run
 ~~~
 
-The applying form preserves the active editable contract, records its legacy origin and migration
-date, leaves the unprovable Program start date null and enters Program mode.
+The applying form preserves the active editable contract, records its legacy origin and migration date, leaves the unprovable Program start date null and enters Program mode.
 
 **Run this in Terminal for a closed legacy Program:**
 
@@ -304,22 +275,15 @@ date, leaves the unprovable Program start date null and enters Program mode.
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --legacy-program-state closed --disposition stopped --closed-on 2026-09-07 --reason "Initiative ended before this migration" --dry-run
 ~~~
 
-Use `--disposition completed` only when completion evidence exists. `stopped` requires
-`--reason`. Every closed legacy migration requires `--closed-on YYYY-MM-DD`. This is the actual
-historical closure date, not the upgrade date. Codex derives it only from repository evidence and
-stops if it cannot be established. A closed migration archives the exact legacy Program bytes.
-Remove only `--dry-run` after reviewing the complete preview.
+Use `--disposition completed` only when completion evidence exists. `stopped` requires `--reason`. Every closed legacy migration requires `--closed-on YYYY-MM-DD`. This is the actual historical closure date, not the upgrade date. Codex derives it only from repository evidence and stops if it cannot be established. A closed migration archives the exact legacy Program bytes. Remove only `--dry-run` after reviewing the complete preview.
 
-`--closed-on` is valid only with `--legacy-program-state closed`. Current-schema upgrades and
-active legacy migrations reject it.
+`--closed-on` is valid only with `--legacy-program-state closed`. Current-schema upgrades and active legacy migrations reject it.
 
-The Codex shortcut `$project-os upgrade` inspects repository evidence and selects these flags. If
-legacy state cannot be determined, it stops for a decision.
+The Codex shortcut `$project-os upgrade` inspects repository evidence and selects these flags. If legacy state cannot be determined, it stops for a decision.
 
 ### Start a Program
 
-Codex normally prepares the definition file from verified repository evidence. Direct helper use
-requires a JSON file matching the Program definition table above.
+Codex normally prepares the definition file from verified repository evidence. Direct helper use requires a JSON file matching the Program definition table above.
 
 **Run this in Terminal:**
 
@@ -327,9 +291,7 @@ requires a JSON file matching the Program definition table above.
 python3 /absolute/path/to/project-os/scripts/project_os.py program start --target /path/to/repository --definition /path/to/program-definition.json --dry-run
 ~~~
 
-Apply the same reviewed command without `--dry-run`. The helper requires Standard mode, no active
-Program and a complete definition. It creates no plan and no empty history scaffold. History appears
-when the first Program is archived.
+Apply the same reviewed command without `--dry-run`. The helper requires Standard mode, no active Program and a complete definition. It creates no plan and no empty history scaffold. History appears when the first Program is archived.
 
 ### Program status
 
@@ -359,10 +321,7 @@ Preview a stopped closure with its required reason.
 python3 /absolute/path/to/project-os/scripts/project_os.py program close --target /path/to/repository --disposition stopped --reason "Initiative replaced by another approach" --dry-run
 ~~~
 
-Closure fails while any plan is active. Apply only the reviewed command without `--dry-run`. The
-helper archives exact bytes, creates the history README on first closure, updates the history index
-and returns the repository to Standard as one transaction. It does not semantically validate
-completion evidence.
+Closure fails while any plan is active. Apply only the reviewed command without `--dry-run`. The helper archives exact bytes, creates the history README on first closure, updates the history index and returns the repository to Standard as one transaction. It does not semantically validate completion evidence.
 
 ## Selection values
 
@@ -381,38 +340,26 @@ For `sync-knowledge`, omitted selection flags use `SYSTEM.json`. Explicit select
 
 Release and file-format versions are separate:
 
-- Release 2.0.1 identifies the installed skill, helper, package metadata, connected
-  `project_os_version` and managed knowledge provenance.
+- Release 2.0.4 identifies the installed skill, helper, package metadata, connected `project_os_version` and managed knowledge provenance.
 - `SYSTEM.schema_version` is 3.
 - Knowledge registries retain their own `schema_version: 1`.
-- The version in the external `$schema` URL inside `plugin.json` belongs to that external schema,
-  not to the Project OS release.
+- The version in the external `$schema` URL inside `plugin.json` belongs to that external schema, not to the Project OS release.
 
-The checker requires the repository release and shared knowledge version to match the installed
-helper. Do not edit version fields manually to silence it.
+The checker requires the repository release and shared knowledge version to match the installed helper. Do not edit version fields manually to silence it.
 
-Upgrade rejects a repository release newer than the helper, including during a dry run. Use a
-matching or newer helper; implicit downgrade is unsupported. SemVer build metadata does not affect
-upgrade direction.
+Upgrade rejects a repository release newer than the helper, including during a dry run. Use a matching or newer helper; implicit downgrade is unsupported. SemVer build metadata does not affect upgrade direction.
 
 ## Safety
 
 - Managed paths remain repository-relative and free of symlink replacement boundaries.
 - Multi-file operations use conflict and concurrency checks and fail closed.
-- Writes require Python 3.9+ on a POSIX host with directory-descriptor operations, such as macOS or
-  Linux. Unsupported write environments fail before mutation; there is no unsafe fallback.
-- Create, replace, delete and rollback use opened directory descriptors and no-follow file opens.
-  Detected parent replacement aborts the transaction; rollback uses the original directories.
-- SYSTEM, knowledge and history JSON are parsed and hashed from the same bytes. Program closure
-  also guards the plan registry through final validation, including closed legacy migration.
-- An abrupt process termination or power loss can interrupt a multi-file operation. Run the checker
-  afterward and repair from Git or another reviewed source if it reports partial state.
-- Shared knowledge policy excludes credentials, personal data, private paths, private URLs, signed
-  URLs and copied project history. The helper rejects common detectable patterns; human review is
-  still required because a denylist cannot prove arbitrary text is sanitized.
+- Writes require Python 3.9+ on a POSIX host with directory-descriptor operations, such as macOS or Linux. Unsupported write environments fail before mutation; there is no unsafe fallback.
+- Create, replace, delete and rollback use opened directory descriptors and no-follow file opens. Detected parent replacement aborts the transaction; rollback uses the original directories.
+- SYSTEM, knowledge and history JSON are parsed and hashed from the same bytes. Program closure also guards the plan registry through final validation, including closed legacy migration.
+- An abrupt process termination or power loss can interrupt a multi-file operation. Run the checker afterward and repair from Git or another reviewed source if it reports partial state.
+- Shared knowledge policy excludes credentials, personal data, private paths, private URLs, signed URLs and copied project history. The helper rejects common detectable patterns; human review is still required because a denylist cannot prove arbitrary text is sanitized.
 - The helper initiates no network request and uses only the Python standard library.
-- Project OS grants no authority for application changes, dependency installation, deletion, Git
-  operations, deployment, publication or external communication.
+- Project OS grants no authority for application changes, dependency installation, deletion, Git operations, deployment, publication or external communication.
 - A passing checker proves Project OS structural consistency, not application or production behavior.
 
 See [Security](../SECURITY.md) for the reporting policy.

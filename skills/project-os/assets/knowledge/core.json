@@ -20,11 +20,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [
           "https://react.dev/reference/react/useEffect"
         ],
-        "content_hash": "sha256:25ea231bf869f103e1bf0e1feeaf226aabaafa9682be74c0feacec5c9d10cc08"
+        "content_hash": "sha256:14bf650d0a8921625428ca3be0f3aa77fead68259e36ce0d9edd421bf21cc574"
       }
     },
     {
@@ -46,12 +46,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [
           "https://docs.expo.dev/versions/latest/sdk/filesystem/",
           "https://react.dev/reference/react/useEffect"
         ],
-        "content_hash": "sha256:64f66bf3a8e024df36fb96852f4111b98b23fd6fce74a5f1605b2e84ab69d19a"
+        "content_hash": "sha256:27ae6212f72fe48eddea87953fa24bdc40ccc2a32854ea801a4e40ff7783d511"
       }
     },
     {
@@ -73,11 +73,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [
           "https://react.dev/reference/react/useEffect"
         ],
-        "content_hash": "sha256:8baa0ccf50a8ff29ed6d96927623e1d02b6dc1a9ba0f8cbf3165b780746c056e"
+        "content_hash": "sha256:da0493c91746e84b2a02454ef369c8ace93e8e4ffcfa3630279b1a60e36d56d6"
       }
     },
     {
@@ -101,9 +101,9 @@
       "source": {
         "kind": "incident-derived",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [],
-        "content_hash": "sha256:fef319562752671db985d5405d7c6ca2818b13afa267ffa80be36d3f6dfd8f46"
+        "content_hash": "sha256:1048c6a154fb1ec69ab9a759a0223551a6f0e8629857f919f87682d0fdec7ccf"
       }
     },
     {
@@ -125,12 +125,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [
           "https://tanstack.com/query/latest/docs/framework/react/guides/query-keys",
           "https://www.postgresql.org/docs/17/ddl-constraints.html"
         ],
-        "content_hash": "sha256:466d3149a889d98fabea9c066dba876e1af4cc0913ccffe1c8f116edeab3b6ef"
+        "content_hash": "sha256:488e100f0c824f480b162ffc49c5a33e9139b73537190871da8cfa0c084641b1"
       }
     },
     {
@@ -152,9 +152,9 @@
       "source": {
         "kind": "incident-derived",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [],
-        "content_hash": "sha256:1f8f98e9c0ab8bfe2672e4ec00f33766dc018851ef4c544a4f792429caba1a82"
+        "content_hash": "sha256:eb21898514bf14d90c45bcfde7012f34c6543ede1c1d477fed4396dfb2c1fa93"
       }
     },
     {
@@ -176,11 +176,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "core",
-        "project_os_version": "2.0.1",
+        "project_os_version": "2.0.4",
         "references": [
           "https://reactnative.dev/docs/0.86/network"
         ],
-        "content_hash": "sha256:19a91f4f3cbb80a321b44bedae0e82e869dd7df228b63d68c8b33419842e6e95"
+        "content_hash": "sha256:8a5371493cd02954cb0ac1661ba24fc77cd23ef27ba00edc82d1cbf4c760e3e4"
       }
     }
   ]

@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.0.1"
+VERSION = "2.0.4"
 SCHEMA_VERSION = 3
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")

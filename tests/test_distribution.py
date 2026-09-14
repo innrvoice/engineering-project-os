@@ -58,6 +58,18 @@ class DistributionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Broken packaged document link"):
             PACKAGE.validate_zip(broken)
 
+    def test_markdown_layout_rejects_wrapped_prose_and_list_items(self):
+        self.assertEqual(PACKAGE.markdown_layout_errors("README.md", "One paragraph on one line.\n"), [])
+        self.assertEqual(PACKAGE.markdown_layout_errors("README.md", "One paragraph\nwrapped here.\n"), ["README.md:2"])
+        self.assertEqual(PACKAGE.markdown_layout_errors("README.md", "- One list item\n  wrapped here.\n"), ["README.md:2"])
+        self.assertEqual(PACKAGE.markdown_layout_errors("README.md", "~~~text\nwrapped\ncontent\n~~~\n"), [])
+
+    def test_packaged_markdown_avoids_oxford_commas(self):
+        with zipfile.ZipFile(self.archive) as archive:
+            for name in archive.namelist():
+                if name.endswith(".md"):
+                    self.assertNotIn(", and ", archive.read(name).decode("utf-8"), name)
+
     def test_each_submission_fixture_is_self_contained_and_matches_runtime(self):
         helper = self.skill / "scripts/project_os.py"
         setup = self.skill / "evals/prepare_fixture.py"
