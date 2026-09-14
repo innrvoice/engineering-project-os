@@ -6,7 +6,7 @@ safe repository adoption without turning Project OS into an application framewor
 ## Development setup
 
 1. Fork and clone the repository.
-2. Use Python 3.9 or newer. Runtime dependencies are not required.
+2. Use Python 3.9 or newer on macOS or Linux. Runtime dependencies are not required.
 3. Create a focused branch for one observable outcome.
 4. Preserve unrelated worktree changes.
 5. Run the complete checks before opening a pull request.
@@ -15,7 +15,8 @@ safe repository adoption without turning Project OS into an application framewor
 
 ~~~bash
 python3 -B -m unittest discover -s tests -v
-python3 -X pycache_prefix=/tmp/project-os-pycache -m compileall -q skills/project-os/scripts
+python3 -X pycache_prefix=/tmp/project-os-pycache -m compileall -q skills/project-os/scripts skills/project-os/evals scripts
+python3 -B scripts/check_public_tree.py
 python3 -B -m json.tool plugin.json >/dev/null
 python3 -B -m json.tool .codex-plugin/plugin.json >/dev/null
 python3 -B -m json.tool .agents/plugins/marketplace.json >/dev/null
@@ -25,6 +26,20 @@ git diff --check
 
 These commands validate runtime behavior, Python syntax, JSON surfaces and patch whitespace. They must
 not rewrite tracked files.
+
+## Repository working records
+
+This repository keeps its own Project OS working records local. Root `.agents` plans, checkpoints,
+findings, evidence and knowledge are ignored by Git. Only `.agents/plugins/marketplace.json` is public
+package metadata. A fresh clone does not need the maintainer's working records to run the tests.
+
+Do not force-add local records. After staging, run the public-source check above: it examines the Git
+index, and CI checks the committed tree. The root-specific ignore rules preserve bundled templates
+and synthetic fixtures under `skills/` and `tests/`. This is this repository's publication policy;
+Project OS does not automatically make working records private in other repositories.
+
+Ignored files need a separate backup if they must survive loss of the local checkout. Existing clones
+and downloaded archives can retain previously published material after a history cleanup.
 
 ## Self-hosting rule
 
@@ -99,12 +114,16 @@ updates every active release surface together:
 - every bundled lesson's release provenance and content hash;
 - CI assertions, fixtures, documentation and release notes.
 
-Release 2.0.0 uses `SYSTEM.schema_version: 3`. Change the schema only when the manifest format
+Project OS 2.0.1 uses `SYSTEM.schema_version: 3`. Change the schema only when the manifest format
 changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and
 is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration
 branches.
+
+Build and validate the exact working-tree ZIP using [Directory packaging](docs/PACKAGING.md). The
+suite includes extracted-package fixtures and runtime checks. Local checks do not replace fresh
+Codex plugin-loader evaluation, portal scan, hosted URL verification or publication authorization.
 
 ## Pull requests
 

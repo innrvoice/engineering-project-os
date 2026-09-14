@@ -9,14 +9,15 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
-import tempfile
+import uuid
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 SCHEMA_VERSION = 3
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
@@ -58,7 +59,7 @@ PRIVATE_KNOWLEDGE_PATTERNS = (
     (re.compile(r"\b(?:sk-(?:proj-)?|gh[pousr]_|github_pat_|xox[baprs]-|AKIA)[A-Za-z0-9_-]+"), "credential-like token"),
     (re.compile(r"\bAIza[A-Za-z0-9_-]{20,}"), "credential-like token"),
     (re.compile(r"Authorization\s*:\s*Bearer\s+eyJ[A-Za-z0-9_.-]+", re.IGNORECASE), "authorization token"),
-    (re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----"), "private key"),
+    (re.compile(r"-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----"), "private key"),
     (re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE), "email address"),
     (re.compile(r"https?://(?:localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?", re.IGNORECASE), "private URL"),
     (re.compile(r"https?://[^/\s?#]+\.internal(?::\d+)?(?:[/\s?#]|$)", re.IGNORECASE), "private URL"),
@@ -107,8 +108,14 @@ class ProjectOSError(RuntimeError):
 
 
 def load_json(path: Path) -> Any:
+    return load_json_snapshot(path)[0]
+
+
+def load_json_snapshot(path: Path) -> tuple[Any, str]:
+    """Parse and fingerprint the same bytes, never a later reread of the file."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        content = path.read_bytes()
+        return json.loads(content.decode("utf-8")), hashlib.sha256(content).hexdigest()
     except FileNotFoundError as error:
         raise ProjectOSError(f"Missing JSON file: {path}") from error
     except UnicodeDecodeError as error:
@@ -121,36 +128,144 @@ def load_json(path: Path) -> Any:
         raise ProjectOSError(f"Could not read JSON file {path}: {error}") from error
 
 
-def atomic_write_text(path: Path, content: str, expected_sha256: str | None = None) -> None:
-    """Atomically replace an existing regular file after an optional concurrency check."""
-    if path.is_symlink():
-        raise ProjectOSError(f"Refusing to replace a symlink: {path}")
-    if expected_sha256 is not None:
-        if not path.is_file():
-            raise ProjectOSError(f"File changed during operation: {path}")
-        current_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
-        if current_sha256 != expected_sha256:
-            raise ProjectOSError(f"File changed during operation: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    original_mode = path.stat().st_mode & 0o7777 if path.exists() else None
-    descriptor, raw_temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temporary = Path(raw_temporary)
+def read_regular_at(directory_fd: int, name: str) -> tuple[bytes, os.stat_result]:
+    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+    with os.fdopen(descriptor, "rb") as handle:
+        details = os.fstat(handle.fileno())
+        if not stat.S_ISREG(details.st_mode):
+            raise ProjectOSError(f"Expected a regular file: {name}")
+        return handle.read(), details
+
+
+def atomic_write_bytes(
+    directory_fd: int, name: str, content: bytes, expected_sha256: str,
+    mode: int | None = None,
+) -> os.stat_result:
+    """Replace within an already opened directory; parent path swaps cannot redirect it."""
+    original, details = read_regular_at(directory_fd, name)
+    if hashlib.sha256(original).hexdigest() != expected_sha256:
+        raise ProjectOSError(f"File changed during operation: {name}")
+    temporary = f".{name}.project-os-write.{uuid.uuid4().hex}"
+    descriptor = os.open(
+        temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        0o600, dir_fd=directory_fd,
+    )
     try:
         with os.fdopen(descriptor, "wb") as handle:
-            handle.write(content.encode("utf-8"))
+            handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        if original_mode is not None:
-            os.chmod(temporary, original_mode)
-        if expected_sha256 is not None:
-            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
-                raise ProjectOSError(f"File changed during operation: {path}")
-        os.replace(temporary, path)
-    except OSError as error:
-        raise ProjectOSError(f"Atomic write failed for {path}: {error}") from error
+            os.fchmod(handle.fileno(), stat.S_IMODE(details.st_mode) if mode is None else mode)
+            replacement_details = os.fstat(handle.fileno())
+        current, current_details = read_regular_at(directory_fd, name)
+        if (
+            (current_details.st_dev, current_details.st_ino) != (details.st_dev, details.st_ino)
+            or hashlib.sha256(current).hexdigest() != expected_sha256
+        ):
+            raise ProjectOSError(f"File changed during operation: {name}")
+        os.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+        return replacement_details
     finally:
-        if temporary.exists():
-            temporary.unlink()
+        try:
+            os.unlink(temporary, dir_fd=directory_fd)
+        except FileNotFoundError:
+            pass
+
+
+def atomic_write_text(
+    path: Path, content: str, expected_sha256: str, *, directory_fd: int,
+) -> os.stat_result:
+    return atomic_write_bytes(directory_fd, path.name, content.encode("utf-8"), expected_sha256)
+
+
+class AnchoredFilesystem:
+    """Keep directory descriptors alive through apply, validation and rollback.
+
+    All mutations use dir_fd and no-follow opens. Namespace checks detect renamed
+    parents; rollback still uses the original directories, never replacement paths.
+    """
+
+    def __init__(self, root: Path):
+        if (
+            not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
+            or not {os.open, os.mkdir, os.stat, os.unlink, os.rmdir, os.rename, os.link}
+            <= os.supports_dir_fd
+        ):
+            raise ProjectOSError("Safe mutations require POSIX directory descriptors (macOS or Linux)")
+        self.root = root
+        self.directories: dict[Path, int] = {}
+        self.links: list[tuple[int, str, int]] = []
+        self.descriptors: list[int] = []
+        self.created: list[tuple[int, str, int]] = []
+        try:
+            descriptor = os.open(root.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            self.descriptors.append(descriptor)
+            for part in root.parts[1:]:
+                descriptor = self.open_directory(descriptor, part)
+            self.directories[root] = descriptor
+        except OSError as error:
+            self.close()
+            raise ProjectOSError(f"Could not safely open repository directories: {error}") from error
+        except BaseException:
+            self.close()
+            raise
+
+    def open_directory(self, parent_fd: int, name: str) -> int:
+        descriptor = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+        self.descriptors.append(descriptor)
+        self.links.append((parent_fd, name, descriptor))
+        return descriptor
+
+    def parent(self, path: Path, create: bool = False) -> int:
+        relative = path.relative_to(self.root)
+        if not relative.parts or any(part in {".", ".."} for part in relative.parts):
+            raise ProjectOSError(f"Unsafe destination: {path}")
+        current = self.root
+        descriptor = self.directories[current]
+        for part in relative.parts[:-1]:
+            current = current / part
+            if current not in self.directories:
+                made = False
+                try:
+                    child = self.open_directory(descriptor, part)
+                except FileNotFoundError:
+                    if not create:
+                        raise
+                    os.mkdir(part, dir_fd=descriptor)
+                    made = True
+                    child = self.open_directory(descriptor, part)
+                if made:
+                    self.created.append((descriptor, part, child))
+                self.directories[current] = child
+            descriptor = self.directories[current]
+        return descriptor
+
+    def verify(self) -> None:
+        for parent_fd, name, descriptor in self.links:
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            original = os.fstat(descriptor)
+            if not stat.S_ISDIR(current.st_mode) or (
+                current.st_dev, current.st_ino
+            ) != (original.st_dev, original.st_ino):
+                raise ProjectOSError(f"Directory changed during operation: {name}")
+
+    def close(self) -> None:
+        for descriptor in reversed(self.descriptors):
+            os.close(descriptor)
+        self.descriptors.clear()
+
+    def rollback_directories(self) -> list[str]:
+        failures = []
+        for parent_fd, name, descriptor in reversed(self.created):
+            try:
+                current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                original = os.fstat(descriptor)
+                if (current.st_dev, current.st_ino) != (original.st_dev, original.st_ino):
+                    raise ProjectOSError("created directory was concurrently replaced")
+                os.rmdir(name, dir_fd=parent_fd)
+            except (OSError, ProjectOSError) as error:
+                failures.append(f"{name}: {error}")
+        return failures
 
 
 def package_metadata(root: Path) -> tuple[dict[str, Any], list[str]]:
@@ -161,6 +276,8 @@ def package_metadata(root: Path) -> tuple[dict[str, Any], list[str]]:
         value = load_json(path)
     except ProjectOSError:
         return {}, ["package.json exists but is not valid JSON"]
+    if not isinstance(value, dict):
+        return {}, ["package.json must contain an object"]
 
     dependency_names: set[str] = set()
     for key in ("dependencies", "devDependencies", "peerDependencies"):
@@ -600,28 +717,6 @@ def relative_string(root: Path, path: Path | None) -> str | None:
         return None
 
 
-def create_parent_directories(root: Path, parent: Path, created: list[Path]) -> None:
-    root = root.resolve()
-    require_destination_within_root(root, parent)
-    relative = parent.relative_to(root)
-    current = root
-    for part in relative.parts:
-        current = current / part
-        if current.is_symlink():
-            raise ProjectOSError(f"Refusing to create through a symlink: {current}")
-        if current.exists():
-            if not current.is_dir():
-                raise ProjectOSError(f"Expected a directory but found a file: {current}")
-            continue
-        try:
-            current.mkdir()
-        except FileExistsError:
-            if current.is_symlink() or not current.is_dir():
-                raise ProjectOSError(f"Unsafe path appeared during operation: {current}")
-        else:
-            created.append(current)
-
-
 def unique_existing(
     root: Path,
     candidates: Sequence[str],
@@ -912,57 +1007,11 @@ def execute_operations(
     if before_write is not None:
         before_write()
 
-    created_files: list[dict[str, Any]] = []
-    created_directories: list[Path] = []
-    try:
-        for action, destination, content in operations:
-            if action == "skip":
-                continue
-            create_parent_directories(root, destination.parent, created_directories)
-            reject_symlink_path(root, destination)
-            handle = destination.open("xb")
-            record: dict[str, Any] = {
-                "path": destination,
-                "identity": (os.fstat(handle.fileno()).st_dev, os.fstat(handle.fileno()).st_ino),
-                "sha256": None,
-            }
-            created_files.append(record)
-            with handle:
-                intended = (content or "").encode("utf-8")
-                handle.write(intended)
-                handle.flush()
-                os.fsync(handle.fileno())
-            record["sha256"] = hashlib.sha256(intended).hexdigest()
-    except (OSError, ProjectOSError) as error:
-        rollback_failures: list[str] = []
-        for record in reversed(created_files):
-            path = record["path"]
-            try:
-                if path.is_symlink():
-                    raise ProjectOSError("destination became a symlink")
-                details = path.stat()
-                if (details.st_dev, details.st_ino) != record["identity"]:
-                    raise ProjectOSError("destination was concurrently replaced")
-                expected = record["sha256"]
-                if (
-                    isinstance(expected, str)
-                    and hashlib.sha256(path.read_bytes()).hexdigest() != expected
-                ):
-                    raise ProjectOSError("created file was concurrently changed")
-                path.unlink()
-            except (OSError, ProjectOSError) as rollback_error:
-                rollback_failures.append(f"{path}: {rollback_error}")
-        for path in reversed(created_directories):
-            try:
-                path.rmdir()
-            except OSError as rollback_error:
-                rollback_failures.append(f"{path}: {rollback_error}")
-        rollback_note = (
-            " rollback incomplete: " + "; ".join(rollback_failures)
-            if rollback_failures
-            else " created files were rolled back"
-        )
-        raise ProjectOSError(f"Project OS write failed;{rollback_note}: {error}") from error
+    execute_sync_transaction(
+        root,
+        [(path, content or "") for action, path, content in operations if action == "create"],
+        [],
+    )
 
 
 def execute_sync_transaction(
@@ -971,9 +1020,11 @@ def execute_sync_transaction(
     replacements: Sequence[tuple[Path, str, str]],
     deletions: Sequence[tuple[Path, str]] = (),
     after_write: Callable[[], None] | None = None,
+    preconditions: dict[Path, str] | None = None,
 ) -> None:
-    """Apply a small file transaction with hash-guarded rollback for caught failures."""
-    root = root.resolve()
+    """Apply using anchored directories, with snapshot checks and guarded rollback."""
+    # Callers resolve the user-selected root before planning. Do not resolve it again
+    # here: a parent symlink introduced during planning must not select a new target.
     destinations = (
         [path for path, _ in creates]
         + [path for path, _, _ in replacements]
@@ -981,162 +1032,136 @@ def execute_sync_transaction(
     )
     if len(destinations) != len(set(destinations)):
         raise ProjectOSError("Sync transaction contains duplicate destinations")
-    for path, _ in creates:
-        require_destination_within_root(root, path)
-        reject_symlink_path(root, path)
-        if path.exists():
-            raise ProjectOSError(f"File changed during sync: {path}")
-    for path, _, expected_sha256 in replacements:
-        require_destination_within_root(root, path)
-        reject_symlink_path(root, path)
-        if not path.is_file():
-            raise ProjectOSError(f"File changed during sync: {path}")
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
-            raise ProjectOSError(f"File changed during sync: {path}")
-    for path, expected_sha256 in deletions:
-        require_destination_within_root(root, path)
-        reject_symlink_path(root, path)
-        if not path.is_file():
-            raise ProjectOSError(f"File changed during sync: {path}")
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
-            raise ProjectOSError(f"File changed during sync: {path}")
+    for path in [*destinations, *(preconditions or {})]:
+        if not path.is_absolute() or not path.is_relative_to(root):
+            raise ProjectOSError(f"Destination escapes repository: {path}")
+    fs = AnchoredFilesystem(root)
+    created: list[tuple[Path, int, tuple[int, int], str]] = []
+    replaced: list[tuple[Path, int, bytes, int, tuple[int, int], str]] = []
+    deleted: list[tuple[Path, int, str, str]] = []
 
-    created_files: list[dict[str, Any]] = []
-    created_directories: list[Path] = []
-    replaced: list[tuple[Path, bytes, str, int, tuple[int, int]]] = []
-    deleted: list[tuple[Path, Path]] = []
+    def require_hash(path: Path, expected: str) -> tuple[bytes, os.stat_result]:
+        content, details = read_regular_at(fs.parent(path), path.name)
+        if hashlib.sha256(content).hexdigest() != expected:
+            raise ProjectOSError(f"File changed during operation: {path}")
+        return content, details
+
+    def check_preconditions(after: bool = False) -> None:
+        for path, digest in (preconditions or {}).items():
+            if not after or path not in destinations:
+                require_hash(path, digest)
+
+    def require_identity(directory_fd: int, name: str, identity: tuple[int, int], digest: str) -> None:
+        content, details = read_regular_at(directory_fd, name)
+        if (details.st_dev, details.st_ino) != identity or (
+            hashlib.sha256(content).hexdigest() != digest
+        ):
+            raise ProjectOSError("file was concurrently changed or replaced")
+
     try:
-        for path, content in creates:
-            create_parent_directories(root, path.parent, created_directories)
-            intended = content if isinstance(content, bytes) else content.encode("utf-8")
-            if isinstance(content, bytes):
-                handle = path.open("xb")
-                record = {
-                    "path": path,
-                    "identity": (os.fstat(handle.fileno()).st_dev, os.fstat(handle.fileno()).st_ino),
-                    "sha256": None,
-                }
-                created_files.append(record)
-                with handle:
-                    handle.write(content)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-            else:
-                handle = path.open("xb")
-                record = {
-                    "path": path,
-                    "identity": (os.fstat(handle.fileno()).st_dev, os.fstat(handle.fileno()).st_ino),
-                    "sha256": None,
-                }
-                created_files.append(record)
-                with handle:
+        try:
+            # Open existing parents before applying anything, pinning their identities.
+            for path, _ in creates:
+                try:
+                    directory_fd = fs.parent(path)
+                    os.stat(path.name, dir_fd=directory_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                raise ProjectOSError(f"File changed during sync: {path}")
+            for path, _, digest in replacements:
+                require_hash(path, digest)
+            for path, digest in deletions:
+                require_hash(path, digest)
+            check_preconditions()
+            fs.verify()
+            for path, content in creates:
+                directory_fd = fs.parent(path, create=True)
+                fs.verify()
+                intended = content if isinstance(content, bytes) else content.encode("utf-8")
+                descriptor = os.open(
+                    path.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o666, dir_fd=directory_fd,
+                )
+                details = os.fstat(descriptor)
+                identity = (details.st_dev, details.st_ino)
+                created.append((path, directory_fd, identity, hashlib.sha256(intended).hexdigest()))
+                with os.fdopen(descriptor, "wb") as handle:
                     handle.write(intended)
                     handle.flush()
                     os.fsync(handle.fileno())
-            record["sha256"] = hashlib.sha256(intended).hexdigest()
-        for path, content, expected_sha256 in replacements:
-            original = path.read_bytes()
-            original_mode = path.stat().st_mode & 0o7777
-            replacement_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            atomic_write_text(path, content, expected_sha256=expected_sha256)
-            replacement_details = path.stat()
-            replaced.append(
-                (
-                    path,
-                    original,
-                    replacement_sha256,
-                    original_mode,
-                    (replacement_details.st_dev, replacement_details.st_ino),
+            for path, content, digest in replacements:
+                directory_fd = fs.parent(path)
+                original, details = require_hash(path, digest)
+                fs.verify()
+                replacement = atomic_write_text(path, content, digest, directory_fd=directory_fd)
+                replaced.append((
+                    path, directory_fd, original, stat.S_IMODE(details.st_mode),
+                    (replacement.st_dev, replacement.st_ino),
+                    hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                ))
+            for path, digest in deletions:
+                directory_fd = fs.parent(path)
+                require_hash(path, digest)
+                fs.verify()
+                tombstone = f".{path.name}.project-os-delete.{uuid.uuid4().hex}"
+                descriptor = os.open(
+                    tombstone, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o600, dir_fd=directory_fd,
                 )
-            )
-        for path, expected_sha256 in deletions:
-            if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
-                raise ProjectOSError(f"File changed during sync: {path}")
-            descriptor, raw_tombstone = tempfile.mkstemp(
-                prefix=f".{path.name}.project-os-delete.", dir=path.parent
-            )
-            os.close(descriptor)
-            tombstone = Path(raw_tombstone)
-            try:
-                os.replace(path, tombstone)
-            except OSError:
-                tombstone.unlink(missing_ok=True)
-                raise
-            deleted.append((path, tombstone))
-        if after_write is not None:
-            after_write()
-    except (OSError, ProjectOSError) as error:
-        rollback_failures: list[str] = []
-        for path, tombstone in reversed(deleted):
-            if path.exists() or path.is_symlink():
-                rollback_failures.append(
-                    f"{path}: destination reappeared; original preserved at {tombstone}"
-                )
-                continue
-            try:
-                os.replace(tombstone, path)
-            except OSError as rollback_error:
-                rollback_failures.append(f"{path}: {rollback_error}")
-        for path, original, replacement_sha256, original_mode, replacement_identity in reversed(
-            replaced
-        ):
-            try:
-                if path.is_symlink() or not path.is_file():
-                    raise ProjectOSError(f"File changed during rollback: {path}")
-                details = path.stat()
-                if (details.st_dev, details.st_ino) != replacement_identity:
-                    raise ProjectOSError(f"File changed during rollback: {path}")
-                if hashlib.sha256(path.read_bytes()).hexdigest() != replacement_sha256:
-                    raise ProjectOSError(f"File changed during rollback: {path}")
-                descriptor, raw_temporary = tempfile.mkstemp(
-                    prefix=f".{path.name}.project-os-rollback.", dir=path.parent
-                )
-                temporary = Path(raw_temporary)
+                os.close(descriptor)
                 try:
-                    with os.fdopen(descriptor, "wb") as handle:
-                        handle.write(original)
-                        handle.flush()
-                        os.fsync(handle.fileno())
-                    os.chmod(temporary, original_mode)
-                    os.replace(temporary, path)
-                except BaseException:
-                    temporary.unlink(missing_ok=True)
+                    os.replace(path.name, tombstone, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+                except OSError:
+                    os.unlink(tombstone, dir_fd=directory_fd)
                     raise
-            except (OSError, ProjectOSError) as rollback_error:
-                rollback_failures.append(f"{path}: {rollback_error}")
-        for record in reversed(created_files):
-            path = record["path"]
+                deleted.append((path, directory_fd, tombstone, digest))
+                actual, _ = read_regular_at(directory_fd, tombstone)
+                if hashlib.sha256(actual).hexdigest() != digest:
+                    raise ProjectOSError(f"File changed during deletion: {path}")
+            fs.verify()
+            check_preconditions(after=True)
+            if after_write is not None:
+                after_write()
+            fs.verify()
+            check_preconditions(after=True)
+        except (OSError, ProjectOSError) as error:
+            failures: list[str] = []
+            for path, directory_fd, tombstone, digest in reversed(deleted):
+                try:
+                    # Exclusive restore: never overwrite a concurrently recreated path.
+                    content, _ = read_regular_at(directory_fd, tombstone)
+                    if hashlib.sha256(content).hexdigest() != digest:
+                        raise ProjectOSError("deletion backup was concurrently changed")
+                    os.link(tombstone, path.name, src_dir_fd=directory_fd,
+                            dst_dir_fd=directory_fd, follow_symlinks=False)
+                    os.unlink(tombstone, dir_fd=directory_fd)
+                except (OSError, ProjectOSError) as rollback_error:
+                    failures.append(f"{path}: {rollback_error}; original preserved at {tombstone}")
+            for path, directory_fd, original, mode, identity, digest in reversed(replaced):
+                try:
+                    require_identity(directory_fd, path.name, identity, digest)
+                    atomic_write_bytes(directory_fd, path.name, original, digest, mode)
+                except (OSError, ProjectOSError) as rollback_error:
+                    failures.append(f"{path}: {rollback_error}")
+            for path, directory_fd, identity, digest in reversed(created):
+                try:
+                    require_identity(directory_fd, path.name, identity, digest)
+                    os.unlink(path.name, dir_fd=directory_fd)
+                except (OSError, ProjectOSError) as rollback_error:
+                    failures.append(f"{path}: {rollback_error}")
+            failures.extend(fs.rollback_directories())
+            note = " rollback incomplete: " + "; ".join(failures) if failures else " changes were rolled back"
+            raise ProjectOSError(f"Project OS transaction failed;{note}: {error}") from error
+        for path, directory_fd, tombstone, digest in deleted:
             try:
-                if path.is_symlink():
-                    raise ProjectOSError("destination became a symlink")
-                details = path.stat()
-                if (details.st_dev, details.st_ino) != record["identity"]:
-                    raise ProjectOSError("destination was concurrently replaced")
-                expected = record["sha256"]
-                if (
-                    isinstance(expected, str)
-                    and hashlib.sha256(path.read_bytes()).hexdigest() != expected
-                ):
-                    raise ProjectOSError("created file was concurrently changed")
-                path.unlink()
-            except (OSError, ProjectOSError) as rollback_error:
-                rollback_failures.append(f"{path}: {rollback_error}")
-        for path in reversed(created_directories):
-            try:
-                path.rmdir()
-            except OSError:
-                pass
-        note = (
-            " rollback incomplete: " + "; ".join(rollback_failures)
-            if rollback_failures
-            else " changes were rolled back"
-        )
-        raise ProjectOSError(f"Project OS transaction failed;{note}: {error}") from error
-    for _, tombstone in deleted:
-        try:
-            tombstone.unlink()
-        except OSError as error:
-            raise ProjectOSError(f"Project OS transaction committed but cleanup failed: {error}")
+                content, _ = read_regular_at(directory_fd, tombstone)
+                if hashlib.sha256(content).hexdigest() != digest:
+                    raise ProjectOSError(f"Deletion backup changed: {path}")
+                os.unlink(tombstone, dir_fd=directory_fd)
+            except (OSError, ProjectOSError) as error:
+                raise ProjectOSError(f"Project OS transaction committed but cleanup failed: {error}") from error
+    finally:
+        fs.close()
 
 
 def init_project(
@@ -2864,10 +2889,14 @@ def check_project(root: Path, config: Path | None = None) -> int:
     return 1 if errors else 0
 
 
-def read_selected_system(root: Path) -> tuple[list[str], list[str], dict[str, Any]]:
+def read_selected_system(
+    root: Path, snapshots: dict[Path, str] | None = None,
+) -> tuple[list[str], list[str], dict[str, Any]]:
     system_path = root / ".agents" / "SYSTEM.json"
     reject_symlink_path(root, system_path)
-    system = load_json(system_path)
+    system, digest = load_json_snapshot(system_path)
+    if snapshots is not None:
+        snapshots[system_path] = digest
     if not isinstance(system, dict):
         raise ProjectOSError("SYSTEM configuration must contain an object")
     if system.get("schema_version") != SCHEMA_VERSION:
@@ -2940,7 +2969,8 @@ def sync_knowledge(
     dry_run: bool,
 ) -> int:
     root = root.resolve()
-    selected_packs, selected_overlays, system = read_selected_system(root)
+    snapshots: dict[Path, str] = {}
+    selected_packs, selected_overlays, system = read_selected_system(root, snapshots)
     packs = (
         selected_packs
         if packs_value.strip().lower() == "selected"
@@ -3028,8 +3058,8 @@ def sync_knowledge(
     if destination.exists():
         if not destination.is_file():
             raise ProjectOSError(f"Shared knowledge destination is not a file: {destination}")
-        pre_read_sha256 = hashlib.sha256(destination.read_bytes()).hexdigest()
-        current = load_json(destination)
+        current, pre_read_sha256 = load_json_snapshot(destination)
+        snapshots[destination] = pre_read_sha256
     else:
         current = {
             "schema_version": 1,
@@ -3141,7 +3171,7 @@ def sync_knowledge(
         pre_read_sha256 is None
         or hashlib.sha256(serialized.encode("utf-8")).hexdigest() != pre_read_sha256
     )
-    system_pre_read = hashlib.sha256(system_path.read_bytes()).hexdigest()
+    system_pre_read = snapshots[system_path]
     system_changed = hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != system_pre_read
 
     creates = list(guidance_creates)
@@ -3157,7 +3187,7 @@ def sync_knowledge(
     if dry_run:
         print("dry-run: no files written")
         return 0
-    execute_sync_transaction(root, creates, replacements)
+    execute_sync_transaction(root, creates, replacements, preconditions=snapshots)
     return 0
 
 
@@ -3294,12 +3324,13 @@ def load_history_for_mutation(
     if index_path.exists():
         if not index_path.is_file():
             raise ProjectOSError("SYSTEM history index must be a regular file")
+        value, index_sha256 = load_json_snapshot(index_path)
         errors: list[str] = []
         validate_history_index(root, history_path, index_path, errors)
         if errors:
             raise ProjectOSError("Invalid history index: " + "; ".join(errors))
-        value = load_json(index_path)
-        index_sha256 = hashlib.sha256(index_path.read_bytes()).hexdigest()
+        if hashlib.sha256(index_path.read_bytes()).hexdigest() != index_sha256:
+            raise ProjectOSError("History index changed during validation")
     else:
         value = {"schema_version": 1, "entries": []}
     if not isinstance(value, dict) or not isinstance(value.get("entries"), list):
@@ -3323,14 +3354,18 @@ def next_program_id(index: dict[str, Any], history_path: Path | None = None) -> 
     return f"{prefix}{sequence:03d}"
 
 
-def active_plan_ids(root: Path, system: dict[str, Any]) -> list[str]:
+def active_plan_ids(
+    root: Path, system: dict[str, Any], snapshots: dict[Path, str] | None = None,
+) -> list[str]:
     paths = system.get("paths")
     if not isinstance(paths, dict):
         raise ProjectOSError("SYSTEM paths must contain an object")
     plans_path = safe_relative(root, paths.get("plans"))
     if plans_path is None or not plans_path.is_file():
         raise ProjectOSError("SYSTEM plans registry is missing")
-    value = load_json(plans_path)
+    value, digest = load_json_snapshot(plans_path)
+    if snapshots is not None:
+        snapshots[plans_path] = digest
     if not isinstance(value, dict) or not isinstance(value.get("plans"), list):
         raise ProjectOSError("Plans registry must contain a plans array")
     active = [
@@ -3347,8 +3382,8 @@ def active_plan_ids(root: Path, system: dict[str, Any]) -> list[str]:
     return []
 
 
-def require_current_system(root: Path) -> dict[str, Any]:
-    _, _, system = read_selected_system(root)
+def require_current_system(root: Path, snapshots: dict[Path, str] | None = None) -> dict[str, Any]:
+    _, _, system = read_selected_system(root, snapshots)
     if system.get("project_os_version") != VERSION:
         raise ProjectOSError("Repository must be upgraded before Program lifecycle changes")
     return system
@@ -3377,13 +3412,16 @@ def start_program(root: Path, definition_path: Path, dry_run: bool) -> int:
     root = root.resolve()
     if check_project(root) != 0:
         raise ProjectOSError("Program start requires a clean Project OS check")
-    system = require_current_system(root)
+    snapshots: dict[Path, str] = {}
+    system = require_current_system(root, snapshots)
     if system.get("mode") != "standard" or system.get("active_program") is not None:
         raise ProjectOSError("A Program is already active")
     definition = validate_program_definition(load_json(definition_path.resolve()))
     history_path, index_path, history_index, index_sha256 = load_history_for_mutation(
         root, system
     )
+    if index_sha256 is not None:
+        snapshots[index_path] = index_sha256
     program_id = next_program_id(history_index, history_path)
     started_on = date.today().isoformat()
     program_path = root / PROGRAM_RELATIVE_PATH
@@ -3413,7 +3451,7 @@ def start_program(root: Path, definition_path: Path, dry_run: bool) -> int:
     creates: list[tuple[Path, str]] = [(program_path, content)]
     replacements: list[tuple[Path, str, str]] = []
     system_path = root / ".agents" / "SYSTEM.json"
-    system_sha256 = hashlib.sha256(system_path.read_bytes()).hexdigest()
+    system_sha256 = snapshots[system_path]
     replacements.append(
         (system_path, json.dumps(next_system, indent=2) + "\n", system_sha256)
     )
@@ -3426,6 +3464,7 @@ def start_program(root: Path, definition_path: Path, dry_run: bool) -> int:
         creates,
         replacements,
         after_write=lambda: require_passing_check(root, "Program start"),
+        preconditions=snapshots,
     )
     return 0
 
@@ -3463,12 +3502,13 @@ def close_program(
     root = root.resolve()
     if check_project(root) != 0:
         raise ProjectOSError("Program close requires a clean Project OS check")
-    system = require_current_system(root)
+    snapshots: dict[Path, str] = {}
+    system = require_current_system(root, snapshots)
     if system.get("mode") != "program" or not isinstance(system.get("active_program"), dict):
         raise ProjectOSError("No Program is active")
     if disposition == "stopped" and (not isinstance(reason, str) or not reason.strip()):
         raise ProjectOSError("A stopped Program requires --reason")
-    if active_plan_ids(root, system):
+    if active_plan_ids(root, system, snapshots):
         raise ProjectOSError("Close the active plan before closing the Program")
     program_path = require_canonical_program_owner(root, system)
     if not program_path.is_file():
@@ -3485,6 +3525,8 @@ def close_program(
         root, system
     )
     archive_path = history_path / "programs" / program_id / "PROGRAM.md"
+    if index_sha256 is not None:
+        snapshots[index_path] = index_sha256
     reject_symlink_path(root, archive_path)
     if archive_path.exists():
         raise ProjectOSError(f"Program archive already exists: {archive_path.relative_to(root)}")
@@ -3528,7 +3570,7 @@ def close_program(
         (
             system_path,
             json.dumps(next_system, indent=2, ensure_ascii=False) + "\n",
-            hashlib.sha256(system_path.read_bytes()).hexdigest(),
+            snapshots[system_path],
         )
     )
     deletions = [(program_path, program_digest)]
@@ -3542,6 +3584,7 @@ def close_program(
         replacements,
         deletions,
         after_write=lambda: require_passing_check(root, "Program close"),
+        preconditions=snapshots,
     )
     return 0
 
@@ -3575,6 +3618,7 @@ def plan_managed_release_update(
     root: Path,
     original_system: dict[str, Any],
     next_system: dict[str, Any],
+    snapshots: dict[Path, str] | None = None,
 ) -> tuple[list[tuple[Path, str]], list[tuple[Path, str, str]]]:
     """Plan conflict-safe managed guidance and knowledge updates without writing."""
     packs, overlays = validate_system_selection(original_system)
@@ -3644,8 +3688,9 @@ def plan_managed_release_update(
     if destination.exists():
         if not destination.is_file():
             raise ProjectOSError("Shared knowledge destination must be a regular file")
-        destination_digest = hashlib.sha256(destination.read_bytes()).hexdigest()
-        current = load_json(destination)
+        current, destination_digest = load_json_snapshot(destination)
+        if snapshots is not None:
+            snapshots[destination] = destination_digest
         registry_errors: list[str] = []
         validate_failure_registry(
             destination,
@@ -3741,6 +3786,25 @@ def plan_managed_release_update(
     return creates, replacements
 
 
+def release_order(value: Any) -> tuple[Any, ...]:
+    """SemVer precedence; build metadata does not affect upgrade direction."""
+    match = re.fullmatch(
+        r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+        r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+        r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?", value if isinstance(value, str) else "",
+    )
+    if match is None:
+        raise ProjectOSError(f"Invalid Project OS release version: {value!r}")
+    identifiers = match.group(4).split(".") if match.group(4) else []
+    if any(item.isdigit() and len(item) > 1 and item.startswith("0") for item in identifiers):
+        raise ProjectOSError(f"Invalid Project OS release version: {value!r}")
+    return (
+        *(int(match.group(index)) for index in (1, 2, 3)),
+        0 if identifiers else 1,
+        tuple((0, int(item)) if item.isdigit() else (1, item) for item in identifiers),
+    )
+
+
 def upgrade_project(
     root: Path,
     legacy_program_state: str | None,
@@ -3752,10 +3816,16 @@ def upgrade_project(
     root = root.resolve()
     system_path = root / ".agents" / "SYSTEM.json"
     reject_symlink_path(root, system_path)
-    loaded = load_json(system_path)
+    loaded, original_digest = load_json_snapshot(system_path)
     if not isinstance(loaded, dict):
         raise ProjectOSError("SYSTEM configuration must contain an object")
     original_system = loaded
+    if release_order(original_system.get("project_os_version")) > release_order(VERSION):
+        raise ProjectOSError(
+            f"Repository release {original_system.get('project_os_version')} is newer than "
+            f"helper {VERSION}; refusing to downgrade. Use the matching or newer helper."
+        )
+    snapshots = {system_path: original_digest}
     schema = original_system.get("schema_version")
     if not isinstance(schema, int) or schema not in {2, SCHEMA_VERSION}:
         raise ProjectOSError(
@@ -3829,6 +3899,8 @@ def upgrade_project(
             history_path, index_path, history_index, index_sha256 = load_history_for_mutation(
                 root, next_system
             )
+            if index_sha256 is not None:
+                snapshots[index_path] = index_sha256
             next_paths["history"] = history_path.relative_to(root).as_posix()
             next_paths["history_index"] = index_path.relative_to(root).as_posix()
             readme_path = history_path / "README.md"
@@ -3863,7 +3935,7 @@ def upgrade_project(
                 )
                 if disposition == "stopped" and (not reason or not reason.strip()):
                     raise ProjectOSError("A stopped legacy Program requires --reason")
-                if active_plan_ids(root, original_system):
+                if active_plan_ids(root, original_system, snapshots):
                     raise ProjectOSError(
                         "Close the active plan before migrating a closed legacy Program"
                     )
@@ -3898,12 +3970,11 @@ def upgrade_project(
                 next_paths["program"] = None
 
     managed_creates, managed_replacements = plan_managed_release_update(
-        root, original_system, next_system
+        root, original_system, next_system, snapshots
     )
     creates.extend(managed_creates)
     replacements.extend(managed_replacements)
     serialized_system = json.dumps(next_system, indent=2, ensure_ascii=False) + "\n"
-    original_digest = hashlib.sha256(system_path.read_bytes()).hexdigest()
     if hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != original_digest:
         replacements.append((system_path, serialized_system, original_digest))
 
@@ -3919,6 +3990,7 @@ def upgrade_project(
         replacements,
         deletions,
         after_write=lambda: require_passing_check(root, "Upgrade"),
+        preconditions=snapshots,
     )
     return 0
 

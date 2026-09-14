@@ -42,7 +42,7 @@ These are recommended natural-language shortcuts. They are not a strict command 
 | `$project-os program close stopped: <reason>` | Stop and archive an incomplete Program | Reason |
 | `$project-os plan open: <outcome>` | Open one resumable outcome plan | Outcome |
 | `$project-os plan checkpoint` | Reconcile and save the active plan checkpoint | None |
-| `$project-os plan resume` | Reconcile and continue the active plan | None |
+| `$project-os plan resume[: <plan-id>]` | Continue active work or reactivate a resolved blocked plan | Plan ID when selection is ambiguous |
 | `$project-os plan complete` | Complete the active plan when evidence permits | None |
 | `$project-os plan block: <reason>` | Preserve a blocked plan and resume condition | Reason |
 | `$project-os plan supersede: <reason>` | Retire a replaced plan | Reason |
@@ -178,11 +178,14 @@ $project-os plan resume
 ~~~
 
 - Result: Codex compares the checkpoint with current HEAD, worktree state and relevant files before
-  continuing the exact next action.
+  continuing the exact next action. When idle, it can reactivate a selected blocked plan after
+  verifying that the recorded blocker is resolved.
 - Files: application files named by the plan and relevant Project OS records may change within the
   authority of the request.
 - Proof: Codex reports the reconciled baseline, work performed, verification and next action.
-- Skip it when: no plan is active. Add `do not continue implementation` for a read-only assessment.
+- Skip it when: there is no active or blocked plan. Add `do not change files` for a read-only assessment.
+  `Do not continue implementation` allows the requested record transition but stops before the next
+  implementation step.
 
 **Type this in Codex chat:**
 
@@ -209,7 +212,13 @@ $project-os plan block: staging credentials are unavailable
 ~~~
 
 This preserves completed evidence, the exact unmet condition and the first action available after the
-blocker clears.
+blocker clears. The plan becomes `blocked`, execution becomes `idle` and the optional `active_plan`
+pointer becomes null.
+
+After the condition clears, type `$project-os plan resume: 001` with the intended plan ID. Codex
+verifies the condition, requires no other active plan, previews the transition back to `active` and
+`running`, updates STATE and runs the checker. If multiple blocked plans exist, bare `plan resume`
+requires a selection. An unresolved blocker leaves the plan blocked.
 
 **Type this in Codex chat:**
 
@@ -354,7 +363,7 @@ $project-os upgrade
   applies only a conflict-free result with caught-failure rollback and runs the checker.
 - Files: version and schema metadata, managed guidance, managed shared knowledge and an explicitly
   required lifecycle migration may change. Project-owned state and application code remain intact.
-- Proof: the checker passes at release 2.0.0 and a repeated dry run reports no pending changes.
+- Proof: the checker passes at release 2.0.1 and a repeated dry run reports no pending changes.
 - Skip it when: the installed checker already passes and the repository is current.
 
 A legacy Program whose state cannot be proved is a decision boundary, not something Codex guesses.

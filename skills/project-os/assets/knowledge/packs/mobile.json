@@ -20,12 +20,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/router/reference/url-parameters/",
           "https://docs.expo.dev/versions/latest/sdk/router/"
         ],
-        "content_hash": "sha256:867c1af4c25619fe12ccdcb0f7b5ffe13382b424d294cb01d7ebab365dbd2f8a"
+        "content_hash": "sha256:e4f78df7afc6adbfef5b48926dd151a76c9a134af40d6d655b66309f25321c07"
       }
     },
     {
@@ -47,12 +47,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://react.dev/reference/react/useEffect",
           "https://tanstack.com/query/latest/docs/framework/react/guides/window-focus-refetching"
         ],
-        "content_hash": "sha256:a129915b9a3140d45959705a238a9a5ef2e8dc45ad1c9a3dcae5f54bf10f7ec9"
+        "content_hash": "sha256:38632dc652195c8f9cf45ada7abbff8e66800e23d047683d5ac0619bb692b065"
       }
     },
     {
@@ -74,11 +74,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/image/#caching-behavior"
         ],
-        "content_hash": "sha256:2d6bcbe15e0fe952954b80a9a65419b00e4ea20658a00982d2f485f086448c83"
+        "content_hash": "sha256:34896b0d1700a9a3b63ff010d2d2d657a40afdbb7ba982ce38953a1f0c9623ce"
       }
     },
     {
@@ -100,11 +100,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/image/#imagesource"
         ],
-        "content_hash": "sha256:c388a2e0945e96f6596a3d27682b52a7fdf6b597ab788761cd550d66349bc9ed"
+        "content_hash": "sha256:293740ab6a5489e5fd3e51a8938454464274e7556bddd2a35052fa4b23f12157"
       }
     },
     {
@@ -126,13 +126,13 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://reactnative.dev/docs/0.86/appstate",
           "https://tanstack.com/query/latest/docs/framework/react/guides/disabling-queries",
           "https://tanstack.com/query/latest/docs/framework/react/react-native"
         ],
-        "content_hash": "sha256:5caeca82da715a885b3140b4493601eb51fb3ba8ed8a0a80fed5856085cb99f7"
+        "content_hash": "sha256:cccae7b38339dd08b8962e355e21b7ea895b0f77ecda9fb37db19b4770a3a6fe"
       }
     },
     {
@@ -154,11 +154,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://reactnative.dev/docs/0.86/appstate"
         ],
-        "content_hash": "sha256:10c7cdd0fd740cab060bb4382d42ca9539d872bc3a68a499525e7ae22e78c0c1"
+        "content_hash": "sha256:4d4dc6183bcd2dfe718520926d0ae40d6f1578cb63d57611ab510246fdd87edb"
       }
     },
     {
@@ -180,12 +180,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/localization/",
           "https://tc39.es/ecma402/#sec-initializedatetimeformat"
         ],
-        "content_hash": "sha256:61dc416f7a0920c28340a71c620bc4ddd19ef48e96b6d0f0daff64261162eafe"
+        "content_hash": "sha256:1afc822459998d1f74f48d9ead5940f1aa48f75cabea5dfa0deea0fe0c6af965"
       }
     },
     {
@@ -207,12 +207,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/notifications/",
           "https://tanstack.com/query/latest/docs/framework/react/guides/render-optimizations"
         ],
-        "content_hash": "sha256:a6a4aedadf4a84508bf0060257debbcea110b47068e04e2190e4987e2e9ccb49"
+        "content_hash": "sha256:99f9c3110d472652c5346773ee1c184ac99e2b37fa22c0e54bafddd1f505b904"
       }
     },
     {
@@ -234,13 +234,13 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://developer.apple.com/documentation/usernotifications/unusernotificationcenter/setbadgecount(_:withcompletionhandler:)",
           "https://developer.apple.com/forums/tags/usernotifications?page=8",
           "https://docs.expo.dev/versions/v57.0.0/sdk/notifications/"
         ],
-        "content_hash": "sha256:71d1e17c3a8f81ead475db481c7950b6c181b23ccced977e167055fb6a0fc46e"
+        "content_hash": "sha256:1c14e223e47250dd4e5910c8d621a96323ec3f1eb089f6d6e30cf45e7a1d4cd3"
       }
     },
     {
@@ -262,12 +262,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/",
           "https://reactnative.dev/docs/0.86/appstate"
         ],
-        "content_hash": "sha256:a19358f4cedd8a398c9a1a151ca76bead310c022f73dd01557bcd7f957796e86"
+        "content_hash": "sha256:52c01e7503a0cd922a5736df17555d66ae0f32baad10b49ff92ccc4c3ae11cd0"
       }
     },
     {
@@ -289,11 +289,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/linking/overview/"
         ],
-        "content_hash": "sha256:fdc2082900d39bfa1e3467d8a82058343ac535b656a4d3f5550d8ad846b4c769"
+        "content_hash": "sha256:ed8f58992e68986fe30ef4c78350b168c2501c381528f2ef0f26a4d58eb9c8cc"
       }
     },
     {
@@ -315,11 +315,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/imagemanipulator/"
         ],
-        "content_hash": "sha256:1134b561edce64282ffc11f15952963fe35c1a56d6b2c29fb2bf166ab5f2b286"
+        "content_hash": "sha256:de84133ff6d173f092f877f63d0bcec7c10b32a94a99ef37e73bca5372c3026f"
       }
     },
     {
@@ -341,11 +341,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/versions/v57.0.0/sdk/imagemanipulator/"
         ],
-        "content_hash": "sha256:8282181d06dcda2a64a9c47d86338ce20f6740b5dc62797c173b2eef7ac13bc8"
+        "content_hash": "sha256:96aff1d7f76c5ec8218fe49cc801a2f6e24e8381163705f70dab5a67db7ab354"
       }
     },
     {
@@ -367,12 +367,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "mobile",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://developer.apple.com/documentation/foundation/urlsessionconfiguration/background%28withidentifier%3A%29",
           "https://docs.expo.dev/versions/latest/sdk/filesystem/"
         ],
-        "content_hash": "sha256:12e10b247c5d5e7a9dc9ebd6a2423f2cc17ab6012bb5b39a3207973dbca5708f"
+        "content_hash": "sha256:d0cb179e95f6e57800f57de65dea02db8906e7d8adbf36940bdca98c00e2f876"
       }
     }
   ]

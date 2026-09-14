@@ -240,7 +240,7 @@ upgrade. Local additions and conflicts remain visible for review.
 
 ## Versions and upgrades
 
-The installed helper defines the Project OS release version. Release 2.0.0 uses
+The installed helper defines the Project OS release version. Release 2.0.1 uses
 `SYSTEM.schema_version: 3` and `SYSTEM.mode: standard|program`. Knowledge registries have their own
 schema version.
 

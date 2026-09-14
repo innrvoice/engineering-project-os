@@ -1,94 +1,44 @@
 # Project working agreement
 
-## Authority and entry route
+Current user instructions take precedence. Inspect Git HEAD and status before non-trivial work,
+read the relevant implementation and callers, preserve unrelated changes and verify the result.
 
-- Current user instructions take precedence over this repository workflow.
-- `.agents/CONTEXT.md` records durable current facts, authority, architecture, and verified commands.
-- `.agents/STATE.md` owns the current checkpoint and exact next action.
-- `.agents/plans/index.json` owns execution state and plan statuses.
-- `.agents/findings/findings.json` owns concrete project findings.
-- `.agents/knowledge/` contains confirmed lessons, not product authority.
-- Chat history, generated summaries, and archived evidence are context, not current verification.
+## Authority
 
-Before non-trivial work, inspect Git HEAD and status, then read CONTEXT, STATE, the active plan if one
-exists, applicable capability guidance, relevant knowledge entries, and the code and callers being changed.
-Do not load complete history or unrelated evidence at startup.
+- `VERSION` and `SCHEMA_VERSION` in `skills/project-os/scripts/project_os.py` own release and format
+  versions. Keep manifests, templates, knowledge provenance, tests and documentation in lockstep.
+- `skills/project-os/SKILL.md` and its references own the skill workflow. `README.md` and `docs/`
+  explain the public contract. Repair runtime and documentation together when they disagree.
+- `tests/`, `scripts/` and `.github/workflows/ci.yml` define source and package checks.
+- Use Python 3.9+ on macOS or Linux. The runtime has no third-party dependencies.
 
-Capability guidance lives under `.agents/packs/`. Read only selected packs and overlays relevant to
-the requested change. Detected languages and frameworks are evidence, not behavioral profiles or
-permission to infer commands.
+## Local working records
 
-Project OS is already connected to this repository. Ordinary engineering work follows this file and
-the routed records without requiring `$project-os`. That prefix explicitly invokes the installed
-Project OS skill for one message and is appropriate when the user wants to inspect, check, repair, or
-upgrade the control plane, manage durable plans or checkpoints, or curate findings and knowledge. It is
-not a shell command or a persistent mode.
+If present, read `.agents/CONTEXT.md`, `.agents/STATE.md` and the active plan routed by
+`.agents/plans/index.json`. Read only relevant capability guidance and knowledge. These records are
+local to this checkout and are not required to develop or test a fresh clone.
 
-## Project authority and self-hosting
+Keep this repository's plans, checkpoints, findings, evidence and knowledge out of Git. The sole
+public root `.agents` file is `.agents/plugins/marketplace.json`. Do not force-add local records.
+Bundled skill templates and synthetic test fixtures are public product files and remain tracked.
+Update local records only when their durable truth changes; state is a compact handoff, not a diary.
+Keep exactly one active plan while execution is running and preserve unverified acceptance gates.
 
-- `VERSION` and `SCHEMA_VERSION` in `skills/project-os/scripts/project_os.py` own the candidate release
-  and repository format. Package manifests, generated metadata, documentation, fixtures and bundled
-  knowledge must remain in lockstep with them.
-- `skills/project-os/SKILL.md` and its focused references own the skill workflow. `README.md` and
-  `docs/` own the public explanation. Runtime behavior wins when prose and executable tests disagree;
-  repair both in the same change.
-- `tests/test_project_os.py` and `.github/workflows/ci.yml` own the deterministic release checks.
-- The installed stable skill governs Project OS work. Candidate behavior is exercised with
-  `skills/project-os/scripts/project_os.py` from this checkout. Never symlink or copy an unreleased
-  checkout over the installed stable skill.
-- Standalone installation from a versioned GitHub tag is the current public route. Repository plugin
-  manifests are packaging surfaces, not evidence of public Codex marketplace availability.
-- A commit, push, tag, GitHub Release, skill replacement or marketplace submission is a separate
-  publication action and requires explicit owner authorization.
+## Development and verification
 
-## Working method
+- Make the smallest coherent change. Reproduce defects where practical and test observable behavior.
+- Preserve repository-owned data during bootstrap, upgrade, synchronization and Program transitions.
+- Keep the installed stable skill separate from the candidate helper in this checkout.
+- Use `python3 -B -m unittest discover -s tests -v` for the complete release checks.
+- Before publication, run `python3 -B scripts/check_public_tree.py` against the staged file list and
+  `git diff --cached --check`. Follow `CONTRIBUTING.md` and `docs/PACKAGING.md` for other checks.
+- If local Project OS records exist, validate them with the candidate helper's `check --target .`.
 
-1. Establish the concrete outcome, affected owners and callers, and the cheapest decisive check.
-2. Distinguish current behavior, required behavior, stale documentation, and unresolved choices.
-3. Make the smallest coherent change and preserve unrelated work.
-4. Reproduce a defect before fixing when practical. Verify the observable outcome, not only an internal
-   call or mock.
-5. Update only the records whose durable truth changed, then leave an exact resumable checkpoint.
+## Publication and communication
 
-Ask a targeted question only when missing information would materially change behavior, security,
-architecture, compatibility, data ownership, or public outcomes. Do not invent project commands or
-requirements.
+Commit, push, tag, GitHub Release, installed-skill replacement and directory submission require
+owner authorization. A tagged standalone installation and public directory availability are separate
+outcomes. Never infer publication from passing local tests.
 
-## Plans and state
-
-- Simple bounded tasks do not require a plan.
-- Multi-session work uses one active plan for one observable outcome.
-- While `execution_state` is `running`, exactly one plan is `active`. If the optional `active_plan`
-  field exists, it matches that record.
-- `STATE` is a compact handoff, not a diary. Durable facts belong in `CONTEXT`; detailed results belong
-  in linked evidence.
-- A plan is not `done` until its stated acceptance evidence exists. Preserve missing manual, hosted,
-  artifact, production, or physical checks as unverified.
-
-## Findings and knowledge
-
-- Keep candidate and project-specific incidents in the findings register.
-- Add knowledge only after confirming a failure mechanism.
-- Shared lessons must be sanitized, conditional on applicability, and explicit about version or
-  platform boundaries.
-- Never treat copied historical evidence as current proof.
-
-## Scope and safety
-
-- Do not refactor unrelated code or introduce speculative abstractions.
-- Do not install dependencies, delete files, change branches, commit, push, deploy, or run destructive
-  or expensive checks without the authorization required by the current user and repository.
-- Keep credentials, tokens, private data, signed URLs, and production identifiers out of tracked agent
-  records.
-- Keep `.agents` material outside application runtime and distributed artifacts.
-
-## Verification
-
-Use the narrowest checks that provide meaningful confidence. Commands must come from verified project
-configuration recorded in CONTEXT or current repository evidence. Keep static, unit, local integration,
-hosted, artifact, production, owner-reported, and physical evidence distinct.
-
-## Communication
-
-Lead with the outcome. State what changed, what was verified, what remains unverified, and any exact
-blocker. Label inference and uncertainty explicitly.
+State what changed, what was verified and what remains unverified. Do not publish credentials,
+private data or internal working history in code, documentation, commit messages or release notes.

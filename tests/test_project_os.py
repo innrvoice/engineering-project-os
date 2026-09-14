@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 
@@ -82,6 +83,28 @@ def write_program_definition(root: Path) -> Path:
 
 
 class KnowledgeAssetTest(unittest.TestCase):
+    def test_submission_cases_cover_positive_and_negative_workflows(self) -> None:
+        submission = json.loads(
+            (ROOT / "skills" / "project-os" / "evals" / "submission.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        cases = submission["cases"]
+        self.assertEqual(submission["product"], "CODEX")
+        self.assertGreaterEqual(
+            sum(case["classification"] == "positive" for case in cases), 5
+        )
+        self.assertGreaterEqual(
+            sum(case["classification"] == "negative" for case in cases), 3
+        )
+        self.assertEqual(len({case["name"] for case in cases}), len(cases))
+        for case in cases:
+            self.assertIn(case["classification"], {"positive", "negative"})
+            self.assertTrue(case["prompt"].startswith("$project-os "))
+            self.assertTrue(case["fixture"]["setup"])
+            self.assertTrue(case["expected_workflow"])
+            self.assertTrue(case["expected_result_shape"])
+
     def test_all_public_knowledge_is_complete_unique_hashed_and_sanitized(self) -> None:
         knowledge_root = ROOT / "skills" / "project-os" / "assets" / "knowledge"
         entries: list[dict[str, object]] = []
@@ -134,7 +157,7 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.0.0")
+        self.assertEqual(PROJECT_OS.VERSION, "2.0.1")
         self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 3)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
@@ -144,14 +167,43 @@ class KnowledgeAssetTest(unittest.TestCase):
             portable_interface["defaultPrompt"],
             compatibility["interface"]["defaultPrompt"],
         )
-        for key in ("brandColor", "composerIcon", "logo"):
+        for key in ("brandColor", "brandColorDark", "composerIcon", "logo"):
             self.assertEqual(
                 portable_interface[key], compatibility["interface"][key], key
             )
-        self.assertEqual(portable_interface["brandColor"], "#B7F34A")
+        self.assertEqual(portable_interface["brandColor"], "#789F25")
+        self.assertEqual(portable_interface["brandColorDark"], "#B7F34A")
+        self.assertLessEqual(len(portable_interface["shortDescription"]), 30)
+        self.assertTrue(portable_interface["developerName"].strip())
+        for key in ("websiteURL", "privacyPolicyURL", "termsOfServiceURL", "supportURL"):
+            self.assertTrue(portable_interface[key].startswith("https://"), key)
+
+        def relative_luminance(color: str) -> float:
+            channels = [int(color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+            linear = [
+                value / 12.92
+                if value <= 0.04045
+                else ((value + 0.055) / 1.055) ** 2.4
+                for value in channels
+            ]
+            return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+        def contrast(first: str, second: str) -> float:
+            bright, dark = sorted(
+                (relative_luminance(first), relative_luminance(second)), reverse=True
+            )
+            return (bright + 0.05) / (dark + 0.05)
+
+        self.assertGreaterEqual(contrast(portable_interface["brandColor"], "#FFFFFF"), 2)
+        self.assertGreaterEqual(
+            contrast(portable_interface["brandColorDark"], "#212121"), 2
+        )
         for key in ("composerIcon", "logo"):
             asset = ROOT / portable_interface[key].removeprefix("./")
             self.assertTrue(asset.is_file(), asset)
+            svg = ET.fromstring(asset.read_text(encoding="utf-8"))
+            self.assertGreaterEqual(float(svg.attrib["width"]), 48, asset)
+            self.assertGreaterEqual(float(svg.attrib["height"]), 48, asset)
         self.assertEqual(
             (ROOT / "assets" / "icon.svg").read_bytes(),
             (ROOT / "skills" / "project-os" / "assets" / "icon-small.svg").read_bytes(),
@@ -165,16 +217,18 @@ class KnowledgeAssetTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('icon_small: "./assets/icon-small.svg"', skill_interface)
         self.assertIn('icon_large: "./assets/icon-large.svg"', skill_interface)
-        self.assertIn('brand_color: "#B7F34A"', skill_interface)
+        self.assertIn('brand_color: "#789F25"', skill_interface)
+        self.assertIn('    - "CODEX"', skill_interface)
         self.assertTrue(
             all(len(prompt) <= 128 for prompt in portable_interface["defaultPrompt"])
         )
         self.assertTrue(
             all(
-                prompt.startswith("$project-os ")
+                "$project-os" in prompt
                 for prompt in portable_interface["defaultPrompt"]
             )
         )
+        self.assertEqual(marketplace["plugins"][0]["policy"]["products"], ["CODEX"])
         self.assertEqual(
             marketplace["plugins"][0]["source"]["ref"],
             f"v{PROJECT_OS.VERSION}",
@@ -477,24 +531,20 @@ class InitializationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             destination = root / "first.txt"
-            original_create_parent = PROJECT_OS.create_parent_directories
+            original_fsync = PROJECT_OS.os.fsync
             calls = 0
 
-            def replace_before_second_create(
-                operation_root: Path, parent: Path, created: list[Path]
-            ) -> None:
+            def replace_before_second_flush(descriptor: int) -> None:
                 nonlocal calls
                 calls += 1
                 if calls == 2:
                     destination.unlink()
                     destination.write_bytes(b"concurrent replacement\n")
                     raise PROJECT_OS.ProjectOSError("injected operation failure")
-                original_create_parent(operation_root, parent, created)
+                original_fsync(descriptor)
 
             with mock.patch.object(
-                PROJECT_OS,
-                "create_parent_directories",
-                side_effect=replace_before_second_create,
+                PROJECT_OS.os, "fsync", side_effect=replace_before_second_flush,
             ):
                 with self.assertRaisesRegex(
                     PROJECT_OS.ProjectOSError, "rollback incomplete"
@@ -1772,7 +1822,7 @@ class UpgradeTest(unittest.TestCase):
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
             self.assertEqual(system["schema_version"], 3)
             self.assertEqual(system["mode"], "standard")
-            self.assertEqual(system["project_os_version"], "2.0.0")
+            self.assertEqual(system["project_os_version"], "2.0.1")
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)
 
     def test_current_upgrade_is_byte_preserving_even_with_an_old_generated_date(self) -> None:

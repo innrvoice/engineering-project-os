@@ -1,6 +1,6 @@
 # Reference
 
-This is the technical contract for Project OS 2.0.0. Start with the [README](../README.md) if
+This is the technical contract for Project OS 2.0.1. Start with the [README](../README.md) if
 installation, `$project-os` or repository connection is still new.
 
 ## Interfaces
@@ -34,7 +34,7 @@ absolute placeholder path so the target repository does not need its own helper 
 | `program close stopped: <reason>` | Reason | Stop and archive an incomplete Program |
 | `plan open: <outcome>` | Outcome | Open one resumable execution package |
 | `plan checkpoint` | None | Save a reconciled checkpoint |
-| `plan resume` | None | Reconcile and continue the active plan |
+| `plan resume[: <plan-id>]` | Plan ID when ambiguous | Continue active work or reactivate a blocked plan after its blocker resolves |
 | `plan complete` | None | Complete only with required evidence |
 | `plan block: <reason>` | Reason | Preserve a precise blocker and resume point |
 | `plan supersede: <reason>` | Reason | Retire a plan whose route or outcome was replaced |
@@ -381,7 +381,7 @@ For `sync-knowledge`, omitted selection flags use `SYSTEM.json`. Explicit select
 
 Release and file-format versions are separate:
 
-- Release 2.0.0 identifies the installed skill, helper, package metadata, connected
+- Release 2.0.1 identifies the installed skill, helper, package metadata, connected
   `project_os_version` and managed knowledge provenance.
 - `SYSTEM.schema_version` is 3.
 - Knowledge registries retain their own `schema_version: 1`.
@@ -391,10 +391,20 @@ Release and file-format versions are separate:
 The checker requires the repository release and shared knowledge version to match the installed
 helper. Do not edit version fields manually to silence it.
 
+Upgrade rejects a repository release newer than the helper, including during a dry run. Use a
+matching or newer helper; implicit downgrade is unsupported. SemVer build metadata does not affect
+upgrade direction.
+
 ## Safety
 
 - Managed paths remain repository-relative and free of symlink replacement boundaries.
 - Multi-file operations use conflict and concurrency checks and fail closed.
+- Writes require Python 3.9+ on a POSIX host with directory-descriptor operations, such as macOS or
+  Linux. Unsupported write environments fail before mutation; there is no unsafe fallback.
+- Create, replace, delete and rollback use opened directory descriptors and no-follow file opens.
+  Detected parent replacement aborts the transaction; rollback uses the original directories.
+- SYSTEM, knowledge and history JSON are parsed and hashed from the same bytes. Program closure
+  also guards the plan registry through final validation, including closed legacy migration.
 - An abrupt process termination or power loss can interrupt a multi-file operation. Run the checker
   afterward and repair from Git or another reviewed source if it reports partial state.
 - Shared knowledge policy excludes credentials, personal data, private paths, private URLs, signed

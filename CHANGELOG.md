@@ -4,6 +4,29 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-09-14
+
+### Fixed
+
+- Anchored filesystem mutation and rollback to directory descriptors so parent symlink swaps cannot
+  redirect writes; unsupported write environments now fail closed.
+- Bound JSON parsing and concurrency hashes to the same byte snapshot across upgrade, sync and
+  Program lifecycle operations.
+- Rejected implicit release downgrades and guarded plan state throughout Program closure.
+- Detected unprefixed PKCS#8 private-key markers in shared-knowledge sanitization.
+- Handled non-object package.json values with a diagnostic instead of a traceback.
+- Corrected the Expo bootstrap reviewer case and documented blocked-plan resumption.
+- Corrected the copyright holder and author attribution to Pavel Bochkov Rastopchin.
+
+### Changed
+
+- Added public Privacy Policy, Terms and support metadata for the skills-only package.
+- Aligned Codex-only metadata, listing assets and explicit invocation settings.
+- Added reproducible ZIP packaging with complete public documentation, self-contained reviewer
+  fixtures and extracted-artifact tests. Directory submission remains an independent distribution step.
+- Kept this repository's working records local and added a publication check that preserves public
+  plugin metadata, bundled templates and synthetic fixtures.
+
 ## [2.0.0] - 2026-09-13
 
 ### Changed
@@ -48,3 +71,4 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 [1.0.0]: https://github.com/innrvoice/engineering-project-os/releases/tag/v1.0.0
 [1.0.1]: https://github.com/innrvoice/engineering-project-os/compare/v1.0.0...v1.0.1
 [2.0.0]: https://github.com/innrvoice/engineering-project-os/compare/v1.0.1...v2.0.0
+[2.0.1]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.0...v2.0.1
