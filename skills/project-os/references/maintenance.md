@@ -44,6 +44,19 @@ leave one exact next action.
 Mark a plan `done` only with its required evidence. Blocking preserves the exact unmet condition and
 resume point. Supersession names the replacement or next decision and does not rewrite the old plan.
 
+`plan block` changes the active plan to `blocked`, execution to `idle` and the optional `active_plan`
+to null. Record the blocker and the first action available after it clears in the plan and STATE.
+
+For `plan resume`, continue the active plan when one exists. To reactivate a blocked plan, accept
+`plan resume: <plan-id>` or select the only blocked plan when execution is idle. Ask for the ID when
+multiple blocked plans could match. Do not displace another active plan. Verify the recorded blocker
+is resolved from current evidence; if it is still unresolved, leave the plan blocked and report the
+exact missing condition. Preview `blocked` -> `active`, `idle` -> `running`, the optional `active_plan`
+pointer and the next action in STATE, then apply that transition. Preserve completed evidence and
+leave acceptance items incomplete until their checks actually pass. With `do not continue
+implementation`, stop after the authorized record transition; with `do not change files`, keep the
+entire assessment read-only.
+
 Run the checker after every plan transition.
 
 ## Start a Program
@@ -123,6 +136,9 @@ python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /pat
 Inspect release, schema, managed baselines and Program state first. Review the complete file preview.
 Abort on managed conflict, unsafe ownership or stale state. Apply the same command without
 `--dry-run`; a successful apply ends with the checker.
+
+If the repository release is newer than the helper, stop and use a matching or newer helper. Upgrade
+never downgrades repository state. Do not lower version fields manually to bypass this check.
 
 Upgrade preserves `AGENTS.md`, context, state, plans, findings, evidence, project knowledge and
 application code except for an explicitly required lifecycle migration.

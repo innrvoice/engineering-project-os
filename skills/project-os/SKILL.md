@@ -36,7 +36,9 @@ Treat the following as canonical, memorable prompts rather than parser tokens:
 - `program close completed`: require complete exit evidence.
 - `program close stopped: <reason>`: require a reason.
 - `plan open: <outcome>`: require one observable outcome.
-- `plan checkpoint`, `plan resume`, `plan complete`: require an active plan.
+- `plan checkpoint`, `plan complete`: require an active plan.
+- `plan resume[: <plan-id>]`: continue the active plan or reactivate a selected blocked plan after
+  verifying its blocker is resolved. Require a plan ID when the selection is ambiguous.
 - `plan block: <reason>`, `plan supersede: <reason>`: require a reason.
 - `finding add: <observation>`: require a concrete observation.
 - `knowledge capture: <finding-id>`: require a confirmed finding.

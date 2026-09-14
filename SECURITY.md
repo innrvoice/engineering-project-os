@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Only Project OS 2.0.0 is supported by this source tree. Install the release first, then upgrade each
+Only Project OS 2.0.1 is supported by this source tree. Install the release first, then upgrade each
 connected repository explicitly. Updating the installed skill does not update repositories by itself.
 
 ## Report a vulnerability
@@ -23,7 +23,7 @@ Include:
 
 ## Runtime boundary
 
-The 2.0.0 helper uses the Python standard library and initiates no network request. It reads bundled
+The 2.0.1 helper uses the Python standard library and initiates no network request. It reads bundled
 assets and the target repository selected by the user. Commands with an explicit `--config` or
 `--definition` may also read that user-selected file outside the target. Mutating operations write
 only inside the target repository. Installing or updating the standalone skill from GitHub is a
@@ -44,6 +44,18 @@ Project OS is designed to fail closed on:
 - incomplete or ambiguous legacy Program migration;
 - concurrent changes before an atomic replacement;
 - common detectable credential, private-path and private-URL patterns in shared knowledge.
+
+Writes require POSIX directory descriptors and no-follow opens (macOS or Linux with Python 3.9+).
+Unsupported write environments fail before mutation. Create, replace, delete and rollback stay
+anchored to opened directories; a swapped parent cannot redirect them into a symlink target.
+Parsed JSON and its concurrency hash come from one byte snapshot. Program closure guards the plan
+registry as well as the files it changes, and upgrade refuses a newer repository release.
+
+These checks detect ordinary concurrent edits and directory swaps. They are not a lock or isolation
+boundary against a process with equal filesystem privileges: that process can move an open directory,
+edit an inode during a syscall sequence or alter files after validation. Keep other writers idle while
+applying an operation. Caught failures trigger guarded rollback; abrupt termination or power loss may
+leave partial state that needs checker-guided recovery from a reviewed source or backup.
 
 A mutating Codex request must inspect, preview or dry-run, apply only a clean result and finish with
 the checker. Direct helper users must review `--dry-run` output before init, adopt, upgrade, Program

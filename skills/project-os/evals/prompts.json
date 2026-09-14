@@ -170,6 +170,36 @@
         "keep project-specific evidence in project records",
         "offer a sanitized mechanism only when verified and portable"
       ]
+    },
+    {
+      "name": "resume-blocked-plan-after-condition-clears",
+      "prompt": "$project-os plan resume: 001. The recorded blocker is resolved.",
+      "expected": [
+        "verify the recorded blocker is resolved from current evidence",
+        "require no other active plan",
+        "preview blocked -> active and idle -> running before writing",
+        "update active_plan when present and leave the exact next action in STATE",
+        "run check after the transition"
+      ]
+    },
+    {
+      "name": "resume-ambiguous-or-still-blocked-plan",
+      "prompt": "$project-os plan resume",
+      "expected": [
+        "continue an existing active plan when present",
+        "if idle, select a blocked plan only when unambiguous",
+        "ask for the plan ID when multiple blocked plans exist",
+        "keep the plan blocked and make no transition when the blocker remains unresolved"
+      ]
+    },
+    {
+      "name": "upgrade-refuses-downgrade",
+      "prompt": "$project-os upgrade",
+      "expected": [
+        "compare repository and installed helper release versions",
+        "refuse to downgrade a repository from a newer release",
+        "request a matching or newer helper without editing version fields manually"
+      ]
     }
   ]
 }

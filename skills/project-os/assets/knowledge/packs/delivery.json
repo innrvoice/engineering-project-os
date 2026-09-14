@@ -20,12 +20,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "delivery",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/eas-update/runtime-versions/",
           "https://docs.expo.dev/workflow/continuous-native-generation/"
         ],
-        "content_hash": "sha256:06dee762ff9174d975903c0025ef2ec191c0e1815bd3016590742884e7d0f961"
+        "content_hash": "sha256:7bda2efd5be020139a643153a520b2560e46c2397b856dd5e0581aa9e37322a5"
       }
     },
     {
@@ -48,12 +48,12 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "delivery",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://supabase.com/docs/guides/local-development/overview",
           "https://www.postgresql.org/docs/17/contrib-dblink-connect.html"
         ],
-        "content_hash": "sha256:e7b5205da009711ac7a9fb5929177ad5ba8fb76d77ec8627abecb43691cdd604"
+        "content_hash": "sha256:9d90987eee783372c70f2bb03f30c67c9419586c76aed290d9db0f4ed9eb780c"
       }
     },
     {
@@ -75,11 +75,11 @@
       "source": {
         "kind": "project-os-pack",
         "pack": "delivery",
-        "project_os_version": "2.0.0",
+        "project_os_version": "2.0.1",
         "references": [
           "https://docs.expo.dev/guides/environment-variables/"
         ],
-        "content_hash": "sha256:1cfde3bd9d0d9f3ba8fc1f56f14c174cdc94a1b9dd6a7f5d8c3f061b093029bf"
+        "content_hash": "sha256:7664d168d40cb6b2fb9fa307c43f2c043d2da66330a82545fdcefa8055bb65d9"
       }
     }
   ]

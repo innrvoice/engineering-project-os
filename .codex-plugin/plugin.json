@@ -1,9 +1,9 @@
 {
   "name": "engineering-project-os",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Bootstrap and maintain a stack-agnostic, repository-local engineering operating system for Codex.",
   "author": {
-    "name": "Pavel",
+    "name": "Pavel Bochkov Rastopchin",
     "url": "https://github.com/innrvoice"
   },
   "homepage": "https://github.com/innrvoice/engineering-project-os",
@@ -13,18 +13,26 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Engineering Project OS",
-    "shortDescription": "Durable project state, plans, and lessons",
+    "shortDescription": "Durable engineering state",
     "longDescription": "Bootstrap, adopt, and validate a stack-agnostic repository control plane for resumable engineering work without copying project-specific history between repositories.",
-    "developerName": "Pavel",
+    "developerName": "Pavel Bochkov Rastopchin",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"],
-    "websiteURL": "https://github.com/innrvoice/engineering-project-os",
-    "defaultPrompt": [
-      "$project-os help",
-      "$project-os inspect",
-      "$project-os upgrade"
+    "capabilities": [
+      "Inspect repository state",
+      "Bootstrap Project OS",
+      "Validate and upgrade state"
     ],
-    "brandColor": "#B7F34A",
+    "websiteURL": "https://github.com/innrvoice/engineering-project-os",
+    "privacyPolicyURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/TERMS.md",
+    "supportURL": "https://github.com/innrvoice/engineering-project-os/issues",
+    "defaultPrompt": [
+      "Use $project-os to inspect this repository without changing files.",
+      "Use $project-os to bootstrap durable repository state safely.",
+      "Use $project-os to validate this repository and report exact errors."
+    ],
+    "brandColor": "#789F25",
+    "brandColorDark": "#B7F34A",
     "composerIcon": "./assets/icon.svg",
     "logo": "./assets/logo.svg"
   }

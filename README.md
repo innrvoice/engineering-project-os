@@ -99,6 +99,7 @@ Requirements:
 
 - A Codex client with standalone skill support.
 - Python 3.9 or newer for the deterministic helper.
+- macOS or Linux with POSIX directory-descriptor support for safe filesystem mutations.
 - A local checkout of the target repository.
 
 ### 1. Install the standalone skill
@@ -108,7 +109,7 @@ Requirements:
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.0/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.1/skills/project-os
 ~~~
 
 - Result: Codex installs the versioned standalone skill in the local Codex profile.
@@ -182,7 +183,11 @@ commit, push, deploy or publish.
 - [How it works](docs/HOW_IT_WORKS.md)
 - [Usage](docs/USAGE.md)
 - [Reference](docs/REFERENCE.md)
+- [GitHub release and optional directory submission](docs/PACKAGING.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
+- [Privacy policy](docs/PRIVACY.md)
+- [Terms of use](docs/TERMS.md)
+- [Support](https://github.com/innrvoice/engineering-project-os/issues)
 - [MIT License](LICENSE)

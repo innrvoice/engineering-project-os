@@ -27,11 +27,14 @@ jobs:
       - name: Validate JSON
         run: python -c "import json, pathlib; [json.loads(path.read_text(encoding='utf-8')) for path in pathlib.Path('.').rglob('*.json')]"
 
+      - name: Check public source contents
+        run: python -B scripts/check_public_tree.py
+
       - name: Check manifest versions
         run: python -c "import json, pathlib, runpy; version = runpy.run_path('skills/project-os/scripts/project_os.py')['VERSION']; paths = [pathlib.Path('plugin.json'), pathlib.Path('.codex-plugin/plugin.json')]; assert {json.loads(path.read_text(encoding='utf-8'))['version'] for path in paths} == {version}"
 
-      - name: Compile helper
-        run: python -B -m compileall -q skills/project-os/scripts
+      - name: Compile helper and packaging tools
+        run: python -X pycache_prefix=${{ runner.temp }}/project-os-pycache -m compileall -q skills/project-os/scripts skills/project-os/evals scripts
 
-      - name: Run tests
+      - name: Run runtime and extracted-package tests
         run: python -B -m unittest discover -s tests -v

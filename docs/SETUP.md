@@ -12,6 +12,8 @@ change another repository.
 
 - A Codex client with standalone skill support.
 - Python 3.9 or newer.
+- macOS or Linux with POSIX directory-descriptor support for helper writes. Unsupported write
+  environments fail before mutation.
 - A local checkout of each target repository.
 
 The helper uses only the Python standard library.
@@ -23,13 +25,13 @@ The helper uses only the Python standard library.
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.0/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.1/skills/project-os
 ~~~
 
 - Result: Codex installs the complete versioned skill in the local profile.
 - Files: the user-level skill directory changes; the open repository does not.
 - Proof: start a new Codex task and confirm that `project-os` is available.
-- Skip it when: release 2.0.0 is already installed in this profile.
+- Skip it when: release 2.0.1 is already installed in this profile.
 
 The URL is pinned to a release tag. It does not follow `main` automatically. The standalone skill is
 the documented installation route.
@@ -41,10 +43,10 @@ An installed skill is replaced as one directory. It is not merged file by file.
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.0.0/skills/project-os and replace only that installed skill; do not change any repository.
+$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.0.1/skills/project-os and replace only that installed skill; do not change any repository.
 ~~~
 
-- Result: Codex replaces the installed `project-os` directory with release 2.0.0.
+- Result: Codex replaces the installed `project-os` directory with release 2.0.1.
 - Files: only the user-level skill installation changes.
 - Proof: start a new Codex task so Codex rebuilds its available-skill list.
 - Skip it when: the installed skill already comes from the same tag.
@@ -218,9 +220,9 @@ $project-os upgrade
 - Files: Project OS version and schema metadata, managed guidance, managed shared knowledge and any
   explicitly required lifecycle migration may change. Project-owned context, state, plans, findings,
   evidence and application code are preserved.
-- Proof: the final checker passes, the repository reports release 2.0.0 and a repeated dry run has no
+- Proof: the final checker passes, the repository reports release 2.0.1 and a repeated dry run has no
   pending changes.
-- Skip it when: the repository already passes the installed 2.0.0 checker.
+- Skip it when: the repository already passes the installed 2.0.1 checker.
 
 A schema 2 repository with the former basic setup upgrades directly to Standard. If a legacy
 `PROGRAM.md` exists, Codex must determine whether it is active or already closed from repository
