@@ -9,7 +9,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/innrvoice/engineering-project-os.git",
-        "ref": "v2.0.5"
+        "ref": "v2.1.0"
       },
       "policy": {
         "installation": "AVAILABLE",

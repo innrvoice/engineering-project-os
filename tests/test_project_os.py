@@ -137,47 +137,13 @@ class KnowledgeAssetTest(unittest.TestCase):
             self.assertTrue(case["expected_workflow"])
             self.assertTrue(case["expected_result_shape"])
 
-    def test_all_public_knowledge_is_complete_unique_hashed_and_sanitized(self) -> None:
+    def test_plugin_contains_no_author_managed_failure_database(self) -> None:
         knowledge_root = ROOT / "skills" / "project-os" / "assets" / "knowledge"
-        entries: list[dict[str, object]] = []
-        for path in sorted(knowledge_root.rglob("*.json")):
-            value = json.loads(path.read_text(encoding="utf-8"))
-            self.assertEqual(value["schema_version"], 1, path)
-            entries.extend(value["entries"])
-
-        self.assertEqual(len(entries), 80)
-        self.assertEqual(len({entry["id"] for entry in entries}), 80)
-        required = {
-            "id",
-            "title",
-            "status",
-            "applies_to",
-            "trigger",
-            "mechanism",
-            "prevention",
-            "verification",
-            "boundaries",
-            "source",
-        }
-        denylist = re.compile(
-            r"\b(?:internal-product-name|private-device-alias|private-person-name|private-feature-name)\b|"
-            r"owner-(?:accepted|reported|provided)|Package\s+\d+|"
-            r"record_private_entity|publish-private-entity|PROJECT-INCIDENT-\d+|"
-            r"\.\./\.\./audit/evidence|/Users/|/home/|C:\\Users\\",
-            re.IGNORECASE,
-        )
-        for entry in entries:
-            self.assertTrue(required.issubset(entry), entry.get("id"))
-            for key in required.difference({"source"}):
-                self.assertTrue(entry[key], f"{entry['id']}:{key}")
-            source = entry["source"]
-            self.assertIn(source["kind"], {"project-os-pack", "incident-derived"})
-            if not source["references"]:
-                self.assertEqual(source["kind"], "incident-derived", entry["id"])
-            for reference in source["references"]:
-                self.assertTrue(reference.startswith("https://"), reference)
-            self.assertEqual(source["content_hash"], PROJECT_OS.entry_content_hash(entry))
-            self.assertIsNone(denylist.search(json.dumps(entry, ensure_ascii=False)), entry["id"])
+        self.assertEqual(list(knowledge_root.rglob("*.json")), [])
+        template = json.loads((
+            ROOT / "skills/project-os/assets/templates/core/.agents/knowledge/reusable/failures.json"
+        ).read_text(encoding="utf-8"))
+        self.assertEqual(template, {"schema_version": 1, "entries": []})
 
     def test_release_version_is_in_lockstep(self) -> None:
         portable = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
@@ -189,8 +155,8 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.0.5")
-        self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 3)
+        self.assertEqual(PROJECT_OS.VERSION, "2.1.0")
+        self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 4)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
         self.assertEqual(portable["name"], compatibility["name"])
@@ -209,15 +175,15 @@ class KnowledgeAssetTest(unittest.TestCase):
         for interface in (portable_interface, compatibility["interface"]):
             self.assertNotIn("brandColorDark", interface)
             self.assertNotIn("supportURL", interface)
-        self.assertEqual(portable_interface["shortDescription"], "Resume engineering work")
+        self.assertEqual(portable_interface["shortDescription"], "Resume work. Reuse lessons.")
         self.assertLessEqual(len(portable_interface["shortDescription"]), 30)
         self.assertEqual(
             portable_interface["capabilities"],
             [
-                "Resume work across sessions",
-                "Inspect and connect repositories",
-                "Validate, repair and upgrade state",
-                "Capture reusable failure knowledge",
+                "Resume engineering work across sessions",
+                "Set up and validate repository state",
+                "Capture verified failure knowledge",
+                "Reuse user-owned lessons across projects",
             ],
         )
         for key in ("shortDescription", "longDescription", "capabilities"):
@@ -271,7 +237,7 @@ class KnowledgeAssetTest(unittest.TestCase):
         skill_prompt = re.search(r'^  default_prompt: "([^"]+)"$', skill_interface, re.MULTILINE)
         self.assertIsNotNone(skill_prompt)
         self.assertIn("$project-os", skill_prompt.group(1))
-        self.assertIn("overview", skill_prompt.group(1))
+        self.assertIn("what Project OS does", skill_prompt.group(1))
         self.assertNotIn("products:", skill_interface)
         self.assertIn("allow_implicit_invocation: true", skill_interface)
         self.assertTrue(
@@ -281,9 +247,9 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertEqual(
             portable_interface["defaultPrompt"],
             [
-                "What does Project OS do, how does it work and when should I use it?",
-                "Create a safe Project OS starter package for my project.",
-                "Review my existing Project OS setup and tell me what to fix.",
+                "Tell me what Project OS does, how it works and when I should use it.",
+                "Help me set up Project OS for this project and start with a safe preview.",
+                "Help me reuse verified failure knowledge from an earlier project in this one.",
             ],
         )
         self.assertEqual(compatibility["interface"]["defaultPrompt"], portable_interface["defaultPrompt"])
@@ -292,7 +258,9 @@ class KnowledgeAssetTest(unittest.TestCase):
         )
         self.assertIn("@Engineering Project OS", skill_text)
         self.assertIn("`overview`: read-only product explanation", skill_text)
-        self.assertIn("Do not imply a hidden database or automatic learning", skill_text)
+        self.assertIn("Do not imply a central database", skill_text)
+        self.assertIn("`knowledge export: <destination>`", skill_text)
+        self.assertIn("`knowledge import: <repo-or-bundle>`", skill_text)
         self.assertIn("never inspect an empty host workspace", skill_text.lower())
         self.assertIn("may begin from the user's project description", skill_text)
         self.assertNotIn("products", marketplace["plugins"][0]["policy"])
@@ -304,14 +272,6 @@ class KnowledgeAssetTest(unittest.TestCase):
             portable["$schema"],
             "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
         )
-
-        knowledge_root = ROOT / "skills" / "project-os" / "assets" / "knowledge"
-        for path in sorted(knowledge_root.rglob("*.json")):
-            value = json.loads(path.read_text(encoding="utf-8"))
-            for entry in value["entries"]:
-                self.assertEqual(
-                    entry["source"]["project_os_version"], PROJECT_OS.VERSION, path
-                )
 
         active_release_versions: set[str] = set()
         markdown_paths = [
@@ -328,9 +288,10 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
         packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
         self.assertIn(f"Project OS {PROJECT_OS.VERSION}", packaging)
-        self.assertIn("Directory version 2.0.4 remains public", packaging)
+        self.assertIn("Directory version 2.0.5 is public", packaging)
         self.assertIn("Versions 2.0.2 and 2.0.3 were intermediate Directory-only releases", packaging)
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [2.1.0] - 2026-09-15", changelog)
         self.assertIn("## [2.0.5] - 2026-09-15", changelog)
         self.assertIn("## [2.0.4] - 2026-09-14", changelog)
         self.assertIn("## 2.0.3 - 2026-09-14 - Universal Plugin Directory only", changelog)
@@ -342,6 +303,10 @@ class KnowledgeAssetTest(unittest.TestCase):
         )
         self.assertIn(
             "[2.0.5]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.4...v2.0.5",
+            changelog,
+        )
+        self.assertIn(
+            "[2.1.0]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.5...v2.1.0",
             changelog,
         )
         self.assertNotIn("GitHub 2.0.3 release line", changelog)
@@ -441,16 +406,21 @@ class InitializationTest(unittest.TestCase):
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
             knowledge = json.loads(
-                (target / ".agents" / "knowledge" / "shared" / "failures.json").read_text()
+                (target / ".agents" / "knowledge" / "reusable" / "failures.json").read_text()
             )
             self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
-            self.assertEqual(system["schema_version"], 3)
+            self.assertEqual(system["schema_version"], 4)
             self.assertEqual(system["mode"], "standard")
             self.assertIsNone(system["active_program"])
             self.assertFalse((target / ".agents" / "PROGRAM.md").exists())
             self.assertFalse((target / ".agents" / "history").exists())
-            self.assertEqual(knowledge["knowledge_version"], PROJECT_OS.VERSION)
-            self.assertEqual(len(knowledge["entries"]), 7)
+            self.assertEqual(knowledge, {"schema_version": 1, "entries": []})
+            self.assertEqual(
+                system["paths"]["reusable_knowledge"],
+                ".agents/knowledge/reusable/failures.json",
+            )
+            self.assertNotIn("shared_knowledge", system["paths"])
+            self.assertNotIn("managed_knowledge", system)
 
     def test_init_preserves_unrelated_agents_namespace(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -693,9 +663,9 @@ class AdoptionTest(unittest.TestCase):
             self.assertEqual(system["packs"], ["service", "mobile", "data", "delivery"])
             self.assertEqual(system["overlays"], ["react-native-expo"])
             knowledge = json.loads(
-                (target / ".agents" / "knowledge" / "shared" / "failures.json").read_text()
+                (target / ".agents" / "knowledge" / "reusable" / "failures.json").read_text()
             )
-            self.assertEqual(len(knowledge["entries"]), 80)
+            self.assertEqual(knowledge, {"schema_version": 1, "entries": []})
             checked = run_cli("check", "--target", str(target))
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
 
@@ -764,7 +734,7 @@ class AdoptionTest(unittest.TestCase):
             self.assertFalse((target / ".agents" / "SYSTEM.json").exists())
             self.assertFalse((target / ".agents" / "packs").exists())
             self.assertFalse(
-                (target / ".agents" / "knowledge" / "shared" / "failures.json").exists()
+                (target / ".agents" / "knowledge" / "reusable" / "failures.json").exists()
             )
 
     def test_adoption_rechecks_indexed_archive_bytes_before_writing(self) -> None:
@@ -876,134 +846,28 @@ class ValidationAndSyncTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def mark_project_as_outdated(self, target: Path) -> None:
-        knowledge_path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-        knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
-        knowledge["knowledge_version"] = "0.0.0"
-        managed_knowledge: dict[str, str] = {}
-        for entry in knowledge["entries"]:
-            entry["source"]["project_os_version"] = "0.0.0"
-            entry["source"]["content_hash"] = PROJECT_OS.entry_content_hash(entry)
-            managed_knowledge[entry["id"]] = entry["source"]["content_hash"]
-        knowledge_path.write_text(
-            json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-
-        system_path = target / ".agents" / "SYSTEM.json"
-        system = json.loads(system_path.read_text(encoding="utf-8"))
-        system["project_os_version"] = "0.0.0"
-        system["managed_knowledge"] = dict(sorted(managed_knowledge.items()))
-        system_path.write_text(
-            json.dumps(system, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-
     def test_check_rejects_project_version_mismatch_with_upgrade_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary)
             self.init(target)
-            system_path = target / ".agents" / "SYSTEM.json"
+            system_path = target / ".agents/SYSTEM.json"
             system = json.loads(system_path.read_text(encoding="utf-8"))
             system["project_os_version"] = "0.0.0"
             system_path.write_text(
                 json.dumps(system, indent=2) + "\n", encoding="utf-8"
             )
-
             checked = run_cli("check", "--target", str(target))
             self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
             self.assertIn("SYSTEM project_os_version must match", checked.stdout)
             self.assertIn("upgrade workflow", checked.stdout)
 
-    def test_check_rejects_shared_knowledge_version_mismatch(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            knowledge_path = (
-                target / ".agents" / "knowledge" / "shared" / "failures.json"
-            )
-            knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
-            knowledge["knowledge_version"] = "0.0.0"
-            knowledge_path.write_text(
-                json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
-            self.assertIn(
-                "shared knowledge_version must match SYSTEM project_os_version",
-                checked.stdout,
-            )
-
-    def test_upgrade_dry_run_is_byte_preserving(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target, packs="mobile", overlays="react-native-expo")
-            self.mark_project_as_outdated(target)
-            before = file_hashes(target)
-
-            upgraded = run_cli("upgrade", "--target", str(target), "--dry-run")
-            self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
-            self.assertIn("dry-run: no files written", upgraded.stdout)
-            self.assertEqual(file_hashes(target), before)
-
-    def test_upgrade_apply_updates_versions_and_passes_check(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target, packs="mobile", overlays="react-native-expo")
-            self.mark_project_as_outdated(target)
-
-            upgraded = run_cli("upgrade", "--target", str(target))
-            self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
-            system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
-            knowledge = json.loads(
-                (
-                    target / ".agents" / "knowledge" / "shared" / "failures.json"
-                ).read_text()
-            )
-            self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
-            self.assertEqual(knowledge["knowledge_version"], PROJECT_OS.VERSION)
-            self.assertTrue(
-                all(
-                    entry["source"]["project_os_version"] == PROJECT_OS.VERSION
-                    for entry in knowledge["entries"]
-                )
-            )
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-
-    def test_upgrade_conflict_aborts_without_writing_any_file(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target, packs="mobile", overlays="react-native-expo")
-            self.mark_project_as_outdated(target)
-            knowledge_path = (
-                target / ".agents" / "knowledge" / "shared" / "failures.json"
-            )
-            knowledge = json.loads(knowledge_path.read_text(encoding="utf-8"))
-            knowledge["entries"][0]["title"] = "Local edit"
-            knowledge["entries"][0]["source"][
-                "content_hash"
-            ] = PROJECT_OS.entry_content_hash(knowledge["entries"][0])
-            knowledge_path.write_text(
-                json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-            before = file_hashes(target)
-
-            upgraded = run_cli("upgrade", "--target", str(target))
-            self.assertEqual(upgraded.returncode, 2, upgraded.stdout + upgraded.stderr)
-            self.assertIn("Upgrade conflicts", upgraded.stderr)
-            self.assertEqual(file_hashes(target), before)
-
     def test_active_plan_is_derived_and_optional_but_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary)
             self.init(target)
-            plan_path = target / ".agents" / "plans" / "001.md"
+            plan_path = target / ".agents/plans/001.md"
             plan_path.write_text("# Plan\n", encoding="utf-8")
-            index_path = target / ".agents" / "plans" / "index.json"
+            index_path = target / ".agents/plans/index.json"
             index = json.loads(index_path.read_text())
             index["execution_state"] = "running"
             index["plans"] = [
@@ -1021,423 +885,43 @@ class ValidationAndSyncTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary)
             self.init(target, packs="web")
-            history = target / ".agents" / "history"
+            history = target / ".agents/history"
             history.mkdir()
             (history / "debug.md").write_text("Flag: __DEV__.\n", encoding="utf-8")
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)
-            pack = target / ".agents" / "packs" / "web.md"
+            pack = target / ".agents/packs/web.md"
             pack.write_text(pack.read_text() + "\n__PROJECT_NAME__\n", encoding="utf-8")
             failed = run_cli("check", "--target", str(target))
             self.assertEqual(failed.returncode, 1)
             self.assertIn("unresolved template tokens", failed.stdout)
 
-    def test_shared_private_material_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            value = json.loads(path.read_text())
-            value["entries"][0]["mechanism"] += " /Users/example/private.txt sk-proj-secret"
-            path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-            failed = run_cli("check", "--target", str(target))
-            self.assertEqual(failed.returncode, 1)
-            self.assertIn("private path", failed.stdout)
-            self.assertIn("credential-like token", failed.stdout)
-
-    def test_check_rejects_symlinked_mutable_and_managed_paths(self) -> None:
-        for kind in ("shared knowledge", "managed guidance"):
+    def test_checker_rejects_symlinked_reusable_knowledge_and_guidance(self) -> None:
+        for kind in ("reusable knowledge", "managed guidance"):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
                 target = Path(temporary)
                 self.init(target, packs="web")
-                if kind == "shared knowledge":
-                    path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-                else:
-                    path = target / ".agents" / "packs" / "web.md"
+                path = (
+                    target / ".agents/knowledge/reusable/failures.json"
+                    if kind == "reusable knowledge"
+                    else target / ".agents/packs/web.md"
+                )
                 actual = path.with_name("actual-" + path.name)
                 path.rename(actual)
                 path.symlink_to(actual.name)
+                failed = run_cli("check", "--target", str(target))
+                self.assertEqual(failed.returncode, 1)
+                self.assertIn("symlink", failed.stdout.lower())
 
-                checked = run_cli("check", "--target", str(target))
-                self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
-                self.assertIn("must not use symlink components", checked.stdout)
-
-    def test_decoded_windows_private_path_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            value = json.loads(path.read_text())
-            value["entries"][0]["mechanism"] = "C:\\Users\\alice\\private.txt"
-            value["entries"][0]["source"]["content_hash"] = PROJECT_OS.entry_content_hash(
-                value["entries"][0]
-            )
-            path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-            failed = run_cli("check", "--target", str(target))
-            self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
-            self.assertIn("private path", failed.stdout)
-
-    def test_sync_conflict_is_unsuccessful_and_byte_preserving(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            value = json.loads(path.read_text())
-            value["entries"][0]["title"] = "Local edit"
-            path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-            before = path.read_bytes()
-            synced = run_cli("sync-knowledge", "--target", str(target))
-            self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
-            self.assertIn("sync aborted", synced.stdout)
-            self.assertEqual(path.read_bytes(), before)
-
-    def test_rehashed_local_edit_still_conflicts_with_installed_baseline(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            value = json.loads(path.read_text())
-            value["entries"][0]["title"] = "Local edit with a recomputed hash"
-            value["entries"][0]["source"]["content_hash"] = PROJECT_OS.entry_content_hash(
-                value["entries"][0]
-            )
-            path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-            before = file_hashes(target)
-            synced = run_cli("sync-knowledge", "--target", str(target))
-            self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
-            self.assertIn("differs locally", synced.stdout)
-            self.assertEqual(file_hashes(target), before)
-
-    def test_clean_installed_baseline_can_receive_an_upstream_entry_update(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            PROJECT_OS.init_project(target, "none", "none", False)
-            current = PROJECT_OS.composed_knowledge([], [])
-            desired_entries = json.loads(json.dumps(current["entries"]))
-            desired_entries[0]["title"] = "Upstream revised title"
-            desired_entries[0]["source"]["content_hash"] = PROJECT_OS.entry_content_hash(
-                desired_entries[0]
-            )
-            with mock.patch.object(PROJECT_OS, "seed_documents", return_value=desired_entries):
-                result = PROJECT_OS.sync_knowledge(target, "selected", "selected", False)
-                self.assertEqual(result, 0)
-            updated = json.loads(
-                (target / ".agents" / "knowledge" / "shared" / "failures.json").read_text()
-            )
-            self.assertEqual(updated["entries"][0]["title"], "Upstream revised title")
-
-    def test_malformed_membership_values_fail_without_traceback(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            system_path = target / ".agents" / "SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["mode"] = []
-            system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-            failed = run_cli("check", "--target", str(target))
-            self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
-            self.assertNotIn("Traceback", failed.stderr)
-
-    def test_malformed_history_and_active_program_membership_values_do_not_crash(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            definition = write_program_definition(target)
-            self.assertEqual(
-                run_cli(
-                    "program",
-                    "start",
-                    "--target",
-                    str(target),
-                    "--definition",
-                    str(definition),
-                ).returncode,
-                0,
-            )
-            system_path = target / ".agents" / "SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["active_program"]["origin"] = []
-            system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-            active_check = run_cli("check", "--target", str(target))
-            self.assertEqual(active_check.returncode, 1)
-            self.assertNotIn("Traceback", active_check.stderr)
-
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            history = target / ".agents" / "history"
-            history.mkdir()
-            archive = history / "snapshot.md"
-            archive.write_text("snapshot\n", encoding="utf-8")
-            index_path = history / "index.json"
-            index_path.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "entries": [
-                            {
-                                "id": "snapshot-001",
-                                "kind": [],
-                                "path": ".agents/history/snapshot.md",
-                                "sha256": "sha256:"
-                                + hashlib.sha256(archive.read_bytes()).hexdigest(),
-                                "disposition": [],
-                            }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            system_path = target / ".agents" / "SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["paths"]["history"] = ".agents/history"
-            system["paths"]["history_index"] = ".agents/history/index.json"
-            system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-            history_check = run_cli("check", "--target", str(target))
-            self.assertEqual(history_check.returncode, 1)
-            self.assertNotIn("Traceback", history_check.stderr)
-
-    def test_invalid_utf8_system_reports_clean_error(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            (target / ".agents" / "SYSTEM.json").write_bytes(b"\xff\xfe")
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 1)
-            self.assertIn("not valid UTF-8", checked.stdout)
-            self.assertNotIn("Traceback", checked.stderr)
-
-    def test_system_directory_reports_clean_read_error(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            system_path = target / ".agents" / "SYSTEM.json"
-            system_path.unlink()
-            system_path.mkdir()
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 1)
-            self.assertIn("Could not read JSON file", checked.stdout)
-            self.assertNotIn("Traceback", checked.stderr)
-
-    def test_owner_collisions_and_aliases_block_check_and_sync_without_writes(self) -> None:
-        for shared_path in (
-            ".agents/CONTEXT.md",
-            ".agents/./CONTEXT.md",
-            ".agents/context.md",
-        ):
-            with self.subTest(shared_path=shared_path), tempfile.TemporaryDirectory() as temporary:
-                target = Path(temporary)
-                self.init(target)
-                context = target / ".agents" / "CONTEXT.md"
-                original_context = context.read_bytes()
-                system_path = target / ".agents" / "SYSTEM.json"
-                system = json.loads(system_path.read_text())
-                system["paths"]["shared_knowledge"] = shared_path
-                system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-                before = file_hashes(target)
-
-                checked = run_cli("check", "--target", str(target))
-                self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
-                self.assertIn("owner collision", checked.stdout)
-                synced = run_cli("sync-knowledge", "--target", str(target))
-                self.assertEqual(synced.returncode, 2, synced.stdout + synced.stderr)
-                self.assertEqual(file_hashes(target), before)
-                self.assertEqual(context.read_bytes(), original_context)
-
-    def test_history_index_must_be_inside_history_owner(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            history = target / ".agents" / "history"
-            history.mkdir()
-            outside_index = target / ".agents" / "history-index.json"
-            outside_index.write_text(
-                json.dumps({"schema_version": 1, "entries": []}) + "\n",
-                encoding="utf-8",
-            )
-            system_path = target / ".agents" / "SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["paths"]["history"] = ".agents/history"
-            system["paths"]["history_index"] = ".agents/history-index.json"
-            system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 1)
-            self.assertIn("history_index must be inside", checked.stdout)
-
-    def test_hardlinked_file_owners_are_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            context = target / ".agents" / "CONTEXT.md"
-            shared = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            shared.unlink()
-            os.link(context, shared)
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 1)
-            self.assertIn("same existing file", checked.stdout)
-
-    def test_sync_rejects_outdated_release_and_does_not_advance_version(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            self.mark_project_as_outdated(target)
-            before = file_hashes(target)
-            synced = run_cli("sync-knowledge", "--target", str(target))
-            self.assertEqual(synced.returncode, 2, synced.stdout + synced.stderr)
-            self.assertIn("run upgrade before sync", synced.stderr)
-            self.assertEqual(file_hashes(target), before)
-
-    def test_sync_dry_run_previews_every_file_it_would_update(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            self.mark_project_as_outdated(target)
-            system_path = target / ".agents" / "SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["project_os_version"] = PROJECT_OS.VERSION
-            system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-
-            preview = run_cli(
-                "sync-knowledge", "--target", str(target), "--dry-run"
-            )
-            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
-            mutations = [
-                line
-                for line in preview.stdout.splitlines()
-                if line.startswith(("create: ", "update: ", "delete: "))
-            ]
-            self.assertEqual(
-                mutations,
-                [
-                    "update: .agents/knowledge/shared/failures.json",
-                    "update: .agents/SYSTEM.json",
-                ],
-            )
-
-    def test_common_private_material_patterns_and_sensitive_keys_are_rejected(self) -> None:
-        variants = (
-            "gho_abcdefghijklmnopqrstuvwxyz",
-            "ghu_abcdefghijklmnopqrstuvwxyz",
-            "ghs_abcdefghijklmnopqrstuvwxyz",
-            "ghr_abcdefghijklmnopqrstuvwxyz",
-            "AIzaabcdefghijklmnopqrstuvwxyz123456",
-            "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
-            "C:\\Users\\alice\\private.txt",
-            "https://service.internal/path",
-            "https://example.com/file?X-Goog-Signature=secret",
-        )
-        for value in variants:
-            with self.subTest(value=value), tempfile.TemporaryDirectory() as temporary:
-                target = Path(temporary)
-                self.init(target)
-                path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-                knowledge = json.loads(path.read_text())
-                knowledge["entries"][0]["mechanism"] = value
-                knowledge["entries"][0]["source"][
-                    "content_hash"
-                ] = PROJECT_OS.entry_content_hash(knowledge["entries"][0])
-                path.write_text(
-                    json.dumps(knowledge, indent=2) + "\n", encoding="utf-8"
-                )
-                self.assertEqual(run_cli("check", "--target", str(target)).returncode, 1)
-
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target)
-            path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            knowledge = json.loads(path.read_text())
-            knowledge["entries"][0]["client_secret"] = "redacted"
-            knowledge["entries"][0]["source"][
-                "content_hash"
-            ] = PROJECT_OS.entry_content_hash(knowledge["entries"][0])
-            path.write_text(json.dumps(knowledge, indent=2) + "\n", encoding="utf-8")
-            checked = run_cli("check", "--target", str(target))
-            self.assertEqual(checked.returncode, 1)
-            self.assertIn("sensitive field name", checked.stdout)
-
-    def test_unreviewed_managed_shared_entry_blocks_sync_and_upgrade(self) -> None:
-        for command, expected_code in (("sync-knowledge", 1), ("upgrade", 2)):
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temporary:
-                target = Path(temporary)
-                self.init(target)
-                path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-                knowledge = json.loads(path.read_text())
-                entry = {
-                    "id": "LOCAL-UNREVIEWED-001",
-                    "title": "Unreviewed portable entry",
-                    "status": "active",
-                    "applies_to": ["core"],
-                    "trigger": "A local entry was inserted.",
-                    "mechanism": "The entry bypassed release review.",
-                    "prevention": "Require a recorded managed baseline.",
-                    "verification": ["The operation aborts."],
-                    "boundaries": ["Shared knowledge only."],
-                    "source": {
-                        "kind": "incident-derived",
-                        "pack": "core",
-                        "project_os_version": PROJECT_OS.VERSION,
-                        "references": [],
-                    },
-                }
-                entry["source"]["content_hash"] = PROJECT_OS.entry_content_hash(entry)
-                knowledge["entries"].append(entry)
-                path.write_text(
-                    json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-                    encoding="utf-8",
-                )
-                before = file_hashes(target)
-                result = run_cli(command, "--target", str(target))
-                self.assertEqual(result.returncode, expected_code, result.stdout + result.stderr)
-                self.assertEqual(file_hashes(target), before)
-
-    def test_sync_requires_exact_system_selection_and_schema_v3(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target, packs="service,mobile")
-            before = file_hashes(target)
-            subset = run_cli(
-                "sync-knowledge",
-                "--target",
-                str(target),
-                "--packs",
-                "mobile",
-                "--overlays",
-                "none",
-            )
-            self.assertEqual(subset.returncode, 2)
-            self.assertEqual(file_hashes(target), before)
-
-            system_path = target / ".agents" / "SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["schema_version"] = 1
-            system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
-            before_old = file_hashes(target)
-            old = run_cli("sync-knowledge", "--target", str(target))
-            self.assertEqual(old.returncode, 2)
-            self.assertIn("migrate older state explicitly", old.stderr)
-            self.assertEqual(file_hashes(target), before_old)
-
-    def test_sync_preserves_file_mode(self) -> None:
+    def test_deprecated_sync_knowledge_is_read_only(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary)
             self.init(target, packs="mobile", overlays="react-native-expo")
-            path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            path.chmod(0o644)
-            synced = run_cli("sync-knowledge", "--target", str(target))
-            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
-            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
-
-    def test_directory_cannot_masquerade_as_existing_guidance(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary)
-            self.init(target, packs="web")
-            pack = target / ".agents" / "packs" / "web.md"
-            pack.unlink()
-            pack.mkdir()
-            knowledge = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            before = knowledge.read_bytes()
-            synced = run_cli("sync-knowledge", "--target", str(target))
-            self.assertEqual(synced.returncode, 2)
-            self.assertEqual(knowledge.read_bytes(), before)
+            before = file_hashes(target)
+            result = run_cli("sync-knowledge", "--target", str(target))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("deprecated", (result.stdout + result.stderr).lower())
+            self.assertIn("knowledge import", result.stdout + result.stderr)
+            self.assertEqual(file_hashes(target), before)
 
     def test_external_config_tokens_and_canonical_order_are_checked(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1445,7 +929,7 @@ class ValidationAndSyncTest(unittest.TestCase):
             target = root / "project"
             target.mkdir()
             self.init(target, packs="service,mobile")
-            system_path = target / ".agents" / "SYSTEM.json"
+            system_path = target / ".agents/SYSTEM.json"
             system = json.loads(system_path.read_text())
 
             alternate = root / "alternate.json"
@@ -1873,24 +1357,27 @@ class UpgradeTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def make_schema2(self, target: Path, mode: str = "lite") -> None:
-        knowledge_path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-        knowledge = json.loads(knowledge_path.read_text())
-        knowledge["knowledge_version"] = "1.0.1"
-        managed: dict[str, str] = {}
-        for entry in knowledge["entries"]:
-            entry["source"]["project_os_version"] = "1.0.1"
-            entry["source"]["content_hash"] = PROJECT_OS.entry_content_hash(entry)
-            managed[entry["id"]] = entry["source"]["content_hash"]
-        knowledge_path.write_text(
-            json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
         system_path = target / ".agents" / "SYSTEM.json"
         system = json.loads(system_path.read_text())
+        reusable_path = target / ".agents" / "knowledge" / "reusable" / "failures.json"
+        knowledge = json.loads(reusable_path.read_text())
+        reusable_path.unlink()
+        reusable_path.parent.rmdir()
+        knowledge_path = target / ".agents" / "knowledge" / "shared" / "failures.json"
+        knowledge.update({
+            "knowledge_version": "1.0.1",
+            "packs": ["core", *system["packs"]],
+            "overlays": system["overlays"],
+        })
+        knowledge_path.parent.mkdir(parents=True, exist_ok=True)
+        knowledge_path.write_text(json.dumps(knowledge, indent=2) + "\n", encoding="utf-8")
         system["schema_version"] = 2
         system["project_os_version"] = "1.0.1"
         system["mode"] = mode
         system.pop("active_program", None)
-        system["managed_knowledge"] = dict(sorted(managed.items()))
+        system["managed_knowledge"] = {}
+        system["paths"].pop("reusable_knowledge")
+        system["paths"]["shared_knowledge"] = ".agents/knowledge/shared/failures.json"
         system["paths"].pop("history_index", None)
         system_path.write_text(json.dumps(system, indent=2) + "\n", encoding="utf-8")
 
@@ -1906,7 +1393,7 @@ class UpgradeTest(unittest.TestCase):
             applied = run_cli("upgrade", "--target", str(target))
             self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
-            self.assertEqual(system["schema_version"], 3)
+            self.assertEqual(system["schema_version"], 4)
             self.assertEqual(system["mode"], "standard")
             self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)
@@ -2115,16 +1602,8 @@ class UpgradeTest(unittest.TestCase):
             target = Path(temporary)
             self.init(target)
             self.make_schema2(target)
-            knowledge_path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            knowledge = json.loads(knowledge_path.read_text())
-            knowledge["entries"][0]["title"] = "Locally changed"
-            knowledge["entries"][0]["source"]["content_hash"] = PROJECT_OS.entry_content_hash(
-                knowledge["entries"][0]
-            )
-            knowledge_path.write_text(
-                json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
+            pack = target / ".agents/packs/mobile.md"
+            pack.write_text(pack.read_text() + "\nLocally changed.\n", encoding="utf-8")
             before = file_hashes(target)
             result = run_cli("upgrade", "--target", str(target))
             self.assertEqual(result.returncode, 2)
@@ -2149,16 +1628,8 @@ class UpgradeTest(unittest.TestCase):
             )
             (target / ".agents" / "history").mkdir()
             self.make_schema2(target, mode="full")
-            knowledge_path = target / ".agents" / "knowledge" / "shared" / "failures.json"
-            knowledge = json.loads(knowledge_path.read_text())
-            knowledge["entries"][0]["title"] = "Local conflict"
-            knowledge["entries"][0]["source"]["content_hash"] = PROJECT_OS.entry_content_hash(
-                knowledge["entries"][0]
-            )
-            knowledge_path.write_text(
-                json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
+            pack = target / ".agents/packs/mobile.md"
+            pack.write_text(pack.read_text() + "\nLocal conflict.\n", encoding="utf-8")
             before = file_hashes(target)
 
             result = run_cli(

@@ -1,10 +1,10 @@
 # Terms of Use
 
-Effective date: September 14, 2026.
+Effective date: September 15, 2026.
 
 ## Service
 
-Engineering Project OS is a skills-only plugin for ChatGPT and Codex plus an open-source software package for maintaining repository-local engineering context, plans, findings, evidence and reusable failure knowledge. It does not provide a hosted service, user account, remote storage or background synchronization.
+Engineering Project OS is a skills-only plugin for ChatGPT and Codex plus an open-source software package for maintaining repository-local engineering context, plans, findings, evidence and user-owned reusable failure knowledge. It does not provide a hosted service, user account, remote storage, central failure database or background synchronization.
 
 ## License
 
@@ -17,7 +17,8 @@ Users are responsible for:
 - using Project OS only with repositories and data they are authorized to access;
 - reviewing previews, diffs and requested permissions before allowing file changes;
 - maintaining appropriate version control, backups and repository access controls;
-- keeping credentials, private data and production secrets out of shared Project OS knowledge;
+- reviewing portable lessons and keeping credentials, private data, URLs, repository-specific evidence and production secrets out of reusable Project OS knowledge and exported bundles;
+- controlling where reusable bundles are stored and which repositories receive imported lessons;
 - complying with the terms and policies of ChatGPT, Codex, GitHub and other environments they use.
 
 Project OS validation checks repository structure and internal consistency. A passing check does not prove application correctness, security, deployment state, production behavior or human acceptance.

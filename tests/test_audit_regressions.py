@@ -151,7 +151,7 @@ class AuditRegressionTests(unittest.TestCase):
             self.assertEqual(run_cli("init", "--target", str(root)).returncode, 0)
             system_path = root / ".agents/SYSTEM.json"
             value = json.loads(system_path.read_text())
-            value["project_os_version"] = "2.0.6"
+            value["project_os_version"] = "3.0.0"
             system_path.write_text(json.dumps(value, indent=2) + "\n")
             before = file_hashes(root)
             for dry_run in (False, True):
@@ -161,7 +161,7 @@ class AuditRegressionTests(unittest.TestCase):
                     self.assertEqual(file_hashes(root), before)
 
     def test_system_snapshot_is_guarded_in_sync_start_and_close(self):
-        for operation, boundary in (("sync", "default_system"), ("start", "render_program_definition"), ("close", "load_history_for_mutation")):
+        for operation, boundary in (("start", "render_program_definition"), ("close", "load_history_for_mutation")):
             with self.subTest(operation=operation), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary).resolve()
                 self.assertEqual(run_cli("init", "--target", str(root)).returncode, 0)
@@ -179,9 +179,7 @@ class AuditRegressionTests(unittest.TestCase):
 
                 with mock.patch.object(PROJECT_OS, boundary, side_effect=change_system):
                     with self.assertRaisesRegex(PROJECT_OS.ProjectOSError, "changed"):
-                        if operation == "sync":
-                            PROJECT_OS.sync_knowledge(root, "selected", "selected", False)
-                        elif operation == "start":
+                        if operation == "start":
                             PROJECT_OS.start_program(root, definition, False)
                         else:
                             PROJECT_OS.close_program(root, "completed", None, False)
@@ -230,16 +228,23 @@ class AuditRegressionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             self.assertEqual(run_cli("init", "--target", str(root)).returncode, 0)
-            shared_path = root / ".agents/knowledge/shared/failures.json"
-            value = json.loads(shared_path.read_text())
-            entry = value["entries"][0]
-            entry["mechanism"] = "-----BEGIN PRIVATE KEY-----\nsynthetic-marker-only"
+            reusable_path = root / ".agents/knowledge/reusable/failures.json"
+            value = json.loads(reusable_path.read_text())
+            entry = {
+                "id": "USER-PRIVATE-KEY-001",
+                "title": "Synthetic private key marker",
+                "status": "active",
+                "applies_to": ["engineering"],
+                "trigger": "A synthetic record contains private material.",
+                "mechanism": "-----BEGIN PRIVATE KEY-----\nsynthetic-marker-only",
+                "prevention": "Reject the record.",
+                "verification": ["The checker reports the private key marker."],
+                "boundaries": ["Synthetic test data only."],
+                "source": {"kind": "user-reviewed", "created_with": PROJECT_OS.VERSION},
+            }
             entry["source"]["content_hash"] = PROJECT_OS.entry_content_hash(entry)
-            shared_path.write_text(json.dumps(value, indent=2) + "\n")
-            system_path = root / ".agents/SYSTEM.json"
-            system = json.loads(system_path.read_text())
-            system["managed_knowledge"][entry["id"]] = entry["source"]["content_hash"]
-            system_path.write_text(json.dumps(system, indent=2) + "\n")
+            value["entries"].append(entry)
+            reusable_path.write_text(json.dumps(value, indent=2) + "\n")
             checked = run_cli("check", "--target", str(root))
             self.assertEqual(checked.returncode, 1)
             self.assertIn("private key", checked.stdout)

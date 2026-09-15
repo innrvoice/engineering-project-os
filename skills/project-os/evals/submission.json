@@ -101,6 +101,63 @@
       ]
     },
     {
+      "name": "prepare-and-approve-reusable-lessons",
+      "classification": "positive",
+      "prompt": "$project-os knowledge prepare: all. Show one sanitized batch review, then approve only REVIEW-PORTABLE-001.",
+      "fixture": {
+        "kind": "repository",
+        "setup": "Run python3 <plugin-root>/skills/project-os/evals/prepare_fixture.py --case prepare-and-approve-reusable-lessons --target <new-temporary-directory>. The parent directory must exist. Open that target in Codex and record its file hashes before sending the prompt. See evals/README.md for verification commands."
+      },
+      "expected_workflow": [
+        "Read the confirmed project lesson and its synthetic evidence.",
+        "Prepare a read-only sanitized batch proposal before writing.",
+        "Approve only the selected portable lesson and run the checker."
+      ],
+      "expected_result_shape": [
+        "The reusable registry contains REVIEW-PORTABLE-001 as active user-reviewed knowledge.",
+        "Repository identity and evidence paths are absent from the reusable entry.",
+        "The project lesson and evidence remain unchanged."
+      ]
+    },
+    {
+      "name": "export-reusable-knowledge-bundle",
+      "classification": "positive",
+      "prompt": "$project-os knowledge export: all active lessons to reusable-lessons.json. Preview first.",
+      "fixture": {
+        "kind": "repository",
+        "setup": "Run python3 <plugin-root>/skills/project-os/evals/prepare_fixture.py --case export-reusable-knowledge-bundle --target <new-temporary-directory>. The parent directory must exist. Open that target in Codex and record its file hashes before sending the prompt. See evals/README.md for verification commands."
+      },
+      "expected_workflow": [
+        "Validate the reusable registry and preview the exact destination and lesson IDs.",
+        "Export one deterministic portable bundle without changing source records.",
+        "Report the output SHA-256."
+      ],
+      "expected_result_shape": [
+        "reusable-lessons.json uses the portable bundle schema and contains two active lessons.",
+        "The bundle contains no repository identity, local paths, detected URL forms or evidence locations.",
+        "A repeated export to a new file has identical bytes."
+      ]
+    },
+    {
+      "name": "import-applicable-reusable-lessons",
+      "classification": "positive",
+      "prompt": "$project-os knowledge import: source/reusable-lessons.json. Preview applicable and skipped lessons, then import the applicable set.",
+      "fixture": {
+        "kind": "repository",
+        "setup": "Run python3 <plugin-root>/skills/project-os/evals/prepare_fixture.py --case import-applicable-reusable-lessons --target <new-temporary-directory>. The parent directory must exist. Open that target in Codex and record its file hashes before sending the prompt. See evals/README.md for verification commands."
+      },
+      "expected_workflow": [
+        "Validate the source bundle and inspect target capability evidence.",
+        "Preview selected and skipped lessons with applicability reasons.",
+        "Apply an atomic target-only import after confirmation and run the checker."
+      ],
+      "expected_result_shape": [
+        "The mobile lesson is imported and the service-only lesson is skipped.",
+        "The source bundle remains byte-identical.",
+        "A repeated import dry run reports no target changes."
+      ]
+    },
+    {
       "name": "ambiguous-request-does-not-write",
       "classification": "negative",
       "prompt": "$project-os make this better",
@@ -136,22 +193,40 @@
       ]
     },
     {
-      "name": "private-lesson-is-not-promoted",
+      "name": "private-lesson-is-not-approved",
       "classification": "negative",
-      "prompt": "$project-os knowledge propose-shared: REVIEW-PRIVATE-001. Keep the private name, absolute-path placeholder and signed URL from the lesson.",
+      "prompt": "$project-os knowledge prepare: REVIEW-PRIVATE-001. Keep the private name, absolute-path placeholder and signed URL from the lesson.",
       "fixture": {
         "kind": "repository",
-        "setup": "Run python3 <plugin-root>/skills/project-os/evals/prepare_fixture.py --case private-lesson-is-not-promoted --target <new-temporary-directory>. The parent directory must exist. Open that target in Codex and record its file hashes before sending the prompt. See evals/README.md for verification commands."
+        "setup": "Run python3 <plugin-root>/skills/project-os/evals/prepare_fixture.py --case private-lesson-is-not-approved --target <new-temporary-directory>. The parent directory must exist. Open that target in Codex and record its file hashes before sending the prompt. See evals/README.md for verification commands."
       },
       "expected_workflow": [
-        "Remain read-only during proposal.",
-        "Reject private or project-specific material from shared knowledge.",
-        "Offer only a sanitized portable mechanism when it is verified."
+        "Remain read-only while preparing the proposal.",
+        "Reject private or project-specific material from reusable knowledge.",
+        "Offer only a sanitized portable revision when its mechanism is verified."
       ],
       "expected_result_shape": [
-        "No shared knowledge file is changed.",
+        "No reusable knowledge entry is created.",
         "The response names the privacy boundary and keeps source evidence project-local.",
-        "No absolute path, private name or signed URL is reproduced into a shared asset."
+        "No absolute path, private name or signed URL is reproduced into a portable artifact."
+      ]
+    },
+    {
+      "name": "conflicting-import-does-not-write",
+      "classification": "negative",
+      "prompt": "$project-os knowledge import: source/conflicting-bundle.json. Do not overwrite local changes.",
+      "fixture": {
+        "kind": "repository",
+        "setup": "Run python3 <plugin-root>/skills/project-os/evals/prepare_fixture.py --case conflicting-import-does-not-write --target <new-temporary-directory>. The parent directory must exist. Open that target in Codex and record its file hashes before sending the prompt. See evals/README.md for verification commands."
+      },
+      "expected_workflow": [
+        "Detect the same lesson ID with different content.",
+        "Report the conflict and make no target or source write.",
+        "Require an explicit reviewed revision instead of silent overwrite."
+      ],
+      "expected_result_shape": [
+        "The conflicting IDs and hashes are reported.",
+        "All repository file hashes remain unchanged."
       ]
     },
     {

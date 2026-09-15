@@ -38,14 +38,14 @@ Ask a targeted question only when missing information would materially change be
 
 - Keep candidate and project-specific incidents in the findings register.
 - Add knowledge only after confirming a failure mechanism.
-- Shared lessons must be sanitized, conditional on applicability and explicit about version or platform boundaries.
+- Reusable lessons are user-owned. Sanitize them before approval, keep applicability and version or platform boundaries explicit and transfer them only through reviewed export or import.
 - Never treat copied historical evidence as current proof.
 
 ## Scope and safety
 
 - Do not refactor unrelated code or introduce speculative abstractions.
 - Do not install dependencies, delete files, change branches, commit, push, deploy or run destructive or expensive checks without the authorization required by the current user and repository.
-- Keep credentials, tokens, private data, signed URLs and production identifiers out of tracked agent records.
+- Keep credentials, tokens, private data and production identifiers out of tracked agent records. Keep every URL out of reusable knowledge and portable bundles.
 - Keep `.agents` material outside application runtime and distributed artifacts.
 
 ## Verification

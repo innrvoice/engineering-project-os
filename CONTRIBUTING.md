@@ -69,11 +69,12 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 
 ## Knowledge rules
 
-- Keep findings, project knowledge and shared knowledge separate.
+- Keep findings, project knowledge and user-owned reusable knowledge separate.
 - Add knowledge only after the failure mechanism is confirmed.
-- Shared fixtures and seed entries contain no credentials, personal data, private paths, real user content, private endpoints or copied proprietary history.
+- Project OS ships no publisher-managed seed database. Reusable fixtures and portable bundles contain no credentials, personal data, private paths, real user content, URLs, evidence paths or copied proprietary history.
 - Preserve applicability, trigger, mechanism, prevention, decisive verification and scope boundaries.
-- Do not overwrite a conflicting shared entry because one copy has a newer date.
+- Require human review before approval or export and never overwrite a conflicting target entry silently.
+- Keep import source repositories read-only and make repeated imports idempotent.
 
 ## Documentation and skill rules
 
@@ -96,11 +97,11 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - repository-local packaging metadata and source ref;
 - pinned standalone installation URLs;
 - generated `SYSTEM.project_os_version`;
-- shared `knowledge_version`;
-- every bundled lesson's release provenance and content hash;
+- reusable knowledge migration rules and content-hash validation;
+- portable bundle metadata;
 - CI assertions, fixtures, documentation and release notes.
 
-Project OS 2.0.5 uses `SYSTEM.schema_version: 3`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Project OS 2.1.0 uses `SYSTEM.schema_version: 4`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 

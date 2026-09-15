@@ -4,7 +4,27 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.5] - 2026-09-15
+## [2.1.0] - 2026-09-15
+
+### Added
+
+- Added a user-owned reusable failure knowledge library that moves directly between the user's repositories or through a deterministic portable JSON bundle.
+- Added reviewed `knowledge list`, `prepare`, `approve`, `revise`, `retire`, `remove`, `export` and `import` workflows with target applicability previews, conflict detection and idempotent replay.
+- Added schema 4 migration that preserves proven user lessons, keeps private lessons local and removes old release-managed seed entries without losing unresolved local changes.
+
+### Changed
+
+- Replaced the publisher-managed shared knowledge model with repository-local project and reusable registries controlled entirely by the user.
+- Updated plugin discovery metadata and the third Directory starter prompt around the cross-project knowledge workflow.
+- Reworked public documentation to explain who Project OS is for, how reusable failure knowledge compounds and how ChatGPT and Codex transfer it without automatic upload or a central service.
+- Refreshed the final social preview alignment for the Resume identity introduced in 2.0.5.
+
+### Deprecated
+
+- Changed `sync-knowledge` into a read-only compatibility notice that directs users to explicit knowledge import.
+- Kept `knowledge propose-shared` as a read-only alias for `knowledge prepare` during the 2.1.0 transition.
+
+## [2.0.5] - 2026-09-15 - Universal Plugin Directory and GitHub
 
 ### Added
 
@@ -128,3 +148,4 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 [2.0.1]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.0...v2.0.1
 [2.0.4]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.1...v2.0.4
 [2.0.5]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.4...v2.0.5
+[2.1.0]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.5...v2.1.0

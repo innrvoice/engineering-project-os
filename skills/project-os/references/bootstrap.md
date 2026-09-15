@@ -54,7 +54,7 @@ The helper refuses the flag until both routes are present. Apply the same comman
 
 ## Existing compatible control plane
 
-Use `adopt` when compatible owners already exist for context, state, plans and findings. Adoption maps them and adds managed metadata, guidance and shared knowledge without rewriting those owners.
+Use `adopt` when compatible owners already exist for context, state, plans and findings. Adoption maps them and adds Project OS metadata, managed guidance and an empty user-owned reusable knowledge registry without rewriting those owners.
 
 Run this in Terminal with the installed helper path resolved:
 
@@ -87,4 +87,4 @@ Do not infer an active Program merely because `PROGRAM.md` exists. Adoption fail
 6. Report created or adopted files, checker result and unverified boundaries.
 7. Recommend a new Codex task so new startup instructions enter the instruction chain.
 
-Do not copy another project's state, plans, findings, history, paths, evidence or product rules.
+Do not copy another project's state, plans, findings, history, paths, evidence or product rules. Transfer only approved reusable lessons through the explicit knowledge import workflow.

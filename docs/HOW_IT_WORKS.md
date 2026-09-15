@@ -8,6 +8,8 @@ Project OS is for developers who want AI-assisted engineering work to survive th
 
 The immediate benefit is continuity. Decisions, checkpoints, plans and evidence stay with the code. The longer-term benefit is compounding knowledge: a confirmed failure can become a lesson that the same repository remembers and, after deliberate sanitization and review, another repository can reuse.
 
+That second benefit matters more than it first appears. After spending weeks learning which failure mechanism was real, repeating the same investigation in the next project feels less like engineering and more like paying an avoidable tax. Project OS cannot make every lesson universal, but it can help you carry the useful ones forward without carrying the old product with them.
+
 ChatGPT and Codex can use the same plugin from the Universal Plugin Directory. They do not receive repository context in the same way. ChatGPT works with the project description and files supplied in the chat. Codex works with the local workspace selected for the task. Installing the plugin alone grants neither surface automatic access to a repository.
 
 ## Selecting Project OS
@@ -19,7 +21,7 @@ The overview is the simplest first request. It explains the product, its benefit
 **Type this in ChatGPT:**
 
 ~~~text
-@Engineering Project OS What does Project OS do, how does it work and when should I use it?
+@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.
 ~~~
 
 **Type this in Codex chat:**
@@ -28,22 +30,22 @@ The overview is the simplest first request. It explains the product, its benefit
 $project-os overview
 ~~~
 
-**Type this in ChatGPT after attaching the existing Project OS files:**
+**Type this in ChatGPT after describing the project:**
 
 ~~~text
-@Engineering Project OS Review my existing Project OS setup and tell me what to fix.
+@Engineering Project OS Help me set up Project OS for this project and start with a safe preview.
 ~~~
 
-**Type this in Codex chat:**
+**Type this in Codex chat with the repository open:**
 
 ~~~text
-$project-os check
+$project-os bootstrap
 ~~~
 
-- Result: the selected surface loads the Project OS instructions needed for this request and runs a read-only check.
-- Files: none change.
-- Proof: the response reports `Project OS check: PASS` or concrete errors.
-- Skip it when: you want ordinary product or code work.
+- Result: the selected surface inspects the available project context and prepares a safe Standard setup preview.
+- Files: none change until the user approves the proposed setup. ChatGPT returns artifacts while Codex can apply the reviewed helper operation in its open workspace.
+- Proof: the response explains the selected packs and overlays, shows the affected files and keeps every unsupported claim unverified.
+- Skip it when: the repository already has Project OS; use `check` instead.
 
 The words after the skill name are normal language. Project OS publishes short requests because they are easy to remember, not because it implements a command parser.
 
@@ -158,14 +160,14 @@ Whether evidence actually proves the Program outcome is a user and Codex judgmen
 ## What the records own
 
 - `AGENTS.md` owns startup routing, authority and working rules.
-- `.agents/SYSTEM.json` owns release, schema, mode, active Program identity, path mappings, selected capabilities and managed baselines.
+- `.agents/SYSTEM.json` owns release, schema, mode, active Program identity, path mappings, selected capabilities and managed guidance baselines.
 - `.agents/CONTEXT.md` owns durable verified facts and exact commands.
 - `.agents/STATE.md` owns the current checkpoint and exact next action.
 - `.agents/plans/` owns resumable outcome packages and execution status.
 - `.agents/findings/` owns concrete defects, candidates and accepted risks.
 - `.agents/evidence/` stores sanitized proof referenced by an owning record.
 - `.agents/knowledge/project/` owns confirmed repository-specific lessons.
-- `.agents/knowledge/shared/` owns sanitized portable failure mechanisms.
+- `.agents/knowledge/reusable/` owns sanitized, reviewed and user-controlled portable failure mechanisms.
 - `.agents/packs/` contains managed capability and ecosystem guidance.
 - `.agents/PROGRAM.md` exists only while one Program is active.
 - `.agents/history/` contains the Program history index and closed snapshots when they exist.
@@ -176,20 +178,24 @@ Do not duplicate one status in several files. `STATE.md` is a handoff, not a dia
 
 This is the part of Project OS that is easiest to underestimate. Context and plans help the next session continue. Failure knowledge can help the next project avoid paying for the same lesson again.
 
+Imagine one project has spent two months collecting confirmed failures around React Native lifecycle, image handling and native handoffs. A new project starts. It should not inherit the first product's paths, names or history, but throwing away every mechanism would be absurd. The useful unit is a sanitized lesson with a trigger, mechanism, prevention, verification and honest boundaries.
+
 The lifecycle is deliberate:
 
 1. A finding records the observed failure, its impact, current evidence and the next decisive check without pretending that a hypothesis is already a cause.
 2. After the mechanism is confirmed, `knowledge capture` creates project knowledge with applicability, trigger, mechanism, prevention, decisive verification and scope boundaries.
-3. `knowledge propose-shared` prepares a read-only portable draft and removes project names, credentials, personal data, private paths, private URLs, deployment identifiers and copied product history.
-4. A person reviews whether the remaining mechanism is both safe and useful. If sanitization makes it misleading, the lesson stays project-specific.
-5. A reviewed Project OS release can include the approved lesson in its shared failure knowledge library.
-6. Another repository receives that managed lesson only through an explicit Project OS upgrade or knowledge synchronization.
+3. `knowledge prepare: all` creates a read-only batch proposal and removes project names, credentials, personal data, private paths, every URL, deployment identifiers, evidence paths and copied product history.
+4. A person reviews the batch and approves only lessons that remain safe, accurate and useful. The approved entries become the user's reusable library inside that repository.
+5. Codex can read that reusable library directly from the old repository. ChatGPT or a different machine can use a deterministic JSON bundle exported by the user.
+6. The destination previews which active lessons match its capabilities and ecosystem, considers lifecycle tombstones independently of applicability, explains every skipped entry and imports only after confirmation.
 
-`failure -> finding -> confirmed project lesson -> sanitized portable lesson -> human review -> Project OS release -> explicit upgrade in another repository`
+`failure -> finding -> confirmed project lesson -> sanitized batch -> human approval -> user-owned reusable library -> explicit import into another project`
 
-The first repository records the lesson. The next repository does not need to repeat the failure.
+No Project OS release sits in that path. No author reviews your lessons and no central database receives them. The source repository does not change during import. The destination receives the reusable mechanism, not the old project's identity or evidence.
 
-This is shared knowledge without hidden sharing. Project evidence stays local, promotion is reviewed and every receiving repository changes through an explicit conflict-checked operation.
+The first repository records the lesson. The next repository does not need to repeat the failure. At least not that particular failure. Software will kindly invent new ones.
+
+This is reusable knowledge without hidden sharing. Every write stays visible, target-local changes win over incoming content and repeated imports are idempotent.
 
 ## What the helper does
 
@@ -198,8 +204,9 @@ The helper provides deterministic operations:
 - `detect` inspects stack and capability signals.
 - `init` creates a Standard control plane.
 - `adopt` validates and maps compatible existing owners.
-- `check` validates paths, registries, state invariants, archive hashes, managed baselines and version alignment.
-- `sync-knowledge` synchronizes managed guidance and seed lessons without overwriting conflicts.
+- `check` validates paths, registries, state invariants, archive hashes, managed guidance baselines and version alignment.
+- `knowledge list`, `approve`, `export`, `import`, `revise`, `retire` and `remove` manage the user's reusable library through deterministic previews and conflict checks.
+- `sync-knowledge` is a read-only compatibility notice that directs older workflows to `knowledge import`.
 - `upgrade` conflict-checks and migrates supported repository state to the installed release, rolling back completed changes when a caught write or final-validation failure occurs.
 - `program start`, `program status` and `program close` manage the Program lifecycle.
 
@@ -235,15 +242,16 @@ Project OS has no:
 - hidden database;
 - automatic upload;
 - automatic Git operation;
-- automatic cross-project synchronization.
+- automatic cross-project synchronization;
+- a publisher-managed failure database.
 
 No repository learns from another repository by itself. Local additions and conflicts remain visible for review.
 
 ## Versions and upgrades
 
-The installed helper defines the Project OS release version. Release 2.0.5 uses `SYSTEM.schema_version: 3` and `SYSTEM.mode: standard|program`. Knowledge registries have their own schema version.
+The installed helper defines the Project OS release version. Release 2.1.0 uses `SYSTEM.schema_version: 4` and `SYSTEM.mode: standard|program`. Knowledge registries and portable bundles have their own schema version.
 
-Updating the Directory plugin or standalone skill does not update repositories. `$project-os upgrade` inspects the old state, previews every managed file change, preserves project-owned records, aborts on managed conflicts, applies only a clean preview with caught-failure rollback and runs the checker. In ChatGPT, the same workflow operates on supplied file copies and returns artifacts that still need deliberate application to the repository.
+Updating the Directory plugin or standalone skill does not update repositories. `$project-os upgrade` inspects the old state, previews every managed file change, preserves project-owned records, migrates proven user-owned lessons into the reusable library, removes old release-managed seeds, aborts on conflicts, applies only a clean preview with caught-failure rollback and runs the checker. In ChatGPT, the same workflow operates on supplied file copies and returns artifacts that still need deliberate application to the repository.
 
 When developing Project OS itself, the installed stable skill governs the workflow while the candidate helper is developed and tested from the source checkout. Do not replace the installed skill with a mutable candidate. Install only a published versioned tag, then start a fresh Codex task.
 

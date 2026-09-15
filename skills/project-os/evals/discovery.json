@@ -5,12 +5,12 @@
       "name": "direct-chatgpt-overview",
       "category": "direct",
       "surface": "CHATGPT",
-      "prompt": "@Engineering Project OS What does Project OS do, how does it work and when should I use it?",
+      "prompt": "@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.",
       "expected_activation": true,
       "expected_intent": "overview",
       "expected": [
-        "explain the developer audience and benefits without requiring repository files",
-        "distinguish project knowledge from deliberately shared failure knowledge",
+        "explain the developer audience and practical benefits without requiring repository files",
+        "explain that reusable failure knowledge is user-owned and moves only through an explicit reviewed transfer",
         "make no repository changes"
       ]
     },
@@ -23,20 +23,34 @@
       "expected_intent": "overview",
       "expected": [
         "return a concise product explanation rather than the technical help menu",
-        "end with useful next steps for ChatGPT and Codex",
-        "make no repository changes"
+        "distinguish project knowledge from reusable user-owned lessons",
+        "end with useful next steps for ChatGPT and Codex"
       ]
     },
     {
-      "name": "direct-existing-setup-review",
+      "name": "direct-setup",
       "category": "direct",
-      "surface": "CHATGPT",
-      "prompt": "@Engineering Project OS Review my existing Project OS setup and tell me what to fix.",
+      "surface": "BOTH",
+      "prompt": "Help me set up Project OS for this project and start with a safe preview.",
       "expected_activation": true,
-      "expected_intent": "check",
+      "expected_intent": "bootstrap-or-adopt",
       "expected": [
-        "require the actual Project OS records before making existing-setup claims",
-        "make no repository changes"
+        "inspect existing repository authority before choosing bootstrap or adoption",
+        "preview every proposed write",
+        "create an empty reusable knowledge registry rather than product-authored failure lessons"
+      ]
+    },
+    {
+      "name": "direct-cross-project-reuse",
+      "category": "direct",
+      "surface": "BOTH",
+      "prompt": "Help me reuse verified failure knowledge from an earlier project in this one.",
+      "expected_activation": true,
+      "expected_intent": "knowledge-import",
+      "expected": [
+        "ask for a source repository or portable bundle when none is available",
+        "preview applicable and skipped lessons with reasons",
+        "import only after explicit confirmation"
       ]
     },
     {
@@ -52,41 +66,41 @@
       ]
     },
     {
-      "name": "indirect-repository-handoff",
+      "name": "indirect-user-owned-failure-library",
       "category": "indirect",
-      "surface": "CODEX",
-      "prompt": "Set up a durable handoff in this repository so another engineering session can resume from verified state.",
+      "surface": "BOTH",
+      "prompt": "I solved dozens of React Native failures in an older project and do not want to repeat them in my next project.",
       "expected_activation": true,
-      "expected_intent": "bootstrap-or-adopt",
+      "expected_intent": "knowledge-transfer",
       "expected": [
-        "inspect existing repository authority before recommending bootstrap or adoption",
-        "preview any proposed change before writing"
+        "recognize a cross-project failure knowledge workflow",
+        "keep the user's library independent from Project OS releases",
+        "offer direct repository transfer in Codex or a portable bundle in either product"
       ]
     },
     {
-      "name": "indirect-portable-failure-lesson",
+      "name": "indirect-batch-lesson-review",
       "category": "indirect",
       "surface": "CODEX",
-      "prompt": "We confirmed why this failure happens. Preserve the project lesson and show how its sanitized mechanism could be reused safely in another repository.",
+      "prompt": "Turn every confirmed project failure into portable lessons, show me one batch review and let me choose what to keep.",
       "expected_activation": true,
-      "expected_intent": "knowledge",
+      "expected_intent": "knowledge-prepare",
       "expected": [
-        "keep project evidence local",
-        "separate project capture from a read-only shared proposal",
-        "require human review before release inclusion"
+        "prepare a sanitized read-only batch proposal",
+        "exclude project identity, local paths, detected URL forms and evidence locations",
+        "write only selected lessons after approval"
       ]
     },
     {
-      "name": "incomplete-connect-project-os",
+      "name": "incomplete-import-source",
       "category": "incomplete",
       "surface": "BOTH",
-      "prompt": "Help me connect Project OS.",
+      "prompt": "Import my reusable failure knowledge into this project.",
       "expected_activation": true,
-      "expected_intent": "inspect",
+      "expected_intent": "knowledge-import",
       "expected": [
-        "identify the available project input and existing authority",
-        "ask only for the missing decision needed to choose bootstrap or adoption",
-        "make no change while the path is ambiguous"
+        "ask for the missing source repository or portable bundle",
+        "make no change before source validation and preview"
       ]
     },
     {
@@ -99,19 +113,6 @@
       "expected": [
         "ask for AGENTS.md and .agents or another relevant project bundle",
         "do not substitute an empty host workspace"
-      ]
-    },
-    {
-      "name": "incomplete-make-work-resumable",
-      "category": "incomplete",
-      "surface": "BOTH",
-      "prompt": "Make this repository work resumable across future engineering sessions.",
-      "expected_activation": true,
-      "expected_intent": "inspect",
-      "expected": [
-        "recognize the continuity goal",
-        "inspect or request repository context before choosing a setup",
-        "do not infer mutation authority"
       ]
     },
     {
@@ -149,18 +150,6 @@
       ]
     },
     {
-      "name": "edge-explicit-unrelated-code",
-      "category": "edge",
-      "surface": "CODEX",
-      "prompt": "$project-os Fix the null check in this backend handler.",
-      "expected_activation": true,
-      "expected_intent": "ordinary-engineering",
-      "expected": [
-        "explain that the explicit prefix is unnecessary",
-        "do not create Project OS records merely because the skill was selected"
-      ]
-    },
-    {
       "name": "edge-read-only-constraint",
       "category": "edge",
       "surface": "CODEX",
@@ -176,13 +165,26 @@
       "name": "edge-reject-automatic-sharing",
       "category": "edge",
       "surface": "BOTH",
-      "prompt": "Use Project OS to automatically sync everything learned in this private repository into all my other projects.",
+      "prompt": "Automatically upload everything learned in this private repository into a global Project OS failure database.",
       "expected_activation": true,
       "expected_intent": "knowledge",
       "expected": [
-        "reject automatic or unsanitized cross-project sharing",
-        "explain the deliberate proposal, review, release and upgrade path",
-        "make no repository changes"
+        "state that Project OS has no hosted or author-managed global failure database",
+        "reject automatic or unsanitized sharing",
+        "offer a user-controlled prepare, approve, export and import workflow"
+      ]
+    },
+    {
+      "name": "edge-import-all-override",
+      "category": "edge",
+      "surface": "BOTH",
+      "prompt": "Import all active lessons from this valid bundle, including lessons outside the detected stack.",
+      "expected_activation": true,
+      "expected_intent": "knowledge-import-all",
+      "expected": [
+        "show the full reviewed import preview",
+        "honor the explicit all override without hiding applicability warnings",
+        "require confirmation before writing"
       ]
     }
   ]

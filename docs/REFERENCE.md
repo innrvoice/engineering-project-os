@@ -1,6 +1,6 @@
 # Reference
 
-This is the technical contract for Project OS 2.0.5. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.1.0. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
@@ -8,7 +8,7 @@ This is the technical contract for Project OS 2.0.5. Start with the [README](../
 | --- | --- | --- |
 | ChatGPT plugin | Setup advice from a project description and workflows over files supplied in the conversation | `@Engineering Project OS ...` with the needed project context |
 | Codex plugin or standalone skill | Reasoned workflows in the selected local workspace | `$project-os ...` in Codex chat |
-| Python helper | Deterministic detect, init, adopt, check, sync, upgrade and Program transitions | `project_os.py ...` in Terminal |
+| Python helper | Deterministic setup, validation, upgrade, Program transitions and reusable knowledge operations | `project_os.py ...` in Terminal |
 | Repository records | Durable context, state, plans, findings, evidence and knowledge | `AGENTS.md` and `.agents/` files |
 
 `@Engineering Project OS` in ChatGPT and `$project-os` in Codex select the same bundled skill for one message. Text after the selector is natural language, not a helper command line or rigid parser. This release enables implicit invocation so the selected plugin can expose the skill for a clear Project OS request.
@@ -19,9 +19,9 @@ The ChatGPT Directory listing exposes three outcome-focused starter prompts:
 
 | Starter prompt | Required initial context |
 | --- | --- |
-| `What does Project OS do, how does it work and when should I use it?` | None |
-| `Create a safe Project OS starter package for my project.` | Project description and any existing authority files |
-| `Review my existing Project OS setup and tell me what to fix.` | Existing `AGENTS.md` and `.agents/` files or a relevant project bundle |
+| `Tell me what Project OS does, how it works and when I should use it.` | None |
+| `Help me set up Project OS for this project and start with a safe preview.` | Project description and any existing authority files |
+| `Help me reuse verified failure knowledge from an earlier project in this one.` | An approved reusable bundle plus destination context; Codex can also use both repositories |
 
 The helper lives at `scripts/project_os.py` inside the installed skill. Terminal examples use an absolute placeholder path so the target repository does not need its own helper copy.
 
@@ -49,7 +49,16 @@ The helper lives at `scripts/project_os.py` inside the installed skill. Terminal
 | `plan supersede: <reason>` | Reason | Retire a plan whose route or outcome was replaced |
 | `finding add: <observation>` | Observation | Record evidence without inventing a mechanism |
 | `knowledge capture: <finding-id>` | Confirmed finding ID | Create project-specific failure knowledge |
-| `knowledge propose-shared: <lesson-id>` | Project lesson ID | Draft a sanitized portable lesson without writing |
+| `knowledge list: project\|reusable` | Scope | List user-owned knowledge without writing |
+| `knowledge prepare: <lesson-id\|all>` | Project lesson ID or `all` | Prepare a sanitized proposal outside the repository without writing |
+| `knowledge approve: <proposal> <lesson-id\|all>` | Proposal and reviewed selection | Add only approved entries to the reusable library |
+| `knowledge revise: <lesson-id>` | Reusable lesson ID | Prepare and apply a reviewed replacement revision |
+| `knowledge retire: <lesson-id> because <reason>` | Lesson ID and reason | Retire an entry while preserving its lifecycle |
+| `knowledge remove: <lesson-id>` | Lesson ID | Permanently remove a local entry after an explicit preview and confirmation |
+| `knowledge export: <destination>` | New output path | Export approved entries and complete lifecycle chains to a deterministic bundle |
+| `knowledge import: <repo-or-bundle>` | Source repository or bundle | Preview active entries applicable to the target plus lifecycle tombstones |
+| `knowledge import all: <repo-or-bundle>` | Source repository or bundle | Explicitly preview every non-draft source entry |
+| `knowledge propose-shared: <lesson-id>` | Project lesson ID | Deprecated read-only alias for `knowledge prepare` |
 
 The table shows the intent words used after `$project-os` in Codex. In ChatGPT, select `@Engineering Project OS` and express the same intent in ordinary language. `$project-os help` always returns this class of concise menu, with purpose, required arguments and one or two examples. It never writes files. See [Usage](USAGE.md) for complete examples.
 
@@ -93,7 +102,7 @@ Closing requires no active plan. Use `completed` only after Program exit evidenc
 | Path | Owns |
 | --- | --- |
 | `AGENTS.md` | Startup routing, authority, working method, safety and verification expectations |
-| `.agents/SYSTEM.json` | Release, schema, state, active Program, mappings, selections and managed baselines |
+| `.agents/SYSTEM.json` | Release, schema, state, active Program, mappings, selections and managed guidance baselines |
 | `.agents/CONTEXT.md` | Durable verified facts, authority, architecture and exact commands |
 | `.agents/STATE.md` | Current scope, verified progress, exact next action and blockers |
 | `.agents/plans/index.json` | Canonical execution state and plan statuses |
@@ -101,7 +110,7 @@ Closing requires no active plan. Use `completed` only after Program exit evidenc
 | `.agents/findings/findings.json` | Concrete defects, candidates and accepted risks |
 | `.agents/evidence/` | Sanitized, dated evidence linked from plans or findings |
 | `.agents/knowledge/project/` | Confirmed repository-specific lessons |
-| `.agents/knowledge/shared/failures.json` | Sanitized portable failure mechanisms |
+| `.agents/knowledge/reusable/failures.json` | Sanitized, reviewed and user-owned portable failure mechanisms |
 | `.agents/packs/` | Managed capability and ecosystem guidance selected for the repository |
 | `.agents/PROGRAM.md` | The one active multi-phase Program contract |
 | `.agents/history/index.json` | Closed Program disposition, canonical closure date, archive path and SHA-256 digest |
@@ -125,9 +134,47 @@ When `execution_state` is `running`, exactly one plan is `active`. If `active_pl
 
 Finding statuses are `candidate`, `confirmed`, `fixed_unverified`, `verified`, `accepted_risk`, `deferred`, `rejected` and `merged`.
 
-Failure knowledge statuses are `active`, `retired` and `replaced`.
+Reusable failure knowledge statuses are `active`, `draft`, `retired` and `replaced`.
 
 A status transition does not manufacture evidence. `done`, `verified` and completed Program closure require the evidence class named by the owning record.
+
+## User-owned reusable knowledge
+
+Project knowledge and reusable knowledge have different privacy boundaries. Project knowledge may retain repository-specific evidence and context. Reusable knowledge contains only lessons explicitly prepared, reviewed and approved by the user for transfer.
+
+Project OS ships no central failure database and no release-managed seed entries. A new repository starts with an empty reusable registry. Users can move their own lessons directly between repositories or through a portable bundle without submitting them to the publisher or waiting for a Project OS release.
+
+The reusable registry has this top-level shape:
+
+~~~json
+{
+  "schema_version": 1,
+  "entries": []
+}
+~~~
+
+Each entry requires `id`, `title`, `status`, `applies_to`, `trigger`, `mechanism`, `prevention`, `verification`, `boundaries` and `source`. `applies_to`, `verification` and `boundaries` are arrays. `status` is `active`, `draft`, `retired` or `replaced`. Lifecycle entries may also use `replaces`, `replaced_by`, `reason` and `previous_content_hash`. Canonical IDs and applicability tags are trimmed and cannot contain whitespace, commas or control characters.
+
+For active, retired and replaced entries, `source.kind` is `user-reviewed`. A schema migration may preserve an unresolved local entry as `draft` with `source.kind: migration-review-required`. Every source also records `created_with` and a canonical `sha256:` content hash. Migrated entries may retain a non-private `origin_pack` for coverage verification, but applicability is determined only by `applies_to`.
+
+A prepared approval or revision proposal has `format: project-os-knowledge-proposal`, `schema_version: 1` and a non-empty `entries` array. Every proposal entry contains exactly `id`, `title`, `applies_to`, `trigger`, `mechanism`, `prevention`, `verification` and `boundaries`. It contains no status, provenance or content hash; the helper adds reviewed provenance and the canonical hash during approval. Proposal and import validation rejects detected URL forms in reusable content, while human review remains responsible for contextual disclosures the scanner cannot recognize.
+
+The portable bundle has this top-level shape:
+
+~~~json
+{
+  "format": "project-os-reusable-knowledge",
+  "schema_version": 1,
+  "created_with": "2.1.0",
+  "entries": []
+}
+~~~
+
+Bundle JSON uses deterministic ordering and formatting. The helper reports the bundle SHA-256 separately. It does not add a timestamp or source repository identity. A default export includes active entries plus retired and replaced tombstones. Drafts never leave the repository. A selected export fails if `--ids` omits a linked predecessor or replacement record required for a complete lifecycle chain. `--active-only` omits tombstones but still fails when an included active lesson depends on an omitted lifecycle record.
+
+Default import selects active entries whose `applies_to` intersects the destination tags and considers retired or replaced tombstones regardless of applicability, then recursively includes every linked entry needed to keep each selected replacement chain complete. Every destination has `engineering`; selected pack names add `service`, `web`, `mobile`, `data` or `delivery`; the `react-native-expo` overlay adds `react-native-expo`, `react-native` and `expo`. The preview reports selected and skipped entries with reasons. `--ids` chooses an exact set and fails if it omits a required lifecycle link. `--all` explicitly bypasses applicability filtering.
+
+Import is idempotent and conflict-safe. The same ID and content hash is skipped. Identical content under another ID is deduplicated. The same ID with different content blocks all writes. A retired or replaced tombstone updates an existing predecessor only when its `previous_content_hash` matches the target predecessor's content hash. If that predecessor is absent, the tombstone is retained so an older active bundle cannot resurrect it later. Target-local revisions are never overwritten silently.
 
 ## Capability packs and overlays
 
@@ -153,8 +200,15 @@ Languages and frameworks are detection signals, not behavioral profiles. Any jus
 | `init` | Unless `--dry-run` | Create Standard |
 | `adopt` | Unless `--dry-run` | Attach to compatible existing owners |
 | `check` | No | Validate structure, lifecycle, archive hashes and release alignment |
-| `sync-knowledge` | Unless `--dry-run` | Synchronize managed guidance and seed knowledge |
+| `sync-knowledge` | No | Explain the 2.1.0 migration to explicit user-owned import |
 | `upgrade` | Unless `--dry-run` | Migrate to the installed release with caught-failure rollback |
+| `knowledge list` | No | List project knowledge, reusable knowledge or both |
+| `knowledge approve` | Unless `--dry-run` | Add reviewed proposal entries to the reusable registry |
+| `knowledge export` | Unless `--dry-run` | Create a deterministic portable bundle |
+| `knowledge import` | Unless `--dry-run` | Import reviewed entries from a repository or bundle |
+| `knowledge revise` | Unless `--dry-run` | Replace one entry through a reviewed proposal |
+| `knowledge retire` | Unless `--dry-run` | Retire one entry with a reason |
+| `knowledge remove` | Unless `--dry-run` | Permanently remove one local entry after exact confirmation |
 | `program start` | Unless `--dry-run` | Validate a definition and start one Program |
 | `program status` | No | Report active Program state |
 | `program close` | Unless `--dry-run` | Close and archive one Program |
@@ -231,24 +285,79 @@ python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/
 
 The command is read-only. Success prints `Project OS check: PASS` and exits zero. Use `--config /path/to/proposed-SYSTEM.json` to validate an adoption manifest before installing it.
 
-### Synchronize managed guidance and knowledge
+### List knowledge
 
 **Run this in Terminal:**
 
 ~~~bash
-python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge list --target /path/to/repository --scope reusable
 ~~~
 
-A locally divergent managed file or knowledge entry is a conflict. Synchronization aborts before partial writes. The repository must already match the helper's Project OS release; synchronization does not perform an upgrade. Apply only a clean preview.
+`--scope` accepts `project`, `reusable` or `all`. Listing is read-only.
+
+### Approve a prepared proposal
+
+The semantic `knowledge prepare` workflow creates and reviews the proposal outside the helper. The helper validates the selected proposal entries and writes only the approved set.
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge approve --target /path/to/repository --proposal /path/to/proposal.json --ids FAIL-001,FAIL-002 --dry-run
+~~~
+
+Use `--all` instead of `--ids` only when the user reviewed and approved every proposal entry. Apply the identical operation without `--dry-run`, then run `check`.
+
+### Export reusable knowledge
+
+Preview a selected export:
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge export --target /path/to/source-repository --output /path/to/failure-knowledge.json --dry-run
+~~~
+
+With no selector the helper exports every non-draft entry: active lessons plus retired and replaced tombstones. Use `--ids FAIL-001,FAIL-002` for an exact set. Every export must contain each linked predecessor and replacement record required for a complete lifecycle chain. `--active-only` excludes tombstones and is valid only when the selected active lessons have no lifecycle dependencies. The flags can be combined. Apply the same operation without `--dry-run`. The output must resolve outside the source repository and its path must not already exist. The source repository does not change and the helper reports the deterministic bundle SHA-256.
+
+### Import reusable knowledge
+
+The source can be a connected Project OS repository or a canonical portable bundle:
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge import --target /path/to/destination --source /path/to/source-repository --dry-run
+~~~
+
+With no selection flag, import previews active entries applicable to the destination plus retired and replaced tombstones regardless of applicability. Use `--ids FAIL-001,FAIL-002` for an exact reviewed set or `--all` to explicitly consider every non-draft source entry. Apply only the same clean command without `--dry-run`, run `check`, then repeat the import dry run to prove idempotency. The source is always read-only.
+
+### Revise, retire or remove
+
+Revision consumes a reviewed one-entry proposal:
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge revise --target /path/to/repository --id FAIL-001 --proposal /path/to/revision.json --dry-run
+~~~
+
+The proposal must use a new stable ID. Apply marks the old active entry `replaced`, links both entries and stores the predecessor hash needed for safe lifecycle import.
+
+Retirement preserves the entry and its reason:
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge retire --target /path/to/repository --id FAIL-001 --reason "Superseded by the supported platform API" --dry-run
+~~~
+
+Permanent local removal requires the same exact ID twice:
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py knowledge remove --target /path/to/repository --id FAIL-001 --confirm FAIL-001 --dry-run
+~~~
+
+Each operation must be reviewed in dry-run form, applied unchanged and followed by `check`. Removal refuses any lesson that participates in a replacement chain because deleting either side would leave a dangling lifecycle link. Removing an unlinked local entry does not recall copies already imported into another repository.
+
+### Deprecated synchronization command
 
 **Run this in Terminal:**
 
 ~~~bash
 python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository
-python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
 ~~~
 
-Project-owned context, state, plans, findings, evidence and project knowledge are never replaced by this command.
+In 2.1.0 this command is read-only. It explains that there is no centrally managed failure knowledge source and directs the user to `knowledge import --source`. Use `upgrade` to synchronize Project OS product guidance, packs, overlays, schema and metadata.
 
 ### Upgrade
 
@@ -258,7 +367,9 @@ Project-owned context, state, plans, findings, evidence and project knowledge ar
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
 ~~~
 
-For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade combines schema migration, managed guidance, shared knowledge and `SYSTEM.json` changes in one conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures roll back completed changes. Applying a clean upgrade finishes by running the checker.
+For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade combines schema migration, managed guidance, user-owned knowledge classification and `SYSTEM.json` changes in one conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures roll back completed changes. Applying a clean upgrade finishes by running the checker.
+
+The schema 3 to 4 migration removes unchanged release-managed seed entries. Entries proven as user-owned through adoption coverage become reusable lessons. Private entries remain project-local. Compatible unknown or locally modified former shared entries become `draft` with `source.kind: migration-review-required`. If classifying any retained local entry would discard lifecycle metadata or unsupported user fields, upgrade refuses the entire transaction and reports the affected lesson and fields. Drafts require explicit preparation and approval before export.
 
 A schema 2 repository with a legacy `PROGRAM.md` requires explicit classification.
 
@@ -335,18 +446,19 @@ For `init`:
 - `--overlays none` selects no overlays.
 - `--overlays react-native-expo` requires `mobile`.
 
-For `sync-knowledge`, omitted selection flags use `SYSTEM.json`. Explicit selections must match it.
+Knowledge import derives default applicability from the destination's selections in `SYSTEM.json`. Product guidance changes only through `upgrade`.
 
 ## Release and schema versions
 
 Release and file-format versions are separate:
 
-- Release 2.0.5 identifies the installed skill, helper, package metadata, connected `project_os_version` and managed knowledge provenance.
-- `SYSTEM.schema_version` is 3.
+- Release 2.1.0 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- `SYSTEM.schema_version` is 4.
 - Knowledge registries retain their own `schema_version: 1`.
+- Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.
 - The version in the external `$schema` URL inside `plugin.json` belongs to that external schema, not to the Project OS release.
 
-The checker requires the repository release and shared knowledge version to match the installed helper. Do not edit version fields manually to silence it.
+The checker requires the repository release to match the installed helper and validates reusable entry content hashes independently of the release. Do not edit version or schema fields manually to silence it.
 
 Upgrade rejects a repository release newer than the helper, including during a dry run. Use a matching or newer helper; implicit downgrade is unsupported. SemVer build metadata does not affect upgrade direction.
 
@@ -358,7 +470,7 @@ Upgrade rejects a repository release newer than the helper, including during a d
 - Create, replace, delete and rollback use opened directory descriptors and no-follow file opens. Detected parent replacement aborts the transaction; rollback uses the original directories.
 - SYSTEM, knowledge and history JSON are parsed and hashed from the same bytes. Program closure also guards the plan registry through final validation, including closed legacy migration.
 - An abrupt process termination or power loss can interrupt a multi-file operation. Run the checker afterward and repair from Git or another reviewed source if it reports partial state.
-- Shared knowledge policy excludes credentials, personal data, private paths, private URLs, signed URLs and copied project history. The helper rejects common detectable patterns; human review is still required because a denylist cannot prove arbitrary text is sanitized.
+- Reusable knowledge policy excludes credentials, personal data, private paths, every URL, evidence paths, deployment identifiers and copied project history. The helper rejects detected URL forms plus common detectable sensitive patterns. Human review is still required because automated screening cannot recognize every project name or contextual disclosure.
 - The helper initiates no network request and uses only the Python standard library.
 - Project OS grants no authority for application changes, dependency installation, deletion, Git operations, deployment, publication or external communication.
 - A passing checker proves Project OS structural consistency, not application or production behavior.

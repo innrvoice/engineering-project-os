@@ -102,10 +102,42 @@ def validate_zip(path: Path) -> dict[str, object]:
             raise ValueError("ZIP CRC validation failed")
         if "plugin.json" not in names or "skills/project-os/SKILL.md" not in names:
             raise ValueError("ZIP is missing the portable manifest or skill")
+        reusable_template = "skills/project-os/assets/templates/core/.agents/knowledge/reusable/failures.json"
+        forbidden_knowledge = [
+            name for name in names
+            if name.startswith("skills/project-os/assets/knowledge/")
+            or "/knowledge/shared/" in name
+        ]
+        if forbidden_knowledge:
+            raise ValueError(
+                "Package contains release-managed failure knowledge: "
+                + ", ".join(sorted(forbidden_knowledge)[:10])
+            )
+        if reusable_template not in names:
+            raise ValueError("ZIP is missing the empty reusable knowledge template")
+        reusable = json.loads(archive.read(reusable_template))
+        if reusable != {"schema_version": 1, "entries": []}:
+            raise ValueError("Reusable knowledge template must be an empty user-owned registry")
         portable = json.loads(archive.read("plugin.json"))
         compatibility = json.loads(archive.read(".codex-plugin/plugin.json"))
         if portable["version"] != compatibility["version"]:
             raise ValueError("Package manifest versions disagree")
+        portable_interface = portable["extensions"]["com.openai"]["interface"]
+        compatibility_interface = compatibility["interface"]
+        if portable_interface["defaultPrompt"] != compatibility_interface["defaultPrompt"]:
+            raise ValueError("Package starter prompts disagree")
+        helper = archive.read("skills/project-os/scripts/project_os.py").decode("utf-8")
+        helper_version = re.search(r'^VERSION = "([^"]+)"$', helper, re.MULTILINE)
+        helper_schema = re.search(r"^SCHEMA_VERSION = (\d+)$", helper, re.MULTILINE)
+        if helper_version is None or helper_version.group(1) != portable["version"]:
+            raise ValueError("Package helper and manifest versions disagree")
+        if helper_schema is None or int(helper_schema.group(1)) != 4:
+            raise ValueError("Package helper must use Project OS schema 4")
+        skill_policy = archive.read("skills/project-os/agents/openai.yaml").decode("utf-8")
+        if "allow_implicit_invocation: true" not in skill_policy or "products:" in skill_policy:
+            raise ValueError("Package skill policy is not portable")
+        for name in sorted(item for item in names if item.endswith(".json")):
+            json.loads(archive.read(name))
         # Relative public-document links must also work in the extracted artifact.
         public_docs = [name for name in names if name.endswith(".md")
                        and ("/" not in name or name.startswith("docs/"))]
