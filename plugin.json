@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "engineering-project-os",
-  "version": "2.0.4",
-  "description": "Bootstrap and maintain a stack-agnostic, repository-local engineering operating system for ChatGPT and Codex.",
+  "version": "2.0.5",
+  "description": "Keep engineering work resumable in ChatGPT and Codex while turning confirmed failures into reusable repository knowledge.",
   "author": {
     "name": "Pavel Bochkov Rastopchin",
     "url": "https://github.com/innrvoice"
@@ -10,32 +10,30 @@
   "homepage": "https://github.com/innrvoice/engineering-project-os",
   "repository": "https://github.com/innrvoice/engineering-project-os",
   "license": "MIT",
-  "keywords": ["codex", "engineering", "project-state", "plans", "knowledge"],
+  "keywords": ["chatgpt", "codex", "engineering-workflow", "repository", "project-state", "continuity", "plans", "evidence", "knowledge"],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Engineering Project OS",
-        "shortDescription": "Durable state for every repo",
-        "longDescription": "Keep engineering work resumable across sessions with repository-local plans, state, evidence and reusable knowledge. Project OS can inspect an existing setup or safely bootstrap, validate, repair and upgrade it in ChatGPT and Codex.",
+        "shortDescription": "Resume engineering work",
+        "longDescription": "Project OS keeps engineering work resumable across ChatGPT and Codex by storing context, plans, state and evidence inside each repository. It turns confirmed failures into reusable knowledge, including sanitized lessons that can be reviewed once and carried deliberately into other projects.",
         "developerName": "Pavel Bochkov Rastopchin",
         "category": "Productivity",
         "capabilities": [
-          "Inspect repository state",
-          "Bootstrap Project OS",
+          "Resume work across sessions",
+          "Inspect and connect repositories",
           "Validate, repair and upgrade state",
-          "Manage plans and evidence"
+          "Capture reusable failure knowledge"
         ],
         "websiteURL": "https://github.com/innrvoice/engineering-project-os",
         "privacyPolicyURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/PRIVACY.md",
         "termsOfServiceURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/TERMS.md",
-        "supportURL": "https://github.com/innrvoice/engineering-project-os/issues",
         "defaultPrompt": [
-          "Help me choose the right Project OS setup for my project.",
+          "What does Project OS do, how does it work and when should I use it?",
           "Create a safe Project OS starter package for my project.",
           "Review my existing Project OS setup and tell me what to fix."
         ],
         "brandColor": "#789F25",
-        "brandColorDark": "#B7F34A",
         "composerIcon": "./assets/icon.svg",
         "logo": "./assets/logo.svg"
       }

@@ -1,8 +1,14 @@
 # Reviewer cases
 
-`submission.json` contains six positive and three negative Codex workspace cases. Each case has an independent synthetic fixture, prompt, expected workflow and expected result. `prompts.json` contains additional ChatGPT and Codex behavioral cases. No private repository, account, dependency installation or network service is needed.
+`submission.json` contains six positive and three negative Codex workspace cases. Each case has an independent synthetic fixture, prompt, expected workflow and expected result. `prompts.json` contains additional ChatGPT and Codex workflow cases. `discovery.json` is the golden prompt set for direct, indirect, incomplete, negative and edge routing behavior. No private repository, account, dependency installation or network service is needed.
 
-The three public starter prompts also require a fresh ChatGPT check. Install the exact candidate ZIP through the local marketplace, start a new chat, attach a synthetic repository archive and run inspect, bootstrap preview and validation. Confirm that the selected plugin exposes Project OS instead of a generic fallback audit. In a separate new chat, run a repository-dependent starter prompt without attaching files and confirm that Project OS asks for them without inspecting an empty host workspace.
+The three public starter prompts also require a fresh ChatGPT check. Install the exact candidate ZIP through the local marketplace and start a new chat. Confirm that the overview prompt explains the product without requesting files. Then use a synthetic project description for starter-package generation and attach synthetic existing Project OS records for review. Confirm that the selected plugin exposes Project OS instead of a generic fallback audit.
+
+## Replay the discovery golden set
+
+Run every case in `discovery.json` on its named surface with the exact candidate installed in a fresh chat or task. Record whether Project OS was selected, which intent it followed and whether every expected behavior was present. Direct and indirect positive cases measure recall. Negative cases measure precision. Incomplete and edge cases verify that selection does not invent missing context or mutation authority.
+
+If routing needs adjustment, change one discovery field at a time, reinstall the candidate and replay the complete set. A frontmatter description change affects selection. A skill-body change affects behavior after selection. Public listing copy and starter prompts affect user expectations but do not replace behavioral testing.
 
 ## Prepare one case
 

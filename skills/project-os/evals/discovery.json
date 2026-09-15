@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "direct-chatgpt-overview",
+      "category": "direct",
+      "surface": "CHATGPT",
+      "prompt": "@Engineering Project OS What does Project OS do, how does it work and when should I use it?",
+      "expected_activation": true,
+      "expected_intent": "overview",
+      "expected": [
+        "explain the developer audience and benefits without requiring repository files",
+        "distinguish project knowledge from deliberately shared failure knowledge",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "direct-codex-overview",
+      "category": "direct",
+      "surface": "CODEX",
+      "prompt": "$project-os overview",
+      "expected_activation": true,
+      "expected_intent": "overview",
+      "expected": [
+        "return a concise product explanation rather than the technical help menu",
+        "end with useful next steps for ChatGPT and Codex",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "direct-existing-setup-review",
+      "category": "direct",
+      "surface": "CHATGPT",
+      "prompt": "@Engineering Project OS Review my existing Project OS setup and tell me what to fix.",
+      "expected_activation": true,
+      "expected_intent": "check",
+      "expected": [
+        "require the actual Project OS records before making existing-setup claims",
+        "make no repository changes"
+      ]
+    },
+    {
+      "name": "indirect-lost-session-context",
+      "category": "indirect",
+      "surface": "BOTH",
+      "prompt": "I keep losing engineering decisions and verification state between AI sessions. Help me keep that working context with the repository.",
+      "expected_activation": true,
+      "expected_intent": "overview",
+      "expected": [
+        "recognize a repository-local continuity need",
+        "explain Project OS before asking for implementation context"
+      ]
+    },
+    {
+      "name": "indirect-repository-handoff",
+      "category": "indirect",
+      "surface": "CODEX",
+      "prompt": "Set up a durable handoff in this repository so another engineering session can resume from verified state.",
+      "expected_activation": true,
+      "expected_intent": "bootstrap-or-adopt",
+      "expected": [
+        "inspect existing repository authority before recommending bootstrap or adoption",
+        "preview any proposed change before writing"
+      ]
+    },
+    {
+      "name": "indirect-portable-failure-lesson",
+      "category": "indirect",
+      "surface": "CODEX",
+      "prompt": "We confirmed why this failure happens. Preserve the project lesson and show how its sanitized mechanism could be reused safely in another repository.",
+      "expected_activation": true,
+      "expected_intent": "knowledge",
+      "expected": [
+        "keep project evidence local",
+        "separate project capture from a read-only shared proposal",
+        "require human review before release inclusion"
+      ]
+    },
+    {
+      "name": "incomplete-connect-project-os",
+      "category": "incomplete",
+      "surface": "BOTH",
+      "prompt": "Help me connect Project OS.",
+      "expected_activation": true,
+      "expected_intent": "inspect",
+      "expected": [
+        "identify the available project input and existing authority",
+        "ask only for the missing decision needed to choose bootstrap or adoption",
+        "make no change while the path is ambiguous"
+      ]
+    },
+    {
+      "name": "incomplete-review-without-records",
+      "category": "incomplete",
+      "surface": "CHATGPT",
+      "prompt": "@Engineering Project OS Review my Project OS setup.",
+      "expected_activation": true,
+      "expected_intent": "check",
+      "expected": [
+        "ask for AGENTS.md and .agents or another relevant project bundle",
+        "do not substitute an empty host workspace"
+      ]
+    },
+    {
+      "name": "incomplete-make-work-resumable",
+      "category": "incomplete",
+      "surface": "BOTH",
+      "prompt": "Make this repository work resumable across future engineering sessions.",
+      "expected_activation": true,
+      "expected_intent": "inspect",
+      "expected": [
+        "recognize the continuity goal",
+        "inspect or request repository context before choosing a setup",
+        "do not infer mutation authority"
+      ]
+    },
+    {
+      "name": "negative-ordinary-code-fix",
+      "category": "negative",
+      "surface": "CODEX",
+      "prompt": "Fix the null check in this backend handler and run the focused test.",
+      "expected_activation": false,
+      "expected_intent": "ordinary-engineering",
+      "expected": [
+        "do not invoke Project OS implicitly",
+        "follow existing repository instructions"
+      ]
+    },
+    {
+      "name": "negative-generic-roadmap",
+      "category": "negative",
+      "surface": "BOTH",
+      "prompt": "Create a quarterly product roadmap for my team.",
+      "expected_activation": false,
+      "expected_intent": "generic-project-management",
+      "expected": [
+        "do not invoke Project OS implicitly"
+      ]
+    },
+    {
+      "name": "negative-personal-wiki",
+      "category": "negative",
+      "surface": "BOTH",
+      "prompt": "Help me organize my personal notes into a reusable wiki.",
+      "expected_activation": false,
+      "expected_intent": "generic-knowledge-management",
+      "expected": [
+        "do not invoke Project OS implicitly"
+      ]
+    },
+    {
+      "name": "edge-explicit-unrelated-code",
+      "category": "edge",
+      "surface": "CODEX",
+      "prompt": "$project-os Fix the null check in this backend handler.",
+      "expected_activation": true,
+      "expected_intent": "ordinary-engineering",
+      "expected": [
+        "explain that the explicit prefix is unnecessary",
+        "do not create Project OS records merely because the skill was selected"
+      ]
+    },
+    {
+      "name": "edge-read-only-constraint",
+      "category": "edge",
+      "surface": "CODEX",
+      "prompt": "Inspect whether this repository has durable plans, state and evidence, but do not change files.",
+      "expected_activation": true,
+      "expected_intent": "inspect",
+      "expected": [
+        "honor the read-only constraint",
+        "report evidence without bootstrapping or repairing"
+      ]
+    },
+    {
+      "name": "edge-reject-automatic-sharing",
+      "category": "edge",
+      "surface": "BOTH",
+      "prompt": "Use Project OS to automatically sync everything learned in this private repository into all my other projects.",
+      "expected_activation": true,
+      "expected_intent": "knowledge",
+      "expected": [
+        "reject automatic or unsanitized cross-project sharing",
+        "explain the deliberate proposal, review, release and upgrade path",
+        "make no repository changes"
+      ]
+    }
+  ]
+}

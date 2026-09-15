@@ -83,6 +83,38 @@ def write_program_definition(root: Path) -> Path:
 
 
 class KnowledgeAssetTest(unittest.TestCase):
+    def test_discovery_golden_set_covers_routing_boundaries(self) -> None:
+        discovery = json.loads(
+            (ROOT / "skills" / "project-os" / "evals" / "discovery.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        cases = discovery["cases"]
+        self.assertEqual(discovery["schema_version"], 1)
+        self.assertEqual(
+            {case["category"] for case in cases},
+            {"direct", "indirect", "incomplete", "negative", "edge"},
+        )
+        self.assertEqual(len({case["name"] for case in cases}), len(cases))
+        for case in cases:
+            self.assertIn(case["surface"], {"CHATGPT", "CODEX", "BOTH"})
+            self.assertIsInstance(case["expected_activation"], bool)
+            self.assertTrue(case["expected_intent"])
+            self.assertTrue(case["expected"])
+        self.assertTrue(
+            all(
+                not case["expected_activation"]
+                for case in cases
+                if case["category"] == "negative"
+            )
+        )
+        self.assertTrue(
+            any(
+                case["category"] == "indirect" and case["expected_activation"]
+                for case in cases
+            )
+        )
+
     def test_submission_cases_cover_positive_and_negative_workflows(self) -> None:
         submission = json.loads(
             (ROOT / "skills" / "project-os" / "evals" / "submission.json").read_text(
@@ -157,25 +189,41 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.0.4")
+        self.assertEqual(PROJECT_OS.VERSION, "2.0.5")
         self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 3)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
         self.assertEqual(portable["name"], compatibility["name"])
+        self.assertEqual(portable["description"], compatibility["description"])
+        self.assertEqual(portable["keywords"], compatibility["keywords"])
         portable_interface = portable["extensions"]["com.openai"]["interface"]
         self.assertEqual(
             portable_interface["defaultPrompt"],
             compatibility["interface"]["defaultPrompt"],
         )
-        for key in ("brandColor", "brandColorDark", "composerIcon", "logo"):
+        for key in ("brandColor", "composerIcon", "logo"):
             self.assertEqual(
                 portable_interface[key], compatibility["interface"][key], key
             )
         self.assertEqual(portable_interface["brandColor"], "#789F25")
-        self.assertEqual(portable_interface["brandColorDark"], "#B7F34A")
+        for interface in (portable_interface, compatibility["interface"]):
+            self.assertNotIn("brandColorDark", interface)
+            self.assertNotIn("supportURL", interface)
+        self.assertEqual(portable_interface["shortDescription"], "Resume engineering work")
         self.assertLessEqual(len(portable_interface["shortDescription"]), 30)
+        self.assertEqual(
+            portable_interface["capabilities"],
+            [
+                "Resume work across sessions",
+                "Inspect and connect repositories",
+                "Validate, repair and upgrade state",
+                "Capture reusable failure knowledge",
+            ],
+        )
+        for key in ("shortDescription", "longDescription", "capabilities"):
+            self.assertEqual(portable_interface[key], compatibility["interface"][key])
         self.assertTrue(portable_interface["developerName"].strip())
-        for key in ("websiteURL", "privacyPolicyURL", "termsOfServiceURL", "supportURL"):
+        for key in ("websiteURL", "privacyPolicyURL", "termsOfServiceURL"):
             self.assertTrue(portable_interface[key].startswith("https://"), key)
 
         def relative_luminance(color: str) -> float:
@@ -195,9 +243,6 @@ class KnowledgeAssetTest(unittest.TestCase):
             return (bright + 0.05) / (dark + 0.05)
 
         self.assertGreaterEqual(contrast(portable_interface["brandColor"], "#FFFFFF"), 2)
-        self.assertGreaterEqual(
-            contrast(portable_interface["brandColorDark"], "#212121"), 2
-        )
         for key in ("composerIcon", "logo"):
             asset = ROOT / portable_interface[key].removeprefix("./")
             self.assertTrue(asset.is_file(), asset)
@@ -218,6 +263,15 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertIn('icon_small: "./assets/icon-small.svg"', skill_interface)
         self.assertIn('icon_large: "./assets/icon-large.svg"', skill_interface)
         self.assertIn('brand_color: "#789F25"', skill_interface)
+        self.assertIn('display_name: "Engineering Project OS"', skill_interface)
+        skill_short = re.search(r'^  short_description: "([^"]+)"$', skill_interface, re.MULTILINE)
+        self.assertIsNotNone(skill_short)
+        self.assertGreaterEqual(len(skill_short.group(1)), 25)
+        self.assertLessEqual(len(skill_short.group(1)), 64)
+        skill_prompt = re.search(r'^  default_prompt: "([^"]+)"$', skill_interface, re.MULTILINE)
+        self.assertIsNotNone(skill_prompt)
+        self.assertIn("$project-os", skill_prompt.group(1))
+        self.assertIn("overview", skill_prompt.group(1))
         self.assertNotIn("products:", skill_interface)
         self.assertIn("allow_implicit_invocation: true", skill_interface)
         self.assertTrue(
@@ -227,7 +281,7 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertEqual(
             portable_interface["defaultPrompt"],
             [
-                "Help me choose the right Project OS setup for my project.",
+                "What does Project OS do, how does it work and when should I use it?",
                 "Create a safe Project OS starter package for my project.",
                 "Review my existing Project OS setup and tell me what to fix.",
             ],
@@ -237,6 +291,8 @@ class KnowledgeAssetTest(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("@Engineering Project OS", skill_text)
+        self.assertIn("`overview`: read-only product explanation", skill_text)
+        self.assertIn("Do not imply a hidden database or automatic learning", skill_text)
         self.assertIn("never inspect an empty host workspace", skill_text.lower())
         self.assertIn("may begin from the user's project description", skill_text)
         self.assertNotIn("products", marketplace["plugins"][0]["policy"])
@@ -272,15 +328,20 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
         packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
         self.assertIn(f"Project OS {PROJECT_OS.VERSION}", packaging)
-        self.assertIn("Directory version 2.0.4 is public", packaging)
+        self.assertIn("Directory version 2.0.4 remains public", packaging)
         self.assertIn("Versions 2.0.2 and 2.0.3 were intermediate Directory-only releases", packaging)
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [2.0.5] - 2026-09-15", changelog)
         self.assertIn("## [2.0.4] - 2026-09-14", changelog)
         self.assertIn("## 2.0.3 - 2026-09-14 - Universal Plugin Directory only", changelog)
         self.assertIn("## 2.0.2 - 2026-09-14 - Universal Plugin Directory only", changelog)
         self.assertNotIn("[2.0.3]:", changelog)
         self.assertIn(
             "[2.0.4]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.1...v2.0.4",
+            changelog,
+        )
+        self.assertIn(
+            "[2.0.5]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.4...v2.0.5",
             changelog,
         )
         self.assertNotIn("GitHub 2.0.3 release line", changelog)
@@ -1847,7 +1908,7 @@ class UpgradeTest(unittest.TestCase):
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
             self.assertEqual(system["schema_version"], 3)
             self.assertEqual(system["mode"], "standard")
-            self.assertEqual(system["project_os_version"], "2.0.4")
+            self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)
 
     def test_current_upgrade_is_byte_preserving_even_with_an_old_generated_date(self) -> None:

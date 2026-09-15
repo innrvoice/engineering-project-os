@@ -4,6 +4,23 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.5] - 2026-09-15
+
+### Added
+
+- Added a read-only `overview` route that explains what Project OS does, how it works and when a developer should use it without requiring repository files.
+- Added a discovery golden set with direct, indirect, incomplete, negative and edge cases for ChatGPT and Codex activation checks.
+- Added an explicit cross-project failure-knowledge lifecycle that keeps project evidence local, sanitizes reusable lessons and requires deliberate review before reuse.
+
+### Changed
+
+- Replaced the first Directory starter prompt with a product overview while retaining starter-package creation and existing-setup review as the other two entry points.
+- Tightened plugin and skill metadata around resumable engineering work, repository continuity, evidence and reusable failure knowledge.
+- Replaced the previous identity mark with a filled Resume symbol and refreshed the repository and social-preview artwork around the 2.0.5 positioning.
+- Reworked the README and architectural explanation for developers so the audience, immediate benefits and compounding knowledge value are clear before setup details.
+- Documented conservative implicit activation for clear Project OS continuity requests while excluding ordinary coding and generic project management.
+- Kept technical setup, usage, reference and packaging guidance synchronized with the 2.0.5 behavior and release gates.
+
 ## [2.0.4] - 2026-09-14
 
 ### Changed
@@ -110,3 +127,4 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 [2.0.0]: https://github.com/innrvoice/engineering-project-os/compare/v1.0.1...v2.0.0
 [2.0.1]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.0...v2.0.1
 [2.0.4]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.1...v2.0.4
+[2.0.5]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.4...v2.0.5

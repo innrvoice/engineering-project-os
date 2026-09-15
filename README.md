@@ -4,7 +4,11 @@
 
 [Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 
-The current Universal Plugin Directory and source-tree version is 2.0.4.
+The source-tree release is 2.0.5. The Directory page shows the version currently available for installation.
+
+Project OS is for developers who need AI-assisted engineering work to survive the next session.
+
+It keeps context, decisions, plans, evidence and failure knowledge inside the repository, so ChatGPT and Codex can continue from verified state instead of starting over.
 
 The difficult part was rarely the first task. It was the fifth one.
 
@@ -12,18 +16,37 @@ I would reopen a repository, reconstruct what had already been decided, search f
 
 Chat history is a poor project database.
 
-Engineering Project OS keeps that working state with the repository. It adds a small, visible control plane for durable context, current checkpoints, plans, findings, evidence and reusable failure knowledge. ChatGPT can help from a project description, selected files or a repository snapshot. Codex can work directly in an open repository workspace. Either way, a new chat can resume from verified repository state instead of treating an old conversation as current truth.
+Engineering Project OS adds a small, visible control plane to the repository. ChatGPT can help from a project description, selected files or a repository snapshot. Codex can work directly in an open repository workspace. Either way, a new chat can read current repository truth instead of treating an old conversation as current state.
+
+## What you get
+
+- Resume work from verified repository state instead of reconstructing context from old chats.
+- Preserve decisions, checkpoints and evidence alongside the code.
+- Preview Project OS changes before applying them.
+- Keep long engineering work organized across sessions and agents.
+- Turn confirmed failures into reusable knowledge.
+- Carry reviewed failure patterns into other projects without copying private project history.
 
 It is stack-agnostic. A TypeScript frontend, Python service, Clojure backend, native mobile app or mixed monorepo uses the same core system. Repository evidence selects only the capability guidance that fits its real boundaries.
 
+## Knowledge that compounds
+
+A failed approach should not disappear into a closed chat. Project OS can record the finding, preserve the evidence and turn a confirmed mechanism into project knowledge with its trigger, prevention, decisive verification and applicability boundaries.
+
+Project knowledge stays with its repository and may retain local context. When a mechanism is useful beyond that project, Project OS can prepare a sanitized portable lesson. Project names, credentials, personal data, private URLs, machine paths and product history must be removed before human review.
+
+An approved portable lesson can enter the shared failure knowledge library in a reviewed Project OS release. Another repository receives it only through an explicit upgrade or knowledge synchronization. Nothing uploads, learns or synchronizes between projects in the background.
+
+The first repository records the lesson. The next repository does not need to repeat the failure.
+
 ## Start with these requests
 
-These are the normal Project OS entry points.
+The first request explains the product without requiring repository files. The other two begin a concrete setup or review workflow.
 
 **In ChatGPT, choose one of these starter requests:**
 
 ~~~text
-@Engineering Project OS Help me choose the right Project OS setup for my project.
+@Engineering Project OS What does Project OS do, how does it work and when should I use it?
 @Engineering Project OS Create a safe Project OS starter package for my project.
 @Engineering Project OS Review my existing Project OS setup and tell me what to fix.
 ~~~
@@ -31,7 +54,7 @@ These are the normal Project OS entry points.
 **In Codex, open the repository workspace, then type:**
 
 ~~~text
-$project-os help
+$project-os overview
 $project-os inspect
 $project-os bootstrap
 $project-os check
@@ -39,12 +62,13 @@ $project-os check
 
 `@Engineering Project OS` explicitly selects the plugin or bundled skill in ChatGPT. `$project-os` selects the bundled skill in Codex. Neither form is a Terminal command, environment variable or permanent mode. The remaining text is an ordinary natural-language request. It can be short, detailed and written in any language.
 
-In ChatGPT, setup advice can begin from a project description. A review of an existing setup needs its actual files, usually `AGENTS.md` and `.agents/`. A full repository ZIP is optional and useful only when the whole tree matters. Project OS does not pretend that an empty host workspace is the repository. In Codex, the selected workspace provides that context.
+The overview needs no project input. In ChatGPT, starter-package advice can begin from a project description. A review of an existing setup needs its actual files, usually `AGENTS.md` and `.agents/`. A full repository ZIP is optional and useful only when the whole tree matters. Project OS does not pretend that an empty host workspace is the repository. In Codex, the selected workspace provides that context.
 
 The exact Codex skill name is `project-os` with a hyphen. `$project os` is not the same invocation.
 
 The examples above are recommended phrases, not a rigid command parser:
 
+- `$project-os overview` explains who Project OS is for, what it does and which workflow to choose without inspecting or changing a repository.
 - `$project-os check` runs the same read-only workflow as a longer request to validate the current repository and report errors.
 - `$project-os check only the plan registry` narrows that request.
 - `$project-os проверь Project OS и ничего не меняй` expresses the same intent in Russian.
@@ -109,7 +133,7 @@ This is the primary installation route for ChatGPT and Codex.
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.4/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.5/skills/project-os
 ~~~
 
 - Result: Codex installs the versioned standalone skill in the local Codex profile.
@@ -128,7 +152,7 @@ In Codex, open the target repository as the task workspace.
 **Type this in ChatGPT:**
 
 ~~~text
-@Engineering Project OS Help me choose the right Project OS setup for my project.
+@Engineering Project OS Create a safe Project OS starter package for my project.
 ~~~
 
 **Type this in Codex:**

@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Only Project OS 2.0.4 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
+Only Project OS 2.0.5 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
 
 ## Report a vulnerability
 
@@ -20,7 +20,7 @@ Include:
 
 ## Runtime boundary
 
-The 2.0.4 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config` or `--definition` may also read that user-selected file outside the target. Mutating operations write only inside the target repository. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
+The 2.0.5 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config` or `--definition` may also read that user-selected file outside the target. Mutating operations write only inside the target repository. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
 
 Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database or automatic cross-project synchronization. The helper runs only when a person, ChatGPT or Codex invokes it.
 
