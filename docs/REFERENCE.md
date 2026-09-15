@@ -1,6 +1,6 @@
 # Reference
 
-This is the technical contract for Project OS 2.0.4. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.0.5. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
@@ -19,7 +19,7 @@ The ChatGPT Directory listing exposes three outcome-focused starter prompts:
 
 | Starter prompt | Required initial context |
 | --- | --- |
-| `Help me choose the right Project OS setup for my project.` | Project description or relevant files |
+| `What does Project OS do, how does it work and when should I use it?` | None |
 | `Create a safe Project OS starter package for my project.` | Project description and any existing authority files |
 | `Review my existing Project OS setup and tell me what to fix.` | Existing `AGENTS.md` and `.agents/` files or a relevant project bundle |
 
@@ -29,6 +29,7 @@ The helper lives at `scripts/project_os.py` inside the installed skill. Terminal
 
 | Shortcut | Required argument | Behavior |
 | --- | --- | --- |
+| `overview` | None | Read-only explanation of the developer audience, benefits, knowledge model and next useful workflow |
 | `help` | None | Read-only menu of every shortcut and Terminal distinction |
 | `inspect` | None | Read-only repository and control-plane inspection |
 | `bootstrap` | None | Create Standard after a clean dry run |
@@ -340,7 +341,7 @@ For `sync-knowledge`, omitted selection flags use `SYSTEM.json`. Explicit select
 
 Release and file-format versions are separate:
 
-- Release 2.0.4 identifies the installed skill, helper, package metadata, connected `project_os_version` and managed knowledge provenance.
+- Release 2.0.5 identifies the installed skill, helper, package metadata, connected `project_os_version` and managed knowledge provenance.
 - `SYSTEM.schema_version` is 3.
 - Knowledge registries retain their own `schema_version: 1`.
 - The version in the external `$schema` URL inside `plugin.json` belongs to that external schema, not to the Project OS release.

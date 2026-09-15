@@ -2,13 +2,31 @@
 
 I built Project OS after repeating the same recovery ritual too many times. The repository still had the code, but the next conversation did not know which decision was current, which check had actually passed or which "done" item still depended on a deployment or a person.
 
-Project OS solves that problem with a reusable plugin, one visible repository contract and ordinary files. The bundled skill knows how to create and maintain the system. The repository files keep the working truth after a conversation ends.
+The usual answer was to reconstruct everything from chat history. That worked until the history became long, the task crossed several sessions or one apparently successful check turned out to prove less than I remembered.
+
+Project OS is for developers who want AI-assisted engineering work to survive that boundary. It solves the problem with a reusable plugin, one visible repository contract and ordinary files. The bundled skill knows how to create and maintain the system. The repository files keep the working truth after a conversation ends.
+
+The immediate benefit is continuity. Decisions, checkpoints, plans and evidence stay with the code. The longer-term benefit is compounding knowledge: a confirmed failure can become a lesson that the same repository remembers and, after deliberate sanitization and review, another repository can reuse.
 
 ChatGPT and Codex can use the same plugin from the Universal Plugin Directory. They do not receive repository context in the same way. ChatGPT works with the project description and files supplied in the chat. Codex works with the local workspace selected for the task. Installing the plugin alone grants neither surface automatic access to a repository.
 
 ## Selecting Project OS
 
 In ChatGPT, `@Engineering Project OS` selects the plugin for the current message. In Codex, `$project-os` selects its bundled skill. Neither form is shell syntax, an environment variable, a Python command or a mode that stays enabled.
+
+The overview is the simplest first request. It explains the product, its benefits and the next useful workflow without inspecting a repository or asking for files.
+
+**Type this in ChatGPT:**
+
+~~~text
+@Engineering Project OS What does Project OS do, how does it work and when should I use it?
+~~~
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os overview
+~~~
 
 **Type this in ChatGPT after attaching the existing Project OS files:**
 
@@ -31,6 +49,7 @@ The words after the skill name are normal language. Project OS publishes short r
 
 | Codex message | Interpretation |
 | --- | --- |
+| `$project-os overview` | Explain who Project OS is for, what it provides and what to do next without reading or changing a repository |
 | `$project-os check` | Validate the current control plane without writing |
 | `$project-os check only plan state` | Run the same check with extra focus |
 | `$project-os проверь систему и ничего не меняй` | Read-only check expressed in Russian |
@@ -40,7 +59,7 @@ The words after the skill name are normal language. Project OS publishes short r
 
 Case, punctuation and explanatory sentences may vary. A clear user constraint such as `do not change files` always keeps the request read-only. A variant is accepted when its intent is clear. An ambiguous mutation is not guessed.
 
-`$project-os help` is also always read-only. It returns every supported short request with its purpose, required argument and examples, then distinguishes those chat requests from Terminal helper commands.
+`$project-os overview` and `$project-os help` are both read-only, but they serve different readers. Overview explains the product and recommends a next step. Help returns every supported short request with its purpose, required argument and examples, then distinguishes those chat requests from Terminal helper commands.
 
 The package allows implicit invocation so the selected plugin can expose its skill when a request clearly concerns Project OS. Explicit `@Engineering Project OS` or `$project-os` invocation remains the clearest route. Unrelated work must not create Project OS records merely because the plugin is installed.
 
@@ -153,6 +172,25 @@ Whether evidence actually proves the Program outcome is a user and Codex judgmen
 
 Do not duplicate one status in several files. `STATE.md` is a handoff, not a diary. `CONTEXT.md` is not an active task list.
 
+## How failure knowledge becomes reusable
+
+This is the part of Project OS that is easiest to underestimate. Context and plans help the next session continue. Failure knowledge can help the next project avoid paying for the same lesson again.
+
+The lifecycle is deliberate:
+
+1. A finding records the observed failure, its impact, current evidence and the next decisive check without pretending that a hypothesis is already a cause.
+2. After the mechanism is confirmed, `knowledge capture` creates project knowledge with applicability, trigger, mechanism, prevention, decisive verification and scope boundaries.
+3. `knowledge propose-shared` prepares a read-only portable draft and removes project names, credentials, personal data, private paths, private URLs, deployment identifiers and copied product history.
+4. A person reviews whether the remaining mechanism is both safe and useful. If sanitization makes it misleading, the lesson stays project-specific.
+5. A reviewed Project OS release can include the approved lesson in its shared failure knowledge library.
+6. Another repository receives that managed lesson only through an explicit Project OS upgrade or knowledge synchronization.
+
+`failure -> finding -> confirmed project lesson -> sanitized portable lesson -> human review -> Project OS release -> explicit upgrade in another repository`
+
+The first repository records the lesson. The next repository does not need to repeat the failure.
+
+This is shared knowledge without hidden sharing. Project evidence stays local, promotion is reviewed and every receiving repository changes through an explicit conflict-checked operation.
+
 ## What the helper does
 
 The helper provides deterministic operations:
@@ -199,11 +237,11 @@ Project OS has no:
 - automatic Git operation;
 - automatic cross-project synchronization.
 
-No repository learns from another repository by itself. A portable failure lesson moves only after deliberate sanitization, inclusion in a reviewed Project OS release and an explicit repository upgrade. Local additions and conflicts remain visible for review.
+No repository learns from another repository by itself. Local additions and conflicts remain visible for review.
 
 ## Versions and upgrades
 
-The installed helper defines the Project OS release version. Release 2.0.4 uses `SYSTEM.schema_version: 3` and `SYSTEM.mode: standard|program`. Knowledge registries have their own schema version.
+The installed helper defines the Project OS release version. Release 2.0.5 uses `SYSTEM.schema_version: 3` and `SYSTEM.mode: standard|program`. Knowledge registries have their own schema version.
 
 Updating the Directory plugin or standalone skill does not update repositories. `$project-os upgrade` inspects the old state, previews every managed file change, preserves project-owned records, aborts on managed conflicts, applies only a clean preview with caught-failure rollback and runs the checker. In ChatGPT, the same workflow operates on supplied file copies and returns artifacts that still need deliberate application to the repository.
 

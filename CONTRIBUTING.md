@@ -100,7 +100,7 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - every bundled lesson's release provenance and content hash;
 - CI assertions, fixtures, documentation and release notes.
 
-Project OS 2.0.4 uses `SYSTEM.schema_version: 3`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Project OS 2.0.5 uses `SYSTEM.schema_version: 3`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 

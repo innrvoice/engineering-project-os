@@ -151,7 +151,7 @@ class AuditRegressionTests(unittest.TestCase):
             self.assertEqual(run_cli("init", "--target", str(root)).returncode, 0)
             system_path = root / ".agents/SYSTEM.json"
             value = json.loads(system_path.read_text())
-            value["project_os_version"] = "2.0.5"
+            value["project_os_version"] = "2.0.6"
             system_path.write_text(json.dumps(value, indent=2) + "\n")
             before = file_hashes(root)
             for dry_run in (False, True):

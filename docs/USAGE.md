@@ -15,7 +15,7 @@ The detailed short request menu below uses Codex syntax. In ChatGPT, select `@En
 
 | Intent | ChatGPT | Codex |
 | --- | --- | --- |
-| Choose setup | `@Engineering Project OS Help me choose the right Project OS setup for my project.` | `$project-os inspect` |
+| Understand Project OS | `@Engineering Project OS What does Project OS do, how does it work and when should I use it?` | `$project-os overview` |
 | Create starter package | `@Engineering Project OS Create a safe Project OS starter package for my project.` | `$project-os bootstrap` |
 | Review existing setup | Attach `AGENTS.md` and `.agents/`, then send `@Engineering Project OS Review my existing Project OS setup and tell me what to fix.` | `$project-os check` |
 
@@ -24,6 +24,25 @@ ChatGPT returns analysis or changed file artifacts in the chat. Apply those arti
 Most engineering work in a connected repository does not need `$project-os`.
 
 Use ordinary chat for the product and its code. Invoke `$project-os` when the object you want to create, inspect or change is the repository's Project OS control plane.
+
+## Understand Project OS before connecting a repository
+
+**Type this in ChatGPT:**
+
+~~~text
+@Engineering Project OS What does Project OS do, how does it work and when should I use it?
+~~~
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os overview
+~~~
+
+- Result: Project OS explains the developer audience, practical benefits, repository-local state, reusable failure knowledge and the next suitable workflow.
+- Files: none change and no repository input is required.
+- Proof: the response distinguishes project knowledge from reviewed shared knowledge and does not claim automatic cross-project learning.
+- Skip it when: you already know whether you need a starter package, an existing-setup review or another Project OS operation.
 
 ## Ask for the Codex menu
 
@@ -46,6 +65,7 @@ These are recommended natural-language shortcuts. They are not a strict command 
 
 | Short request | Purpose | Required text |
 | --- | --- | --- |
+| `$project-os overview` | Explain Project OS, its benefits and useful next steps | None |
 | `$project-os help` | Show the read-only menu | None |
 | `$project-os inspect` | Inspect repository and recommend setup or maintenance | None |
 | `$project-os bootstrap` | Create a Standard control plane | None |
@@ -82,8 +102,7 @@ That is still a check. If the intent is ambiguous, Codex shows relevant help or 
 **Type this in Codex chat:**
 
 ~~~text
-Find why the orders endpoint repeats the final item on two cursor pages. Fix the verified cause
-without changing the response schema and run the focused tests.
+Find why the orders endpoint repeats the final item on two cursor pages. Fix the verified cause without changing the response schema and run the focused tests.
 ~~~
 
 - Result: Codex follows the repository's `AGENTS.md`, reads only relevant records and works on the application normally.
@@ -319,7 +338,16 @@ $project-os knowledge propose-shared: FAIL-PROJECT-012
 - Proof: project names, credentials, personal data, private paths, private URLs and product history are absent while the mechanism and limits remain intact.
 - Skip it when: the lesson depends on a repository-specific contract.
 
-Shared knowledge never travels to another repository automatically.
+Shared knowledge never travels to another repository automatically. The complete reuse path is:
+
+1. Record the observed failure as a finding with evidence and a decisive next check.
+2. Confirm the mechanism, then capture a project lesson.
+3. Propose a sanitized portable lesson without writing or publishing it.
+4. Review the proposal for privacy, portability, accuracy and useful scope boundaries.
+5. Include an approved lesson in a reviewed Project OS release.
+6. Install that release and run an explicit upgrade in another connected repository or synchronize managed knowledge when the repository already matches the release.
+
+The receiving repository gets the reusable mechanism, prevention, verification and boundaries. It does not get the source project's name, credentials, private paths, private URLs, deployment identifiers or copied history.
 
 ## Upgrade
 
@@ -333,7 +361,7 @@ $project-os upgrade
 
 - Result: Codex inspects release, schema and Program state, previews every managed file change, applies only a conflict-free result with caught-failure rollback and runs the checker.
 - Files: version and schema metadata, managed guidance, managed shared knowledge and an explicitly required lifecycle migration may change. Project-owned state and application code remain intact.
-- Proof: the checker passes at release 2.0.4 and a repeated dry run reports no pending changes.
+- Proof: the checker passes at release 2.0.5 and a repeated dry run reports no pending changes.
 - Skip it when: the installed checker already passes and the repository is current.
 
 A legacy Program whose state cannot be proved is a decision boundary, not something Codex guesses. For a closed legacy Program, Codex also requires the actual closure date in `YYYY-MM-DD` form and derives it only from repository evidence.

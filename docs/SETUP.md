@@ -34,13 +34,13 @@ To update the Directory plugin, install the new published version when it appear
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.4/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.5/skills/project-os
 ~~~
 
 - Result: Codex installs the complete versioned skill in the local profile.
 - Files: the user-level skill directory changes; the open repository does not.
 - Proof: start a new Codex task and confirm that `project-os` is available.
-- Skip it when: release 2.0.4 is already installed in this profile.
+- Skip it when: release 2.0.5 is already installed in this profile.
 
 The URL is pinned to a release tag and does not follow `main` automatically. This route installs the skill in Codex only. It does not install the plugin in ChatGPT.
 
@@ -51,10 +51,10 @@ An installed skill is replaced as one directory. It is not merged file by file.
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.0.4/skills/project-os and replace only that installed skill; do not change any repository.
+$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.0.5/skills/project-os and replace only that installed skill; do not change any repository.
 ~~~
 
-- Result: Codex replaces the installed `project-os` directory with release 2.0.4.
+- Result: Codex replaces the installed `project-os` directory with release 2.0.5.
 - Files: only the user-level skill installation changes.
 - Proof: start a new Codex task so Codex rebuilds its available-skill list.
 - Skip it when: the installed skill already comes from the same tag.
@@ -70,7 +70,7 @@ Describe the project or attach the files relevant to the requested workflow. Cho
 **Choose a starter request in ChatGPT:**
 
 ~~~text
-@Engineering Project OS Help me choose the right Project OS setup for my project.
+@Engineering Project OS What does Project OS do, how does it work and when should I use it?
 @Engineering Project OS Create a safe Project OS starter package for my project.
 @Engineering Project OS Review my existing Project OS setup and tell me what to fix.
 ~~~
@@ -215,8 +215,8 @@ $project-os upgrade
 
 - Result: Codex inspects the current schema and Program state, runs the helper upgrade as a dry run, reviews every managed change, applies only a clean transaction and runs the checker.
 - Files: Project OS version and schema metadata, managed guidance, managed shared knowledge and any explicitly required lifecycle migration may change. Project-owned context, state, plans, findings, evidence and application code are preserved.
-- Proof: the final checker passes, the repository reports release 2.0.4 and a repeated dry run has no pending changes.
-- Skip it when: the repository already passes the installed 2.0.4 checker.
+- Proof: the final checker passes, the repository reports release 2.0.5 and a repeated dry run has no pending changes.
+- Skip it when: the repository already passes the installed 2.0.5 checker.
 
 A schema 2 repository with the former basic setup upgrades directly to Standard. If a legacy `PROGRAM.md` exists, Codex must determine whether it is active or already closed from repository evidence. It does not guess. A closed contract is archived with an explicit `completed` or `stopped` disposition and its verified actual closure date; an active contract remains active in Program mode. If repository evidence does not establish the closure date, Codex stops for that decision instead of using the migration date.
 

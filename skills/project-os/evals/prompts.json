@@ -2,6 +2,17 @@
   "schema_version": 1,
   "cases": [
     {
+      "name": "overview-needs-no-repository-input",
+      "prompt": "$project-os overview",
+      "expected": [
+        "explain that Project OS is for developers whose AI-assisted work spans sessions",
+        "lead with continuity, evidence, safe previews and reusable failure knowledge",
+        "distinguish local project knowledge from sanitized reviewed shared knowledge",
+        "recommend useful next steps for ChatGPT and Codex",
+        "do not ask for repository files, inspect a workspace or make changes"
+      ]
+    },
+    {
       "name": "chatgpt-missing-repository-input-stops",
       "prompt": "@Engineering Project OS Review my existing Project OS setup and tell me what to fix.",
       "expected": [

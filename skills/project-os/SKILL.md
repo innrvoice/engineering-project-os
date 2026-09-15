@@ -1,6 +1,6 @@
 ---
 name: project-os
-description: Inspect, bootstrap, adopt, validate, upgrade or maintain a repository-local engineering operating system using AGENTS.md and .agents state, Programs, plans, findings, evidence and reusable failure knowledge. Use when the user explicitly wants to set up or operate that control plane. Do not use for ordinary coding in a repository with a healthy workflow.
+description: Explain, inspect, bootstrap, adopt, validate, upgrade or maintain a repository-local engineering operating system that keeps context, plans, state, evidence and reusable knowledge available across ChatGPT and Codex sessions. Use when the user explicitly asks for Project OS or clearly wants repository-local continuity, a safe engineering handoff or resumable work across sessions. Do not use for ordinary coding in a repository with a healthy workflow or for generic project management.
 ---
 
 # Project OS
@@ -21,6 +21,7 @@ Before inspecting or changing a repository, identify the available project input
 
 Treat the following as canonical, memorable prompts rather than parser tokens:
 
+- `overview`: read-only product explanation. No argument or repository input.
 - `help`: read-only menu. No argument.
 - `inspect`: read-only repository and setup inspection. No argument.
 - `bootstrap`: create Standard. No argument.
@@ -41,6 +42,8 @@ Treat the following as canonical, memorable prompts rather than parser tokens:
 - `knowledge propose-shared: <lesson-id>`: require a project lesson and remain read-only.
 
 Additional text, synonyms, punctuation and another language may refine the same intent. Prefer the clear intended operation over exact wording. A user constraint such as `do not change files` always keeps the request read-only.
+
+For `overview`, never inspect a repository, ask for files or write anything. Explain that Project OS is for developers whose AI-assisted engineering work spans sessions. Lead with the practical benefits: resume from verified repository state, preserve decisions and evidence, preview control-plane changes and turn confirmed failures into reusable knowledge. Explain that project knowledge stays local while a sanitized portable lesson reaches another repository only through human review, inclusion in a Project OS release and an explicit upgrade or synchronization. Do not imply a hidden database or automatic learning. End with concise next steps for ChatGPT and Codex.
 
 For `help`, never write files or run an applying helper operation. Return a concise menu of every supported short request above, its purpose, required argument and one or two examples. Explicitly separate requests typed in Codex chat from Python helper commands run in Terminal.
 
@@ -63,7 +66,7 @@ When upgrading a closed legacy Program, require its actual closure date in canon
 - For `inspect`, `bootstrap` or `adopt`, read [bootstrap.md](references/bootstrap.md).
 - For `check`, `repair`, `upgrade`, Program lifecycle or plan lifecycle, read [maintenance.md](references/maintenance.md).
 - For findings or failure knowledge, read [knowledge.md](references/knowledge.md).
-- `help` is fully specified above and does not require loading every reference.
+- `overview` and `help` are fully specified above and do not require loading every reference.
 
 ## Mutation protocol
 
