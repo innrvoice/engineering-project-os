@@ -1,26 +1,26 @@
 # Reference
 
-This is the technical contract for Project OS 2.1.0. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.1.1. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
 | Interface | Used for | Invocation |
 | --- | --- | --- |
-| ChatGPT plugin | Setup advice from a project description and workflows over files supplied in the conversation | `@Engineering Project OS ...` with the needed project context |
-| Codex plugin or standalone skill | Reasoned workflows in the selected local workspace | `$project-os ...` in Codex chat |
-| Python helper | Deterministic setup, validation, upgrade, Program transitions and reusable knowledge operations | `project_os.py ...` in Terminal |
+| Codex plugin or standalone skill | Repository-native workflows in the selected local workspace | `$project-os ...` in Codex chat |
 | Repository records | Durable context, state, plans, findings, evidence and knowledge | `AGENTS.md` and `.agents/` files |
+| Python helper | Deterministic setup, validation, upgrade, Program transitions and reusable knowledge operations | `project_os.py ...` in Terminal |
+| ChatGPT companion | Explanations and workflows over project files or portable bundles supplied in the conversation | `@Engineering Project OS ...` with the needed material |
 
-`@Engineering Project OS` in ChatGPT and `$project-os` in Codex select the same bundled skill for one message. Text after the selector is natural language, not a helper command line or rigid parser. This release enables implicit invocation so the selected plugin can expose the skill for a clear Project OS request.
+Engineering Project OS was built for Codex. `$project-os` selects the bundled skill for one Codex message while `@Engineering Project OS` selects the ChatGPT companion. Text after either selector is natural language, not a helper command line or rigid parser. This release enables implicit invocation so the selected plugin can expose the skill for a clear Project OS request.
 
-Installation and repository access are separate. ChatGPT can use only the project description and files available in the chat. Choosing a setup or creating a starter package can begin from a description. Reviewing an existing setup requires its actual Project OS files. Codex can use the local workspace selected for the task. Neither surface gains repository access from installation alone.
+Installation and repository access are separate. Codex can use only the local workspace selected for the task. ChatGPT can use only the project description, files and portable bundles available in the chat. Choosing a setup can begin from a description while reviewing an existing setup requires its actual Project OS files. Neither surface gains repository access from installation alone.
 
 The ChatGPT Directory listing exposes three outcome-focused starter prompts:
 
 | Starter prompt | Required initial context |
 | --- | --- |
-| `Tell me what Project OS does, how it works and when I should use it.` | None |
-| `Help me set up Project OS for this project and start with a safe preview.` | Project description and any existing authority files |
+| `Tell me how Project OS helps Codex resume real engineering work across sessions.` | None |
+| `Help me set up Project OS for this repository and start with a safe preview.` | Project description and any existing authority files |
 | `Help me reuse verified failure knowledge from an earlier project in this one.` | An approved reusable bundle plus destination context; Codex can also use both repositories |
 
 The helper lives at `scripts/project_os.py` inside the installed skill. Terminal examples use an absolute placeholder path so the target repository does not need its own helper copy.
@@ -165,7 +165,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.1.0",
+  "created_with": "2.1.1",
   "entries": []
 }
 ~~~
@@ -200,7 +200,7 @@ Languages and frameworks are detection signals, not behavioral profiles. Any jus
 | `init` | Unless `--dry-run` | Create Standard |
 | `adopt` | Unless `--dry-run` | Attach to compatible existing owners |
 | `check` | No | Validate structure, lifecycle, archive hashes and release alignment |
-| `sync-knowledge` | No | Explain the 2.1.0 migration to explicit user-owned import |
+| `sync-knowledge` | No | Explain the migration from deprecated synchronization language to explicit user-owned import |
 | `upgrade` | Unless `--dry-run` | Migrate to the installed release with caught-failure rollback |
 | `knowledge list` | No | List project knowledge, reusable knowledge or both |
 | `knowledge approve` | Unless `--dry-run` | Add reviewed proposal entries to the reusable registry |
@@ -357,7 +357,7 @@ Each operation must be reviewed in dry-run form, applied unchanged and followed 
 python3 /absolute/path/to/project-os/scripts/project_os.py sync-knowledge --target /path/to/repository
 ~~~
 
-In 2.1.0 this command is read-only. It explains that there is no centrally managed failure knowledge source and directs the user to `knowledge import --source`. Use `upgrade` to synchronize Project OS product guidance, packs, overlays, schema and metadata.
+This compatibility command is read-only. It explains that there is no centrally managed failure knowledge source and directs the user to `knowledge import --source`. Use `upgrade` to update Project OS product guidance, packs, overlays, schema and metadata.
 
 ### Upgrade
 
@@ -452,7 +452,7 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.1.0 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- Release 2.1.1 identifies the installed skill, helper, package metadata and connected `project_os_version`.
 - `SYSTEM.schema_version` is 4.
 - Knowledge registries retain their own `schema_version: 1`.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.

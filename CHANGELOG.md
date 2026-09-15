@@ -4,6 +4,16 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-09-15
+
+### Changed
+
+- Made `Built for Codex` the permanent product descriptor and positioned ChatGPT as a companion for explanations, supplied project files and portable knowledge bundles.
+- Rewrote the primary onboarding around concrete developer workflows: resuming long Codex work, preserving acceptance boundaries, coordinating multi-phase migrations and reusing verified failure knowledge.
+- Aligned plugin descriptions, skill metadata, capabilities, starter prompts and discovery evaluations with Codex-first activation and explicit negative cases.
+- Updated the versionless social preview with the `BUILT FOR CODEX` eyebrow while preserving the approved logo, alignment, tagline and record labels.
+- Kept schema 4, command interfaces, repository record formats and knowledge transfer formats unchanged.
+
 ## [2.1.0] - 2026-09-15
 
 ### Added
@@ -149,3 +159,4 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 [2.0.4]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.1...v2.0.4
 [2.0.5]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.4...v2.0.5
 [2.1.0]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.5...v2.1.0
+[2.1.1]: https://github.com/innrvoice/engineering-project-os/compare/v2.1.0...v2.1.1

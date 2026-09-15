@@ -114,6 +114,13 @@ class KnowledgeAssetTest(unittest.TestCase):
                 for case in cases
             )
         )
+        by_name = {case["name"]: case for case in cases}
+        self.assertEqual(by_name["direct-codex-overview"]["surface"], "CODEX")
+        self.assertEqual(by_name["direct-setup"]["surface"], "CODEX")
+        self.assertEqual(by_name["direct-chatgpt-supplied-files"]["surface"], "CHATGPT")
+        self.assertEqual(by_name["incomplete-review-without-records"]["surface"], "CHATGPT")
+        self.assertFalse(by_name["negative-ordinary-code-fix"]["expected_activation"])
+        self.assertTrue(by_name["edge-reject-automatic-sharing"]["expected_activation"])
 
     def test_submission_cases_cover_positive_and_negative_workflows(self) -> None:
         submission = json.loads(
@@ -122,7 +129,7 @@ class KnowledgeAssetTest(unittest.TestCase):
             )
         )
         cases = submission["cases"]
-        self.assertEqual(submission["products"], ["CHATGPT", "CODEX"])
+        self.assertEqual(submission["products"], ["CODEX", "CHATGPT"])
         self.assertGreaterEqual(
             sum(case["classification"] == "positive" for case in cases), 5
         )
@@ -155,13 +162,18 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.1.0")
+        self.assertEqual(PROJECT_OS.VERSION, "2.1.1")
         self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 4)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
         self.assertEqual(portable["name"], compatibility["name"])
         self.assertEqual(portable["description"], compatibility["description"])
         self.assertEqual(portable["keywords"], compatibility["keywords"])
+        self.assertEqual(
+            portable["description"],
+            "Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.",
+        )
+        self.assertLess(portable["keywords"].index("codex"), portable["keywords"].index("chatgpt"))
         portable_interface = portable["extensions"]["com.openai"]["interface"]
         self.assertEqual(
             portable_interface["defaultPrompt"],
@@ -180,14 +192,18 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertEqual(
             portable_interface["capabilities"],
             [
-                "Resume engineering work across sessions",
-                "Set up and validate repository state",
+                "Resume Codex work across sessions",
+                "Keep plans, decisions and evidence with the repository",
                 "Capture verified failure knowledge",
-                "Reuse user-owned lessons across projects",
+                "Reuse reviewed lessons across your own projects",
             ],
         )
         for key in ("shortDescription", "longDescription", "capabilities"):
             self.assertEqual(portable_interface[key], compatibility["interface"][key])
+        self.assertEqual(
+            portable_interface["longDescription"],
+            "Use this when Codex work must survive multiple sessions, preserve verified decisions and evidence or carry reviewed failure lessons into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.",
+        )
         self.assertTrue(portable_interface["developerName"].strip())
         for key in ("websiteURL", "privacyPolicyURL", "termsOfServiceURL"):
             self.assertTrue(portable_interface[key].startswith("https://"), key)
@@ -223,6 +239,13 @@ class KnowledgeAssetTest(unittest.TestCase):
             (ROOT / "assets" / "logo.svg").read_bytes(),
             (ROOT / "skills" / "project-os" / "assets" / "icon-large.svg").read_bytes(),
         )
+        social_svg = (ROOT / "assets" / "social-preview.svg").read_text(encoding="utf-8")
+        self.assertIn("BUILT FOR CODEX", social_svg)
+        self.assertNotRegex(social_svg, r"\bv?\d+\.\d+\.\d+\b")
+        social_png = (ROOT / "assets" / "social-preview.png").read_bytes()
+        self.assertEqual(social_png[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(int.from_bytes(social_png[16:20], "big"), 1280)
+        self.assertEqual(int.from_bytes(social_png[20:24], "big"), 640)
         skill_interface = (
             ROOT / "skills" / "project-os" / "agents" / "openai.yaml"
         ).read_text(encoding="utf-8")
@@ -236,8 +259,10 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertLessEqual(len(skill_short.group(1)), 64)
         skill_prompt = re.search(r'^  default_prompt: "([^"]+)"$', skill_interface, re.MULTILINE)
         self.assertIsNotNone(skill_prompt)
-        self.assertIn("$project-os", skill_prompt.group(1))
-        self.assertIn("what Project OS does", skill_prompt.group(1))
+        self.assertEqual(
+            skill_prompt.group(1),
+            "Use $project-os to explain how it helps Codex resume engineering work across sessions.",
+        )
         self.assertNotIn("products:", skill_interface)
         self.assertIn("allow_implicit_invocation: true", skill_interface)
         self.assertTrue(
@@ -247,8 +272,8 @@ class KnowledgeAssetTest(unittest.TestCase):
         self.assertEqual(
             portable_interface["defaultPrompt"],
             [
-                "Tell me what Project OS does, how it works and when I should use it.",
-                "Help me set up Project OS for this project and start with a safe preview.",
+                "Tell me how Project OS helps Codex resume real engineering work across sessions.",
+                "Help me set up Project OS for this repository and start with a safe preview.",
                 "Help me reuse verified failure knowledge from an earlier project in this one.",
             ],
         )
@@ -277,7 +302,11 @@ class KnowledgeAssetTest(unittest.TestCase):
         markdown_paths = [
             ROOT / "README.md",
             ROOT / "SECURITY.md",
-            *(path for path in (ROOT / "docs").glob("*.md") if path.name != "PACKAGING.md"),
+            *(
+                path
+                for path in (ROOT / "docs").glob("*.md")
+                if path.name not in {"PACKAGING.md", "SETUP.md"}
+            ),
         ]
         for path in markdown_paths:
             active_release_versions.update(
@@ -286,11 +315,18 @@ class KnowledgeAssetTest(unittest.TestCase):
                 )
             )
         self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
+        setup_versions = set(
+            re.findall(
+                r"\bv?(\d+\.\d+\.\d+)\b",
+                (ROOT / "docs" / "SETUP.md").read_text(encoding="utf-8"),
+            )
+        )
+        self.assertEqual(setup_versions, {"2.1.0", PROJECT_OS.VERSION})
         packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
-        self.assertIn(f"Project OS {PROJECT_OS.VERSION}", packaging)
-        self.assertIn("Directory version 2.0.5 is public", packaging)
-        self.assertIn("Versions 2.0.2 and 2.0.3 were intermediate Directory-only releases", packaging)
+        self.assertIn(f"Project OS {PROJECT_OS.VERSION} is the source-tree candidate", packaging)
+        self.assertIn("Project OS 2.1.0 is the current public baseline", packaging)
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [2.1.1] - 2026-09-15", changelog)
         self.assertIn("## [2.1.0] - 2026-09-15", changelog)
         self.assertIn("## [2.0.5] - 2026-09-15", changelog)
         self.assertIn("## [2.0.4] - 2026-09-14", changelog)
@@ -307,6 +343,10 @@ class KnowledgeAssetTest(unittest.TestCase):
         )
         self.assertIn(
             "[2.1.0]: https://github.com/innrvoice/engineering-project-os/compare/v2.0.5...v2.1.0",
+            changelog,
+        )
+        self.assertIn(
+            "[2.1.1]: https://github.com/innrvoice/engineering-project-os/compare/v2.1.0...v2.1.1",
             changelog,
         )
         self.assertNotIn("GitHub 2.0.3 release line", changelog)

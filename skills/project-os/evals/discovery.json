@@ -2,19 +2,6 @@
   "schema_version": 1,
   "cases": [
     {
-      "name": "direct-chatgpt-overview",
-      "category": "direct",
-      "surface": "CHATGPT",
-      "prompt": "@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.",
-      "expected_activation": true,
-      "expected_intent": "overview",
-      "expected": [
-        "explain the developer audience and practical benefits without requiring repository files",
-        "explain that reusable failure knowledge is user-owned and moves only through an explicit reviewed transfer",
-        "make no repository changes"
-      ]
-    },
-    {
       "name": "direct-codex-overview",
       "category": "direct",
       "surface": "CODEX",
@@ -22,22 +9,50 @@
       "expected_activation": true,
       "expected_intent": "overview",
       "expected": [
-        "return a concise product explanation rather than the technical help menu",
+        "state that Engineering Project OS was built for Codex and return a concise product explanation rather than the technical help menu",
         "distinguish project knowledge from reusable user-owned lessons",
-        "end with useful next steps for ChatGPT and Codex"
+        "end with the next useful Codex workflow, then mention the ChatGPT companion"
+      ]
+    },
+    {
+      "name": "direct-chatgpt-codex-overview",
+      "category": "direct",
+      "surface": "CHATGPT",
+      "prompt": "@Engineering Project OS Tell me how Project OS helps Codex resume real engineering work across sessions.",
+      "expected_activation": true,
+      "expected_intent": "overview",
+      "expected": [
+        "explain the Codex-first developer audience and practical benefits without requiring repository files",
+        "describe ChatGPT as a companion for supplied files and portable knowledge bundles",
+        "explain that reusable failure knowledge is user-owned and moves only through an explicit reviewed transfer",
+        "make no repository changes"
       ]
     },
     {
       "name": "direct-setup",
       "category": "direct",
-      "surface": "BOTH",
-      "prompt": "Help me set up Project OS for this project and start with a safe preview.",
+      "surface": "CODEX",
+      "prompt": "$project-os Help me set up Project OS for this repository and start with a safe preview.",
       "expected_activation": true,
       "expected_intent": "bootstrap-or-adopt",
       "expected": [
         "inspect existing repository authority before choosing bootstrap or adoption",
         "preview every proposed write",
         "create an empty reusable knowledge registry rather than product-authored failure lessons"
+      ]
+    },
+    {
+      "name": "direct-chatgpt-supplied-files",
+      "category": "direct",
+      "surface": "CHATGPT",
+      "prompt": "@Engineering Project OS Inspect the attached AGENTS.md and .agents records without changing them.",
+      "expected_activation": true,
+      "expected_intent": "inspect",
+      "expected": [
+        "inspect only the files supplied in the conversation",
+        "describe ChatGPT as a companion rather than a live repository workspace",
+        "report unsupported repository claims as unverified",
+        "make no repository changes"
       ]
     },
     {
@@ -56,8 +71,8 @@
     {
       "name": "indirect-lost-session-context",
       "category": "indirect",
-      "surface": "BOTH",
-      "prompt": "I keep losing engineering decisions and verification state between AI sessions. Help me keep that working context with the repository.",
+      "surface": "CODEX",
+      "prompt": "I keep losing engineering decisions and verification state between Codex sessions. Help me keep that working context with the repository.",
       "expected_activation": true,
       "expected_intent": "overview",
       "expected": [

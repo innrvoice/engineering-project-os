@@ -56,7 +56,7 @@ In ChatGPT, the user downloads the returned bundle artifact and later uploads it
 
 ## Import into another project
 
-Import is always explicit and never mutates the source. First ensure the destination repository is connected to Project OS 2.1.0, then preview the source:
+Import is always explicit and never mutates the source. First ensure the destination repository is connected to Project OS 2.1.1, then preview the source:
 
 ~~~shell
 python3 /absolute/path/to/project-os/scripts/project_os.py knowledge import --target /path/to/destination --source /path/to/source-repository --dry-run
@@ -76,4 +76,4 @@ Import is conflict-safe:
 
 ## Deprecated synchronization command
 
-`sync-knowledge` is read-only in 2.1.0. It explains that Project OS has no centrally managed knowledge source and directs the user to `knowledge import --source`. It does not write. Use `upgrade` to update product guidance, packs and overlays.
+Since 2.1.0, `sync-knowledge` is read-only. It explains that Project OS has no centrally managed knowledge source and directs the user to `knowledge import --source`. It does not write. Use `upgrade` to update product guidance, packs and overlays.

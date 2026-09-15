@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "submission_target": "Universal Plugin Directory",
-  "products": ["CHATGPT", "CODEX"],
+  "products": ["CODEX", "CHATGPT"],
   "cases": [
     {
       "name": "help-is-complete-and-read-only",

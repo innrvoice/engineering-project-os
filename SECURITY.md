@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Only Project OS 2.1.0 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
+Only Project OS 2.1.1 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
 
 ## Report a vulnerability
 
@@ -14,15 +14,15 @@ Include:
 
 - affected Project OS version;
 - operating system and Python version;
-- exact helper command, ChatGPT workflow boundary or Codex workflow boundary;
+- exact helper command, Codex workflow boundary or ChatGPT companion boundary;
 - expected and observed behavior;
 - a minimal sanitized repository when possible.
 
 ## Runtime boundary
 
-The 2.1.0 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
+The 2.1.1 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
 
-Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database, central failure database or automatic cross-project synchronization. The helper runs only when a person, ChatGPT or Codex invokes it.
+Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database, central failure database or automatic cross-project synchronization. The helper runs only when a person or Codex invokes it locally. ChatGPT can work only with material supplied in its conversation.
 
 ## File safety
 

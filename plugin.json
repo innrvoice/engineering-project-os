@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "engineering-project-os",
-  "version": "2.1.0",
-  "description": "Resume engineering work across ChatGPT and Codex and reuse verified failure knowledge safely between your own projects.",
+  "version": "2.1.1",
+  "description": "Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.",
   "author": {
     "name": "Pavel Bochkov Rastopchin",
     "url": "https://github.com/innrvoice"
@@ -10,27 +10,27 @@
   "homepage": "https://github.com/innrvoice/engineering-project-os",
   "repository": "https://github.com/innrvoice/engineering-project-os",
   "license": "MIT",
-  "keywords": ["chatgpt", "codex", "developer-tools", "engineering-workflow", "repository", "project-state", "continuity", "failure-knowledge", "cross-project", "engineering-memory"],
+  "keywords": ["codex", "developer-tools", "engineering-workflow", "repository", "project-state", "continuity", "failure-knowledge", "cross-project", "engineering-memory", "chatgpt"],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Engineering Project OS",
         "shortDescription": "Resume work. Reuse lessons.",
-        "longDescription": "Use this when developers need durable repository state across ChatGPT and Codex sessions or want verified failure lessons to move safely between their own projects. It inspects, bootstraps, validates, repairs and upgrades Project OS records with previews before writes. Do not use it for ordinary one-session coding or as an automatic global knowledge service.",
+        "longDescription": "Use this when Codex work must survive multiple sessions, preserve verified decisions and evidence or carry reviewed failure lessons into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.",
         "developerName": "Pavel Bochkov Rastopchin",
         "category": "Productivity",
         "capabilities": [
-          "Resume engineering work across sessions",
-          "Set up and validate repository state",
+          "Resume Codex work across sessions",
+          "Keep plans, decisions and evidence with the repository",
           "Capture verified failure knowledge",
-          "Reuse user-owned lessons across projects"
+          "Reuse reviewed lessons across your own projects"
         ],
         "websiteURL": "https://github.com/innrvoice/engineering-project-os",
         "privacyPolicyURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/PRIVACY.md",
         "termsOfServiceURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/TERMS.md",
         "defaultPrompt": [
-          "Tell me what Project OS does, how it works and when I should use it.",
-          "Help me set up Project OS for this project and start with a safe preview.",
+          "Tell me how Project OS helps Codex resume real engineering work across sessions.",
+          "Help me set up Project OS for this repository and start with a safe preview.",
           "Help me reuse verified failure knowledge from an earlier project in this one."
         ],
         "brandColor": "#789F25",

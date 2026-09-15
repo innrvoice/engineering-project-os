@@ -78,7 +78,7 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 
 ## Documentation and skill rules
 
-- Explain whether a request belongs in ChatGPT, Codex chat or Terminal.
+- Explain whether a request belongs in Codex chat, Terminal or the ChatGPT companion.
 - Keep each Markdown prose paragraph and each list item on one physical line. Do not hard-wrap prose. Preserve separate lines only for headings, tables, code fences and intentional nested blocks.
 - Make canonical short requests primary and describe them as natural language, not a parser.
 - `$project-os help` stays read-only and lists every supported shortcut, purpose, required argument and examples.
@@ -101,11 +101,11 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - portable bundle metadata;
 - CI assertions, fixtures, documentation and release notes.
 
-Project OS 2.1.0 uses `SYSTEM.schema_version: 4`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Project OS 2.1.1 uses `SYSTEM.schema_version: 4`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 
-Build and validate the exact working-tree ZIP using [Directory packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh ChatGPT and Codex plugin-loader evaluation, portal scan, hosted URL verification or publication authorization.
+Build and validate the exact working-tree ZIP using [Directory packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh Codex and ChatGPT plugin-loader evaluation, Portal scan, hosted URL verification or publication authorization.
 
 ## Pull requests
 

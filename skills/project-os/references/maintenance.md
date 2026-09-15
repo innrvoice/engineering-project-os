@@ -120,7 +120,7 @@ Never infer this classification from the file alone. The closed date is the actu
 
 `--closed-on` is valid only for a closed schema 2 migration. Do not pass it for an active legacy Program or a current-schema upgrade.
 
-Do not edit version or schema fields manually. `sync-knowledge` is a read-only deprecation route in 2.1.0 and cannot replace upgrade. Schema, lifecycle, managed guidance, user-owned knowledge migration and metadata remain one transaction.
+Do not edit version or schema fields manually. Since 2.1.0, `sync-knowledge` is a read-only deprecation route and cannot replace upgrade. Schema, lifecycle, managed guidance, user-owned knowledge migration and metadata remain one transaction.
 
 ## Self-hosting
 
