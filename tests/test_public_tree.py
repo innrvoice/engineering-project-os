@@ -62,6 +62,32 @@ class PublicTreeTests(unittest.TestCase):
         self.write(".agents/evidence/internal.md")
         self.assertEqual(self.check("--tree", str(self.root)).returncode, 1)
 
+    def test_gate_rejects_archives_and_author_managed_failure_knowledge(self):
+        for name in (
+            "engineering-project-os-plugin.zip",
+            "skills/project-os/assets/knowledge/core.json",
+        ):
+            with self.subTest(name=name):
+                nested = self.root / "candidate"
+                nested.mkdir()
+                shutil.copyfile(self.root / ".gitignore", nested / ".gitignore")
+                (nested / "scripts").mkdir()
+                shutil.copyfile(
+                    self.root / "scripts/check_public_tree.py",
+                    nested / "scripts/check_public_tree.py",
+                )
+                path = nested / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("synthetic fixture\n")
+                result = subprocess.run(
+                    [sys.executable, "-B", str(nested / "scripts/check_public_tree.py"),
+                     "--tree", str(nested)],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 1)
+                shutil.rmtree(nested)
+
 
 if __name__ == "__main__":
     unittest.main()

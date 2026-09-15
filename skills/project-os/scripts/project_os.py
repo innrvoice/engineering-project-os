@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bootstrap, adopt, validate, upgrade, and maintain repository-local Project OS state."""
+"""Bootstrap, adopt, validate, upgrade and maintain repository-local Project OS state."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.0.5"
-SCHEMA_VERSION = 3
+VERSION = "2.1.0"
+SCHEMA_VERSION = 4
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
 OVERLAY_NAMES = ("react-native-expo",)
@@ -34,7 +34,7 @@ FINDING_STATUSES = {
     "rejected",
     "merged",
 }
-FAILURE_STATUSES = {"active", "retired", "replaced"}
+FAILURE_STATUSES = {"draft", "active", "retired", "replaced"}
 COVERAGE_DISPOSITIONS = {"promoted", "merged", "retained_private", "retired"}
 RESERVED_TEMPLATE_TOKENS = {
     "__UPDATED_DATE__",
@@ -54,6 +54,8 @@ RESERVED_TEMPLATE_TOKENS = {
     "__PROGRAM_EXCLUSIONS__",
 }
 LESSON_HEADING_PATTERN = re.compile(r"^## ([A-Z][A-Z0-9-]*-\d+):\s*(.+?)\s*$")
+CANONICAL_TOKEN_CONTROL_PATTERN = re.compile(r"[\x00-\x1f\x7f]")
+FULL_SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 PRIVATE_KNOWLEDGE_PATTERNS = (
     (re.compile(r"(?:/Users/|/home/|/private/var/|/var/folders/|[A-Za-z]:\\Users\\)"), "private path"),
     (re.compile(r"\b(?:sk-(?:proj-)?|gh[pousr]_|github_pat_|xox[baprs]-|AKIA)[A-Za-z0-9_-]+"), "credential-like token"),
@@ -61,8 +63,22 @@ PRIVATE_KNOWLEDGE_PATTERNS = (
     (re.compile(r"Authorization\s*:\s*Bearer\s+eyJ[A-Za-z0-9_.-]+", re.IGNORECASE), "authorization token"),
     (re.compile(r"-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----"), "private key"),
     (re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE), "email address"),
-    (re.compile(r"https?://(?:localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?", re.IGNORECASE), "private URL"),
-    (re.compile(r"https?://[^/\s?#]+\.internal(?::\d+)?(?:[/\s?#]|$)", re.IGNORECASE), "private URL"),
+    (
+        re.compile(
+            r"\b(?:[a-z][a-z0-9+.-]*://[^\s`<>]+|www\.[^\s`<>]+)",
+            re.IGNORECASE,
+        ),
+        "URL",
+    ),
+    (
+        re.compile(
+            r"(?<![@\w.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+            r"(?:ai|app|cloud|co|com|dev|edu|gov|io|me|net|org|tech)"
+            r"(?::[0-9]{1,5})?(?:/[^\s`()<>\[\]{}]*)?",
+            re.IGNORECASE,
+        ),
+        "URL",
+    ),
     (re.compile(r"[?&](?:token|access_token|signature|x-amz-signature|x-goog-signature)=[^&\s]+", re.IGNORECASE), "signed URL"),
 )
 SENSITIVE_FIELD_NAMES = {
@@ -85,7 +101,6 @@ PROGRAM_TEMPLATE = ASSETS / "templates" / "program" / "PROGRAM.md"
 HISTORY_README_TEMPLATE = ASSETS / "templates" / "program" / "history" / "README.md"
 PACK_TEMPLATE = ASSETS / "packs"
 OVERLAY_TEMPLATE = ASSETS / "overlays"
-KNOWLEDGE_TEMPLATE = ASSETS / "knowledge"
 
 DEFAULT_PATHS: dict[str, Any] = {
     "context": ".agents/CONTEXT.md",
@@ -96,7 +111,7 @@ DEFAULT_PATHS: dict[str, Any] = {
     "program": None,
     "history": None,
     "history_index": None,
-    "shared_knowledge": ".agents/knowledge/shared/failures.json",
+    "reusable_knowledge": ".agents/knowledge/reusable/failures.json",
     "project_knowledge": [".agents/knowledge/project/failures.json"],
     "legacy_knowledge": [],
     "knowledge_coverage": None,
@@ -137,6 +152,35 @@ def read_regular_at(directory_fd: int, name: str) -> tuple[bytes, os.stat_result
         return handle.read(), details
 
 
+def unlink_owned_at(directory_fd: int, name: str, identity: tuple[int, int]) -> None:
+    """Remove only the directory entry that still names the caller-owned inode."""
+    try:
+        details = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if (details.st_dev, details.st_ino) == identity:
+        os.unlink(name, dir_fd=directory_fd)
+
+
+def replace_at(directory_fd: int, source: str, destination: str) -> None:
+    os.replace(
+        source,
+        destination,
+        src_dir_fd=directory_fd,
+        dst_dir_fd=directory_fd,
+    )
+
+
+def link_at(directory_fd: int, source: str, destination: str) -> None:
+    os.link(
+        source,
+        destination,
+        src_dir_fd=directory_fd,
+        dst_dir_fd=directory_fd,
+        follow_symlinks=False,
+    )
+
+
 def atomic_write_bytes(
     directory_fd: int, name: str, content: bytes, expected_sha256: str,
     mode: int | None = None,
@@ -146,30 +190,157 @@ def atomic_write_bytes(
     if hashlib.sha256(original).hexdigest() != expected_sha256:
         raise ProjectOSError(f"File changed during operation: {name}")
     temporary = f".{name}.project-os-write.{uuid.uuid4().hex}"
-    descriptor = os.open(
+    ownership_descriptor = os.open(
         temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
         0o600, dir_fd=directory_fd,
     )
+    temporary_details = os.fstat(ownership_descriptor)
+    temporary_identity = (temporary_details.st_dev, temporary_details.st_ino)
+    original_identity = (details.st_dev, details.st_ino)
+    replacement_digest = hashlib.sha256(content).hexdigest()
+    backup = f".{name}.project-os-backup.{uuid.uuid4().hex}"
+    displaced = f".{name}.project-os-displaced.{uuid.uuid4().hex}"
+    backup_created = False
+    publication_started = False
+    publication_verified = False
     try:
-        with os.fdopen(descriptor, "wb") as handle:
+        writer_descriptor = os.dup(ownership_descriptor)
+        try:
+            handle = os.fdopen(writer_descriptor, "wb")
+        except BaseException:
+            os.close(writer_descriptor)
+            raise
+        with handle:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
             os.fchmod(handle.fileno(), stat.S_IMODE(details.st_mode) if mode is None else mode)
-            replacement_details = os.fstat(handle.fileno())
         current, current_details = read_regular_at(directory_fd, name)
         if (
-            (current_details.st_dev, current_details.st_ino) != (details.st_dev, details.st_ino)
+            (current_details.st_dev, current_details.st_ino) != original_identity
             or hashlib.sha256(current).hexdigest() != expected_sha256
         ):
             raise ProjectOSError(f"File changed during operation: {name}")
-        os.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
-        return replacement_details
+        replacement, temporary_details = read_regular_at(directory_fd, temporary)
+        if (
+            (temporary_details.st_dev, temporary_details.st_ino) != temporary_identity
+            or hashlib.sha256(replacement).hexdigest() != replacement_digest
+        ):
+            raise ProjectOSError(f"Temporary replacement changed during operation: {name}")
+        link_at(directory_fd, name, backup)
+        backup_created = True
+        backup_content, backup_details = read_regular_at(directory_fd, backup)
+        if (
+            (backup_details.st_dev, backup_details.st_ino) != original_identity
+            or hashlib.sha256(backup_content).hexdigest() != expected_sha256
+        ):
+            raise ProjectOSError(f"Original backup changed during operation: {name}")
+        publication_started = True
+        replace_at(directory_fd, name, displaced)
+        displaced_content, displaced_details = read_regular_at(directory_fd, displaced)
+        if (
+            (displaced_details.st_dev, displaced_details.st_ino) != original_identity
+            or hashlib.sha256(displaced_content).hexdigest() != expected_sha256
+        ):
+            raise ProjectOSError(
+                f"Target changed at publication: {name}; concurrent file preserved at {displaced}"
+            )
+        link_at(directory_fd, temporary, name)
+        published, published_details = read_regular_at(directory_fd, name)
+        if (
+            (published_details.st_dev, published_details.st_ino) == temporary_identity
+            and hashlib.sha256(published).hexdigest() == replacement_digest
+        ):
+            publication_verified = True
+            return published_details
+        raise ProjectOSError(f"Temporary replacement changed at publication: {name}")
+    except BaseException as error:
+        preserved: str | None = None
+        if publication_started and backup_created:
+            try:
+                current, current_details = read_regular_at(directory_fd, name)
+            except FileNotFoundError:
+                current = None
+                current_details = None
+            if current_details is not None and (
+                (current_details.st_dev, current_details.st_ino) == original_identity
+                and hashlib.sha256(current or b"").hexdigest() == expected_sha256
+            ):
+                publication_started = False
+            else:
+                if current_details is not None and (
+                    (current_details.st_dev, current_details.st_ino) != temporary_identity
+                    or hashlib.sha256(current or b"").hexdigest() != replacement_digest
+                ):
+                    preserved = f".{name}.project-os-conflict.{uuid.uuid4().hex}"
+                    try:
+                        link_at(directory_fd, name, preserved)
+                        preserved_content, preserved_details = read_regular_at(
+                            directory_fd, preserved
+                        )
+                        if (
+                            (preserved_details.st_dev, preserved_details.st_ino)
+                            != (current_details.st_dev, current_details.st_ino)
+                            or hashlib.sha256(preserved_content).hexdigest()
+                            != hashlib.sha256(current or b"").hexdigest()
+                        ):
+                            raise ProjectOSError(
+                                "concurrent replacement preservation was not exact"
+                            )
+                        latest, latest_details = read_regular_at(directory_fd, name)
+                        if (
+                            (latest_details.st_dev, latest_details.st_ino)
+                            != (current_details.st_dev, current_details.st_ino)
+                            or hashlib.sha256(latest).hexdigest()
+                            != hashlib.sha256(current or b"").hexdigest()
+                        ):
+                            raise ProjectOSError(
+                                "target changed again during recovery"
+                            )
+                    except BaseException as recovery_error:
+                        raise ProjectOSError(
+                            f"Atomic replacement recovery is incomplete for {name}; "
+                            f"original preserved at {backup}: {recovery_error}"
+                        ) from error
+                try:
+                    replace_at(directory_fd, backup, name)
+                except BaseException as restore_error:
+                    try:
+                        restored, restored_details = read_regular_at(directory_fd, name)
+                    except BaseException:
+                        restored = None
+                        restored_details = None
+                    if not (
+                        restored_details is not None
+                        and (restored_details.st_dev, restored_details.st_ino)
+                        == original_identity
+                        and hashlib.sha256(restored or b"").hexdigest()
+                        == expected_sha256
+                    ):
+                        raise ProjectOSError(
+                            f"Atomic replacement recovery is incomplete for {name}; "
+                            f"original preserved at {backup}: {restore_error}"
+                        ) from error
+                backup_created = False
+                restored, restored_details = read_regular_at(directory_fd, name)
+                if (
+                    (restored_details.st_dev, restored_details.st_ino) != original_identity
+                    or hashlib.sha256(restored).hexdigest() != expected_sha256
+                ):
+                    raise ProjectOSError(
+                        f"Atomic replacement recovery could not verify {name}"
+                    ) from error
+        if preserved is not None and isinstance(error, ProjectOSError):
+            raise ProjectOSError(
+                f"{error}; concurrent file preserved at {preserved}"
+            ) from error
+        raise
     finally:
-        try:
-            os.unlink(temporary, dir_fd=directory_fd)
-        except FileNotFoundError:
-            pass
+        unlink_owned_at(directory_fd, temporary, temporary_identity)
+        if backup_created and (not publication_started or publication_verified):
+            unlink_owned_at(directory_fd, backup, original_identity)
+        unlink_owned_at(directory_fd, displaced, original_identity)
+        os.close(ownership_descriptor)
 
 
 def atomic_write_text(
@@ -263,7 +434,7 @@ class AnchoredFilesystem:
                 if (current.st_dev, current.st_ino) != (original.st_dev, original.st_ino):
                     raise ProjectOSError("created directory was concurrently replaced")
                 os.rmdir(name, dir_fd=parent_fd)
-            except (OSError, ProjectOSError) as error:
+            except BaseException as error:
                 failures.append(f"{name}: {error}")
         return failures
 
@@ -588,7 +759,7 @@ def detect_repository(root: Path) -> dict[str, Any]:
         "package_scripts": package.get("scripts", []),
         "warnings": package_warnings,
         "note": (
-            "Signals recommend capability packs only. Verify commands, architecture, and product "
+            "Signals recommend capability packs only. Verify commands, architecture and product "
             "authority from the repository before recording them."
         ),
     }
@@ -777,10 +948,6 @@ def default_system(
         managed_guidance[relative] = (
             "sha256:" + hashlib.sha256((OVERLAY_TEMPLATE / f"{name}.md").read_bytes()).hexdigest()
         )
-    managed_knowledge = {
-        entry["id"]: entry_content_hash(entry)
-        for entry in seed_documents(packs, overlays)
-    }
     return {
         "schema_version": SCHEMA_VERSION,
         "project_os_version": VERSION,
@@ -793,142 +960,13 @@ def default_system(
         "overlays": list(overlays),
         "overlay_paths": [f".agents/packs/overlays/{name}.md" for name in overlays],
         "managed_guidance": managed_guidance,
-        "managed_knowledge": dict(sorted(managed_knowledge.items())),
         "toolchain_signals": detect_repository(root)["toolchain_signals"],
         "paths": paths,
     }
 
 
-def seed_documents(packs: Sequence[str], overlays: Sequence[str]) -> list[dict[str, Any]]:
-    selected_packs = set(packs)
-    paths = [KNOWLEDGE_TEMPLATE / "core.json"]
-    paths.extend(KNOWLEDGE_TEMPLATE / "packs" / f"{name}.json" for name in PACK_NAMES)
-    paths.extend(KNOWLEDGE_TEMPLATE / "overlays" / f"{name}.json" for name in overlays)
-    missing = [path for path in paths if not path.is_file()]
-    if missing:
-        raise ProjectOSError(
-            "Missing bundled knowledge asset: "
-            + ", ".join(path.relative_to(SKILL_ROOT).as_posix() for path in missing)
-        )
-    entries: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for path in paths:
-        value = load_json(path)
-        source_entries = value.get("entries", []) if isinstance(value, dict) else None
-        if not isinstance(source_entries, list):
-            raise ProjectOSError(f"Knowledge seed must contain an entries array: {path}")
-        for entry in source_entries:
-            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
-                raise ProjectOSError(f"Knowledge seed has an invalid entry: {path}")
-            source = entry.get("source", {})
-            source_pack = source.get("pack") if isinstance(source, dict) else None
-            applies_to = entry.get("applies_to", [])
-            selected = (
-                path.name == "core.json" and path.parent == KNOWLEDGE_TEMPLATE
-            ) or (
-                isinstance(source_pack, str)
-                and source_pack in {f"overlay/{name}" for name in overlays}
-            )
-            if path.parent.name == "packs":
-                selected = source_pack in selected_packs or bool(
-                    isinstance(applies_to, list) and selected_packs.intersection(applies_to)
-                )
-            if not selected:
-                continue
-            if entry["id"] in seen:
-                raise ProjectOSError(f"Duplicate knowledge seed id {entry['id']}: {path}")
-            seen.add(entry["id"])
-            entries.append(entry)
-    return entries
-
-
-def composed_knowledge(packs: Sequence[str], overlays: Sequence[str]) -> dict[str, Any]:
-    return {
-        "schema_version": 1,
-        "knowledge_version": VERSION,
-        "packs": ["core", *packs],
-        "overlays": list(overlays),
-        "entries": sorted(seed_documents(packs, overlays), key=lambda entry: entry["id"]),
-    }
-
-
-def validate_composed_knowledge(
-    value: dict[str, Any], packs: Sequence[str], overlays: Sequence[str]
-) -> None:
-    """Fail closed before bundled knowledge can be written into a target repository."""
-    errors: list[str] = []
-    if value.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
-    if value.get("knowledge_version") != VERSION:
-        errors.append(f"knowledge_version must be {VERSION}")
-    if value.get("packs") != ["core", *packs]:
-        errors.append("packs do not match the selected capability packs")
-    if value.get("overlays") != list(overlays):
-        errors.append("overlays do not match the selected ecosystem overlays")
-
-    required = (
-        "id",
-        "title",
-        "status",
-        "applies_to",
-        "trigger",
-        "mechanism",
-        "prevention",
-        "verification",
-        "boundaries",
-        "source",
-    )
-    entries = value.get("entries")
-    check_unique_ids(entries, "bundled knowledge", errors, required, FAILURE_STATUSES)
-    allowed_source_packs = {
-        "core",
-        *PACK_NAMES,
-        *(f"overlay/{name}" for name in OVERLAY_NAMES),
-    }
-    if isinstance(entries, list):
-        for index, entry in enumerate(entries):
-            if not isinstance(entry, dict):
-                continue
-            entry_id = entry.get("id", f"index {index}")
-            for key in ("id", "title", "trigger", "mechanism", "prevention"):
-                if not isinstance(entry.get(key), str) or not entry.get(key):
-                    errors.append(f"bundled knowledge {entry_id!r} has invalid {key}")
-            for key in ("applies_to", "verification", "boundaries"):
-                values = entry.get(key)
-                if (
-                    not isinstance(values, list)
-                    or not values
-                    or any(not isinstance(item, str) or not item for item in values)
-                ):
-                    errors.append(f"bundled knowledge {entry_id!r} has invalid {key}")
-            source = entry.get("source")
-            if not isinstance(source, dict):
-                errors.append(f"bundled knowledge {entry_id!r} has invalid source")
-                continue
-            source_kind = source.get("kind")
-            if not isinstance(source_kind, str) or source_kind not in {
-                "project-os-pack",
-                "incident-derived",
-            }:
-                errors.append(f"bundled knowledge {entry_id!r} has invalid source kind")
-            source_pack = source.get("pack")
-            if not isinstance(source_pack, str) or source_pack not in allowed_source_packs:
-                errors.append(f"bundled knowledge {entry_id!r} has invalid source pack")
-            references = source.get("references")
-            if not isinstance(references, list) or any(
-                not isinstance(reference, str) or not reference.startswith("https://")
-                for reference in references
-            ):
-                errors.append(f"bundled knowledge {entry_id!r} has invalid source references")
-            if source_kind == "project-os-pack" and not references:
-                errors.append(f"bundled knowledge {entry_id!r} needs a public source reference")
-            if source.get("content_hash") != entry_content_hash(entry):
-                errors.append(f"bundled knowledge {entry_id!r} content_hash is stale")
-
-    for label in private_material_labels(value):
-        errors.append(f"bundled knowledge contains a {label}")
-    if errors:
-        raise ProjectOSError("Invalid bundled knowledge: " + "; ".join(errors))
+def empty_reusable_knowledge() -> dict[str, Any]:
+    return {"schema_version": 1, "entries": []}
 
 
 def guidance_operations(
@@ -1124,7 +1162,7 @@ def execute_sync_transaction(
                 after_write()
             fs.verify()
             check_preconditions(after=True)
-        except (OSError, ProjectOSError) as error:
+        except BaseException as error:
             failures: list[str] = []
             for path, directory_fd, tombstone, digest in reversed(deleted):
                 try:
@@ -1135,23 +1173,29 @@ def execute_sync_transaction(
                     os.link(tombstone, path.name, src_dir_fd=directory_fd,
                             dst_dir_fd=directory_fd, follow_symlinks=False)
                     os.unlink(tombstone, dir_fd=directory_fd)
-                except (OSError, ProjectOSError) as rollback_error:
+                except BaseException as rollback_error:
                     failures.append(f"{path}: {rollback_error}; original preserved at {tombstone}")
             for path, directory_fd, original, mode, identity, digest in reversed(replaced):
                 try:
                     require_identity(directory_fd, path.name, identity, digest)
                     atomic_write_bytes(directory_fd, path.name, original, digest, mode)
-                except (OSError, ProjectOSError) as rollback_error:
+                except BaseException as rollback_error:
                     failures.append(f"{path}: {rollback_error}")
             for path, directory_fd, identity, digest in reversed(created):
                 try:
                     require_identity(directory_fd, path.name, identity, digest)
                     os.unlink(path.name, dir_fd=directory_fd)
-                except (OSError, ProjectOSError) as rollback_error:
+                except BaseException as rollback_error:
                     failures.append(f"{path}: {rollback_error}")
             failures.extend(fs.rollback_directories())
-            note = " rollback incomplete: " + "; ".join(failures) if failures else " changes were rolled back"
-            raise ProjectOSError(f"Project OS transaction failed;{note}: {error}") from error
+            if failures:
+                note = " rollback incomplete: " + "; ".join(failures)
+                raise ProjectOSError(f"Project OS transaction failed;{note}: {error}") from error
+            if isinstance(error, (KeyboardInterrupt, SystemExit)):
+                raise
+            raise ProjectOSError(
+                f"Project OS transaction failed; changes were rolled back: {error}"
+            ) from error
         for path, directory_fd, tombstone, digest in deleted:
             try:
                 content, _ = read_regular_at(directory_fd, tombstone)
@@ -1229,16 +1273,11 @@ def init_project(
         "__PACK_NAMES__": ", ".join(packs) if packs else "none",
         "__OVERLAY_NAMES__": ", ".join(overlays) if overlays else "none",
     }
-    knowledge = composed_knowledge(packs, overlays)
-    validate_composed_knowledge(knowledge, packs, overlays)
     operations: list[tuple[str, Path, str | None]] = []
     template_roots = [CORE_TEMPLATE]
-    shared_relative = Path(".agents/knowledge/shared/failures.json")
     for template_root in template_roots:
         for source in iter_template_files(template_root):
             relative = source.relative_to(template_root)
-            if relative == shared_relative:
-                continue
             if relative == Path("AGENTS.md") and agents_exists:
                 continue
             destination = root / relative
@@ -1255,16 +1294,6 @@ def init_project(
     paths = dict(DEFAULT_PATHS)
     system = default_system(root, "standard", "initialized", packs, overlays, paths)
     operations.extend(guidance_operations(root, packs, overlays))
-    shared_destination = root / str(paths["shared_knowledge"])
-    operations.append(
-        ("skip", shared_destination, None)
-        if shared_destination.exists()
-        else (
-            "create",
-            shared_destination,
-            json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
-        )
-    )
     operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
     execute_operations(root, operations, dry_run)
 
@@ -1573,7 +1602,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
     legacy_knowledge: list[str] = []
     if knowledge_root.is_dir():
         for directory in sorted(path for path in knowledge_root.iterdir() if path.is_dir()):
-            if directory.name in {"project", "shared"}:
+            if directory.name in {"project", "reusable", "shared"}:
                 continue
             if directory.is_symlink():
                 errors.append(f"unsafe legacy knowledge symlink: {directory}")
@@ -1592,7 +1621,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         "program": None,
         "history": relative_string(root, history) if history_index is not None else None,
         "history_index": relative_string(root, history_index),
-        "shared_knowledge": ".agents/knowledge/shared/failures.json",
+        "reusable_knowledge": ".agents/knowledge/reusable/failures.json",
         "project_knowledge": project_knowledge,
         "legacy_knowledge": legacy_knowledge,
         "knowledge_coverage": relative_string(root, coverage),
@@ -1644,19 +1673,21 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
     if inventory and coverage is None:
         errors.append("legacy knowledge requires an explicit complete coverage map")
     elif coverage is not None:
-        coverage_errors: list[str] = []
-        shared_targets = {
-            entry["id"]: entry["source"]["pack"]
-            for entry in composed_knowledge(packs, overlays)["entries"]
-        }
-        validate_knowledge_coverage(root, inventory, coverage, shared_targets, coverage_errors)
-        errors.extend(coverage_errors)
+        validate_knowledge_coverage(
+            root,
+            inventory,
+            coverage,
+            {},
+            errors,
+            require_canonical_targets=False,
+        )
+        warnings.append("legacy knowledge coverage is preserved for later user review")
     if duplicates:
         warnings.append("legacy knowledge duplicate ids are resolved only by source fingerprint")
 
     managed_destinations = [
         ".agents/packs/README.md",
-        ".agents/knowledge/shared/failures.json",
+        ".agents/knowledge/reusable/failures.json",
         *(f".agents/packs/{name}.md" for name in packs),
         *(f".agents/packs/overlays/{name}.md" for name in overlays),
     ]
@@ -1672,7 +1703,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
     planned_creates = [".agents/SYSTEM.json"]
     planned_creates.extend(f".agents/packs/{name}.md" for name in packs)
     planned_creates.extend(f".agents/packs/overlays/{name}.md" for name in overlays)
-    planned_creates.extend((".agents/packs/README.md", ".agents/knowledge/shared/failures.json"))
+    planned_creates.extend((".agents/packs/README.md", ".agents/knowledge/reusable/failures.json"))
     planned_creates = [relative for relative in planned_creates if not (root / relative).exists()]
 
     preconditions: dict[str, Any] | None = None
@@ -1706,8 +1737,6 @@ def adopt_project(root: Path, dry_run: bool, include_inventory: bool) -> int:
         raise ProjectOSError("Project OS is already configured; use check instead of adopt")
     report = discover_adoption(root, include_inventory=include_inventory)
     proposed = report["proposed_system"]
-    knowledge = composed_knowledge(proposed["packs"], proposed["overlays"])
-    validate_composed_knowledge(knowledge, proposed["packs"], proposed["overlays"])
     print(json.dumps(report, indent=2, ensure_ascii=False))
     if not report["safe_to_adopt"]:
         return 1
@@ -1722,12 +1751,12 @@ def adopt_project(root: Path, dry_run: bool, include_inventory: bool) -> int:
             system["packs"], system["overlays"]
         ).items()
     ]
-    shared_destination = root / system["paths"]["shared_knowledge"]
+    reusable_destination = root / system["paths"]["reusable_knowledge"]
     operations.append(
         (
             "create",
-            shared_destination,
-            json.dumps(knowledge, indent=2, ensure_ascii=False) + "\n",
+            reusable_destination,
+            json.dumps(empty_reusable_knowledge(), indent=2, ensure_ascii=False) + "\n",
         )
     )
     operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
@@ -1781,6 +1810,307 @@ def entry_content_hash(entry: dict[str, Any]) -> str:
         source.pop("content_hash", None)
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def semantic_lesson_hash(entry: dict[str, Any]) -> str:
+    value = {
+        key: copy.deepcopy(entry.get(key))
+        for key in (
+            "title",
+            "applies_to",
+            "trigger",
+            "mechanism",
+            "prevention",
+            "verification",
+            "boundaries",
+        )
+    }
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+
+
+def make_user_owned_entry(
+    value: dict[str, Any],
+    *,
+    status: str,
+    source_kind: str,
+    origin_pack: str | None = None,
+) -> dict[str, Any]:
+    entry = {
+        key: copy.deepcopy(value[key])
+        for key in (
+            "id",
+            "title",
+            "applies_to",
+            "trigger",
+            "mechanism",
+            "prevention",
+            "verification",
+            "boundaries",
+        )
+        if key in value
+    }
+    entry["status"] = status
+    for key in ("replaces", "replaced_by", "reason", "previous_content_hash"):
+        if key in value:
+            entry[key] = copy.deepcopy(value[key])
+    source: dict[str, Any] = {"kind": source_kind, "created_with": VERSION}
+    if isinstance(origin_pack, str) and origin_pack:
+        source["origin_pack"] = origin_pack
+    entry["source"] = source
+    source["content_hash"] = entry_content_hash(entry)
+    return entry
+
+
+def migrated_predecessor_hash(
+    legacy_tombstone: dict[str, Any], origin_pack: str | None
+) -> str | None:
+    legacy_previous = legacy_tombstone.get("previous_content_hash")
+    if (
+        not isinstance(legacy_previous, str)
+        or FULL_SHA256_PATTERN.fullmatch(legacy_previous) is None
+    ):
+        return None
+    legacy_active = copy.deepcopy(legacy_tombstone)
+    legacy_active["status"] = "active"
+    for key in ("replaced_by", "reason", "previous_content_hash"):
+        legacy_active.pop(key, None)
+    if entry_content_hash(legacy_active) != legacy_previous:
+        return None
+    migrated_active = make_user_owned_entry(
+        legacy_active,
+        status="active",
+        source_kind="user-reviewed",
+        origin_pack=origin_pack,
+    )
+    return migrated_active["source"]["content_hash"]
+
+
+def populated_migration_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict, set)):
+        return bool(value)
+    return True
+
+
+def discarded_schema_three_migration_fields(
+    entry: dict[str, Any], *, draft_fallback: bool, exact_managed_baseline: bool
+) -> list[str]:
+    """Name user-owned values schema-4 migration cannot preserve losslessly."""
+    discarded: list[str] = []
+    status = entry.get("status")
+    if draft_fallback:
+        if populated_migration_value(status) and status not in {"active", "draft"}:
+            discarded.append("status")
+        for field in ("replaces", "replaced_by", "reason", "previous_content_hash"):
+            if field in entry and populated_migration_value(entry[field]):
+                discarded.append(field)
+
+    supported_top_level = {
+        "id", "title", "status", "applies_to", "trigger", "mechanism",
+        "prevention", "verification", "boundaries", "source", "replaces",
+        "replaced_by", "reason", "previous_content_hash",
+    }
+    for field in sorted(set(entry).difference(supported_top_level)):
+        if populated_migration_value(entry[field]):
+            discarded.append(field)
+
+    source = entry.get("source")
+    if isinstance(source, dict):
+        references = source.get("references")
+        if not exact_managed_baseline and populated_migration_value(references):
+            discarded.append("source.references")
+        supported_source = {
+            "kind", "pack", "project_os_version", "references", "content_hash",
+        }
+        for field in sorted(set(source).difference(supported_source)):
+            if populated_migration_value(source[field]):
+                discarded.append(f"source.{field}")
+        pack = source.get("pack")
+        supported_packs = {
+            "core", *PACK_NAMES, *(f"overlay/{name}" for name in OVERLAY_NAMES),
+        }
+        if populated_migration_value(pack) and pack not in supported_packs:
+            discarded.append("source.pack")
+    elif populated_migration_value(source):
+        discarded.append("source")
+    return sorted(set(discarded))
+
+
+def is_canonical_knowledge_token(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value == value.strip()
+        and "," not in value
+        and not any(character.isspace() for character in value)
+        and CANONICAL_TOKEN_CONTROL_PATTERN.search(value) is None
+    )
+
+
+def validate_strict_reusable_entries(
+    entries: Any,
+    label: str,
+    errors: list[str],
+    *,
+    verify_hashes: bool,
+) -> None:
+    if not isinstance(entries, list):
+        return
+    by_id = {
+        entry["id"]: entry
+        for entry in entries
+        if isinstance(entry, dict) and is_canonical_knowledge_token(entry.get("id"))
+    }
+    allowed = {
+        "id", "title", "status", "applies_to", "trigger", "mechanism",
+        "prevention", "verification", "boundaries", "source", "replaces",
+        "replaced_by", "reason", "previous_content_hash",
+    }
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        entry_id = entry.get("id")
+        if not is_canonical_knowledge_token(entry_id):
+            errors.append(
+                f"{label}[{index}] id must be trimmed and contain no whitespace, commas or controls"
+            )
+        applies_to = entry.get("applies_to")
+        if isinstance(applies_to, list):
+            if any(not is_canonical_knowledge_token(tag) for tag in applies_to):
+                errors.append(
+                    f"{label}[{index}] applies_to tags must be trimmed and contain no whitespace, commas or controls"
+                )
+            elif len(applies_to) != len(set(applies_to)):
+                errors.append(f"{label}[{index}] applies_to tags must be unique")
+        extras = sorted(set(entry).difference(allowed))
+        if extras:
+            errors.append(f"{label}[{index}] has unsupported fields: {', '.join(extras)}")
+        source = entry.get("source")
+        if not isinstance(source, dict):
+            errors.append(f"{label}[{index}] source must be an object")
+            continue
+        source_extras = sorted(
+            set(source).difference({"kind", "created_with", "origin_pack", "content_hash"})
+        )
+        if source_extras:
+            errors.append(
+                f"{label}[{index}] source has unsupported fields: {', '.join(source_extras)}"
+            )
+        expected_kind = (
+            "migration-review-required"
+            if entry.get("status") == "draft"
+            else "user-reviewed"
+        )
+        if source.get("kind") != expected_kind:
+            errors.append(f"{label}[{index}] source.kind must be {expected_kind}")
+        if (
+            not isinstance(source.get("created_with"), str)
+            or not source.get("created_with")
+            or source["created_with"] != source["created_with"].strip()
+        ):
+            errors.append(f"{label}[{index}] source.created_with must be a canonical version")
+        origin_pack = source.get("origin_pack")
+        if origin_pack is not None and (
+            not isinstance(origin_pack, str)
+            or origin_pack not in {
+                "core", *PACK_NAMES, *(f"overlay/{name}" for name in OVERLAY_NAMES),
+            }
+        ):
+            errors.append(f"{label}[{index}] source.origin_pack is invalid")
+        content_hash = source.get("content_hash")
+        if not isinstance(content_hash, str) or FULL_SHA256_PATTERN.fullmatch(content_hash) is None:
+            errors.append(f"{label}[{index}] content_hash must be sha256 followed by 64 hex digits")
+        elif verify_hashes and content_hash != entry_content_hash(entry):
+            errors.append(f"{label}[{index}] content_hash does not match its content")
+
+        for relation in ("replaces", "replaced_by"):
+            related = entry.get(relation)
+            if related is not None and not is_canonical_knowledge_token(related):
+                errors.append(f"{label}[{index}] {relation} must be a canonical id")
+            elif related == entry_id:
+                errors.append(f"{label}[{index}] {relation} cannot reference itself")
+
+        status = entry.get("status")
+        tombstone_fields = {"reason", "previous_content_hash"}
+        if status in {"active", "draft"}:
+            forbidden = sorted(
+                field for field in (*tombstone_fields, "replaced_by") if field in entry
+            )
+            if status == "draft" and "replaces" in entry:
+                forbidden.append("replaces")
+            if forbidden:
+                errors.append(
+                    f"{label}[{index}] {status} entry has invalid lifecycle fields: "
+                    + ", ".join(sorted(forbidden))
+                )
+        elif status in {"retired", "replaced"}:
+            if not isinstance(entry.get("reason"), str) or not entry.get("reason", "").strip():
+                errors.append(f"{label}[{index}] {status} entry needs a reason")
+            previous = entry.get("previous_content_hash")
+            if not isinstance(previous, str) or FULL_SHA256_PATTERN.fullmatch(previous) is None:
+                errors.append(
+                    f"{label}[{index}] {status} entry needs a full previous_content_hash"
+                )
+            if status == "retired" and "replaced_by" in entry:
+                errors.append(f"{label}[{index}] retired entry cannot have replaced_by")
+            if status == "replaced" and not is_canonical_knowledge_token(
+                entry.get("replaced_by")
+            ):
+                errors.append(f"{label}[{index}] replaced entry needs replaced_by")
+
+    for entry_id, entry in by_id.items():
+        replaced_by = entry.get("replaced_by")
+        if isinstance(replaced_by, str):
+            if replaced_by not in by_id:
+                errors.append(
+                    f"{label} lifecycle link is dangling: {entry_id} replaced_by {replaced_by}"
+                )
+            elif by_id[replaced_by].get("replaces") != entry_id:
+                errors.append(
+                    f"{label} lifecycle mismatch: {entry_id} names {replaced_by} but the successor is not reciprocal"
+                )
+        replaces = entry.get("replaces")
+        if isinstance(replaces, str):
+            if replaces not in by_id:
+                errors.append(
+                    f"{label} lifecycle link is dangling: {entry_id} replaces {replaces}"
+                )
+            elif (
+                by_id[replaces].get("status") != "replaced"
+                or by_id[replaces].get("replaced_by") != entry_id
+            ):
+                errors.append(
+                    f"{label} lifecycle mismatch: {entry_id} replaces {replaces} but the predecessor is not reciprocal"
+                )
+    visited: set[str] = set()
+    for start in sorted(by_id):
+        if start in visited:
+            continue
+        order: list[str] = []
+        positions: dict[str, int] = {}
+        current = start
+        while current in by_id and current not in visited:
+            if current in positions:
+                cycle = order[positions[current]:] + [current]
+                errors.append(
+                    f"{label} lifecycle replacement cycle: " + " -> ".join(cycle)
+                )
+                break
+            positions[current] = len(order)
+            order.append(current)
+            next_id = by_id[current].get("replaced_by")
+            if not isinstance(next_id, str):
+                break
+            current = next_id
+        visited.update(order)
 
 
 def validate_registry_schema(value: dict[str, Any], label: str, errors: list[str]) -> None:
@@ -1844,6 +2174,7 @@ def validate_system_owner_paths(
         "program",
         "history_index",
         "shared_knowledge",
+        "reusable_knowledge",
         "knowledge_coverage",
     ):
         raw_path = paths.get(key)
@@ -1982,7 +2313,7 @@ def validate_failure_registry(
     label: str,
     errors: list[str],
     verify_hashes: bool = True,
-    strict_managed: bool = False,
+    strict_reusable: bool = False,
 ) -> set[str]:
     required = (
         "id",
@@ -2009,42 +2340,23 @@ def validate_failure_registry(
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 continue
-            source = entry.get("source")
-            source_kind = source.get("kind") if isinstance(source, dict) else None
-            if strict_managed:
-                if not isinstance(source, dict):
-                    errors.append(f"{label}[{index}] source must be an object")
-                    continue
-                if not isinstance(source_kind, str) or source_kind not in {
-                    "project-os-pack",
-                    "incident-derived",
-                }:
-                    errors.append(f"{label}[{index}] has invalid managed source kind")
-                    continue
-                source_pack = source.get("pack")
-                if not isinstance(source_pack, str) or source_pack not in {
-                    "core",
-                    *PACK_NAMES,
-                    *(f"overlay/{name}" for name in OVERLAY_NAMES),
-                }:
-                    errors.append(f"{label}[{index}] has invalid managed source pack")
-                references = source.get("references")
-                if not isinstance(references, list) or any(
-                    not isinstance(reference, str) or not reference.startswith("https://")
-                    for reference in references
+            for key in ("id", "title", "trigger", "mechanism", "prevention"):
+                if not isinstance(entry.get(key), str) or not entry.get(key).strip():
+                    errors.append(f"{label}[{index}] has invalid {key}")
+            for key in ("applies_to", "verification", "boundaries"):
+                values = entry.get(key)
+                if (
+                    not isinstance(values, list)
+                    or not values
+                    or any(not isinstance(item, str) or not item.strip() for item in values)
                 ):
-                    errors.append(f"{label}[{index}] has invalid source references")
-                if source_kind == "project-os-pack" and not references:
-                    errors.append(f"{label}[{index}] needs a public source reference")
-            if (
-                not verify_hashes
-                or not isinstance(source_kind, str)
-                or source_kind not in {"project-os-pack", "incident-derived"}
-            ):
-                continue
-            stored_hash = source.get("content_hash")
-            if stored_hash != entry_content_hash(entry):
-                errors.append(f"{label}[{index}] content_hash does not match its content")
+                    errors.append(f"{label}[{index}] has invalid {key}")
+    if strict_reusable:
+        validate_strict_reusable_entries(
+            entries, label, errors, verify_hashes=verify_hashes
+        )
+        for material_label in private_material_labels(value):
+            errors.append(f"{label} contains a {material_label}")
     return identifiers
 
 
@@ -2147,8 +2459,10 @@ def validate_knowledge_coverage(
     root: Path,
     inventory: Sequence[dict[str, Any]],
     coverage_path: Path,
-    shared_targets: dict[str, str],
+    reusable_targets: dict[str, str],
     errors: list[str],
+    *,
+    require_canonical_targets: bool = True,
 ) -> None:
     try:
         value = load_json(coverage_path)
@@ -2229,17 +2543,23 @@ def validate_knowledge_coverage(
             )
         canonical_id = entry.get("canonical_id")
         if isinstance(disposition, str) and disposition in {"promoted", "merged"}:
-            if not isinstance(canonical_id, str) or canonical_id not in shared_targets:
+            if not isinstance(canonical_id, str) or not canonical_id:
                 errors.append(
-                    f"knowledge coverage {fingerprint} references missing shared id {canonical_id!r}"
+                    f"knowledge coverage {fingerprint} has an invalid canonical id {canonical_id!r}"
                 )
-            else:
-                expected_target = shared_targets[canonical_id]
+            elif canonical_id in reusable_targets:
+                expected_target = reusable_targets[canonical_id]
                 if entry.get("target") != expected_target:
                     errors.append(
                         f"knowledge coverage {fingerprint} target must be {expected_target}"
                     )
-            if isinstance(canonical_id, str) and canonical_id in shared_targets and disposition == "promoted":
+            elif require_canonical_targets:
+                errors.append(
+                    f"knowledge coverage {fingerprint} references missing reusable id {canonical_id!r}"
+                )
+            elif not isinstance(entry.get("target"), str) or not entry.get("target"):
+                errors.append(f"knowledge coverage {fingerprint} has an invalid target")
+            if isinstance(canonical_id, str) and canonical_id and disposition == "promoted":
                 if canonical_id in canonical_seen:
                     errors.append(f"knowledge coverage duplicates canonical id {canonical_id}")
                 canonical_seen.add(canonical_id)
@@ -2548,17 +2868,8 @@ def check_project(root: Path, config: Path | None = None) -> int:
         if expected_hash != actual_hash:
             errors.append(f"managed guidance differs from its recorded baseline: {raw_path}")
 
-    managed_knowledge = system.get("managed_knowledge")
-    if not isinstance(managed_knowledge, dict) or any(
-        not isinstance(entry_id, str)
-        or not isinstance(entry_hash, str)
-        or not entry_hash.startswith("sha256:")
-        for entry_id, entry_hash in (
-            managed_knowledge.items() if isinstance(managed_knowledge, dict) else ()
-        )
-    ):
-        errors.append("SYSTEM managed_knowledge must map ids to sha256 baselines")
-        managed_knowledge = {}
+    if "managed_knowledge" in system:
+        errors.append("SYSTEM managed_knowledge was removed in schema 4; run upgrade")
 
     paths = system.get("paths")
     if not isinstance(paths, dict):
@@ -2588,7 +2899,9 @@ def check_project(root: Path, config: Path | None = None) -> int:
     program_path = system_path_value(root, paths, "program", errors, required=mode == "program")
     history_path = system_path_value(root, paths, "history", errors)
     history_index_path = system_path_value(root, paths, "history_index", errors)
-    shared_path = system_path_value(root, paths, "shared_knowledge", errors, required=True)
+    if "shared_knowledge" in paths:
+        errors.append("SYSTEM paths.shared_knowledge was removed in schema 4; run upgrade")
+    reusable_path = system_path_value(root, paths, "reusable_knowledge", errors, required=True)
 
     for label, path in (
         ("context", context_path),
@@ -2599,7 +2912,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
         ("program", program_path),
         ("history", history_path),
         ("history index", history_index_path),
-        ("shared knowledge", shared_path),
+        ("reusable knowledge", reusable_path),
     ):
         if path is not None:
             check_no_symlink_path(root, path, f"SYSTEM path {label}", errors)
@@ -2609,7 +2922,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
         ("state", state_path),
         ("plans", plans_path),
         ("findings", findings_path),
-        ("shared knowledge", shared_path),
+        ("reusable knowledge", reusable_path),
     ):
         if path is not None and not path.is_file():
             errors.append(f"missing {label} file: {path.relative_to(root)}")
@@ -2742,58 +3055,32 @@ def check_project(root: Path, config: Path | None = None) -> int:
                                 f"finding {finding.get('id')!r} evidence does not exist: {raw_path}"
                             )
 
-    shared_targets: dict[str, str] = {}
-    if shared_path is not None and shared_path.is_file():
-        valid_shared_ids = validate_failure_registry(
-            shared_path, "shared knowledge", errors, strict_managed=True
+    reusable_targets: dict[str, str] = {}
+    if reusable_path is not None and reusable_path.is_file():
+        valid_reusable_ids = validate_failure_registry(
+            reusable_path, "reusable knowledge", errors, strict_reusable=True
         )
         try:
-            shared_value = load_json(shared_path)
+            reusable_value = load_json(reusable_path)
         except ProjectOSError:
-            shared_value = None
-        if isinstance(shared_value, dict):
-            if shared_value.get("knowledge_version") != system.get("project_os_version"):
-                errors.append(
-                    "shared knowledge_version must match SYSTEM project_os_version"
-                )
-            if shared_value.get("packs") != ["core", *packs]:
-                errors.append("shared knowledge packs must match SYSTEM packs")
-            if shared_value.get("overlays") != overlays:
-                errors.append("shared knowledge overlays must match SYSTEM overlays")
-            entries = shared_value.get("entries", [])
+            reusable_value = None
+        if isinstance(reusable_value, dict):
+            if set(reusable_value) != {"schema_version", "entries"}:
+                errors.append("reusable knowledge may contain only schema_version and entries")
+            entries = reusable_value.get("entries", [])
             if isinstance(entries, list):
-                entries_by_id = {
-                    entry.get("id"): entry
-                    for entry in entries
-                    if isinstance(entry, dict) and isinstance(entry.get("id"), str)
-                }
-                for entry_id, recorded_hash in managed_knowledge.items():
-                    entry = entries_by_id.get(entry_id)
-                    if entry is None:
-                        errors.append(f"managed knowledge baseline references missing id {entry_id}")
-                    elif entry_content_hash(entry) != recorded_hash:
-                        errors.append(f"managed knowledge differs from its recorded baseline: {entry_id}")
                 for entry in entries:
                     entry_id = entry.get("id") if isinstance(entry, dict) else None
                     if (
                         not isinstance(entry, dict)
                         or not isinstance(entry_id, str)
-                        or entry_id not in valid_shared_ids
+                        or entry_id not in valid_reusable_ids
                     ):
                         continue
                     source = entry.get("source")
-                    source_kind = source.get("kind") if isinstance(source, dict) else None
-                    if (
-                        isinstance(source_kind, str)
-                        and source_kind in {"project-os-pack", "incident-derived"}
-                        and entry["id"] not in managed_knowledge
-                    ):
-                        errors.append(f"managed knowledge baseline is missing id {entry['id']}")
-                    source_pack = source.get("pack") if isinstance(source, dict) else None
-                    if isinstance(source_pack, str):
-                        shared_targets[entry["id"]] = source_pack
-        for label in private_material_labels(shared_value):
-            errors.append(f"shared knowledge contains a {label}")
+                    origin_pack = source.get("origin_pack") if isinstance(source, dict) else None
+                    if isinstance(origin_pack, str):
+                        reusable_targets[entry["id"]] = origin_pack
 
     project_paths = paths.get("project_knowledge", [])
     if not isinstance(project_paths, list):
@@ -2833,20 +3120,18 @@ def check_project(root: Path, config: Path | None = None) -> int:
         if not coverage_path.is_file():
             errors.append(f"missing knowledge coverage file: {coverage_path.relative_to(root)}")
         else:
-            validate_knowledge_coverage(root, inventory, coverage_path, shared_targets, errors)
-    elif inventory:
-        errors.append(
-            "legacy knowledge requires paths.knowledge_coverage"
-            + (
-                "; duplicate ids: " + ", ".join(duplicate_legacy_ids)
-                if duplicate_legacy_ids
-                else ""
+            validate_knowledge_coverage(
+                root,
+                inventory,
+                coverage_path,
+                reusable_targets,
+                errors,
+                require_canonical_targets=False,
             )
-        )
 
     scan_paths: list[Path] = [config_path]
     scan_paths.extend(
-        path for path in (shared_path, *[safe_relative(root, value) for value in expected_pack_paths])
+        path for path in (reusable_path, *[safe_relative(root, value) for value in expected_pack_paths])
         if path is not None
     )
     scan_paths.extend(
@@ -2901,11 +3186,11 @@ def read_selected_system(
         raise ProjectOSError("SYSTEM configuration must contain an object")
     if system.get("schema_version") != SCHEMA_VERSION:
         raise ProjectOSError(
-            f"sync requires SYSTEM schema_version {SCHEMA_VERSION}; migrate older state explicitly"
+            f"operation requires SYSTEM schema_version {SCHEMA_VERSION}; run upgrade first"
         )
     if system.get("project_os_version") != VERSION:
         raise ProjectOSError(
-            f"Repository Project OS version must be {VERSION}; run upgrade before sync"
+            f"Repository Project OS version must be {VERSION}; run upgrade first"
         )
     if not isinstance(system.get("mode"), str) or system.get("mode") not in {
         "standard",
@@ -2926,9 +3211,9 @@ def read_selected_system(
     if any(not isinstance(name, str) or name not in OVERLAY_NAMES for name in overlays):
         raise ProjectOSError("SYSTEM overlays contain an unknown value")
     if packs != [name for name in PACK_NAMES if name in set(packs)]:
-        raise ProjectOSError("SYSTEM packs must be known, unique, and in canonical order")
+        raise ProjectOSError("SYSTEM packs must be known, unique and in canonical order")
     if overlays != [name for name in OVERLAY_NAMES if name in set(overlays)]:
-        raise ProjectOSError("SYSTEM overlays must be known, unique, and in canonical order")
+        raise ProjectOSError("SYSTEM overlays must be known, unique and in canonical order")
     validate_overlay_dependencies(packs, overlays)
     if system.get("pack_paths") != [f".agents/packs/{name}.md" for name in packs]:
         raise ProjectOSError("SYSTEM pack_paths do not match selected packs")
@@ -2955,10 +3240,10 @@ def read_selected_system(
         validate_active_program(program_path, system.get("active_program"), lifecycle_errors)
     if lifecycle_errors:
         raise ProjectOSError("Invalid Program lifecycle: " + "; ".join(lifecycle_errors))
-    shared_path = safe_relative(root, system["paths"].get("shared_knowledge"))
-    if shared_path is None:
-        raise ProjectOSError("SYSTEM shared knowledge path is unsafe or missing")
-    reject_symlink_path(root, shared_path)
+    reusable_path = safe_relative(root, system["paths"].get("reusable_knowledge"))
+    if reusable_path is None:
+        raise ProjectOSError("SYSTEM reusable knowledge path is unsafe or missing")
+    reject_symlink_path(root, reusable_path)
     return packs, overlays, system
 
 
@@ -2968,227 +3253,750 @@ def sync_knowledge(
     overlays_value: str,
     dry_run: bool,
 ) -> int:
+    del packs_value, overlays_value, dry_run
     root = root.resolve()
-    snapshots: dict[Path, str] = {}
-    selected_packs, selected_overlays, system = read_selected_system(root, snapshots)
-    packs = (
-        selected_packs
-        if packs_value.strip().lower() == "selected"
-        else parse_selection(packs_value, selected_packs, PACK_NAMES, "packs")
-    )
-    overlays = (
-        selected_overlays
-        if overlays_value.strip().lower() == "selected"
-        else parse_selection(overlays_value, selected_overlays, OVERLAY_NAMES, "overlays")
-    )
-    validate_overlay_dependencies(packs, overlays)
-    if list(packs) != list(selected_packs):
-        raise ProjectOSError("sync packs must exactly match SYSTEM packs")
-    if list(overlays) != list(selected_overlays):
-        raise ProjectOSError("sync overlays must exactly match SYSTEM overlays")
-    expected_system = default_system(
-        root,
-        str(system.get("mode", "standard")),
-        str(system.get("installation", "initialized")),
-        packs,
-        overlays,
-        system.get("paths", {}),
-        system.get("active_program") if isinstance(system.get("active_program"), dict) else None,
-    )
-    recorded_guidance = system.get("managed_guidance")
-    expected_guidance = expected_system["managed_guidance"]
-    if not isinstance(recorded_guidance, dict) or list(recorded_guidance) != list(expected_guidance):
-        raise ProjectOSError("SYSTEM managed_guidance is missing or inconsistent")
-    if any(not isinstance(value, str) for value in recorded_guidance.values()):
-        raise ProjectOSError("SYSTEM managed_guidance contains an invalid baseline")
-    recorded_knowledge = system.get("managed_knowledge")
-    if not isinstance(recorded_knowledge, dict) or any(
-        not isinstance(entry_id, str) or not isinstance(entry_hash, str)
-        for entry_id, entry_hash in (
-            recorded_knowledge.items() if isinstance(recorded_knowledge, dict) else ()
-        )
-    ):
-        raise ProjectOSError("SYSTEM managed_knowledge is missing or invalid")
-
-    guidance_contents = guidance_content_map(packs, overlays)
-    guidance_conflicts: list[str] = []
-    guidance_creates: list[tuple[Path, str]] = []
-    guidance_replacements: list[tuple[Path, str, str]] = []
-    for raw_path, recorded_hash in recorded_guidance.items():
-        path = safe_relative(root, raw_path)
-        if path is None:
-            raise ProjectOSError(f"Managed guidance path is unsafe: {raw_path}")
-        reject_symlink_path(root, path)
-        desired_hash = expected_guidance[raw_path]
-        desired_content = guidance_contents[raw_path]
-        if not path.exists():
-            guidance_creates.append((path, desired_content))
-            continue
-        if not path.is_file():
-            raise ProjectOSError(f"Managed guidance is not a regular file: {raw_path}")
-        actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        actual_hash = "sha256:" + actual_digest
-        if actual_hash == desired_hash:
-            continue
-        if actual_hash == recorded_hash:
-            guidance_replacements.append((path, desired_content, actual_digest))
-        else:
-            guidance_conflicts.append(f"{raw_path} differs locally")
-    if guidance_conflicts:
-        for conflict in guidance_conflicts:
-            print(f"guidance conflict: {conflict}")
-        return 1
-    paths = system.get("paths", {})
-    raw_destination = paths.get("shared_knowledge", DEFAULT_PATHS["shared_knowledge"])
-    destination = safe_relative(root, raw_destination)
-    if destination is None:
-        raise ProjectOSError(f"Invalid shared knowledge destination: {raw_destination!r}")
-    require_destination_within_root(root, destination)
-    reject_symlink_path(root, destination)
     system_path = root / ".agents" / "SYSTEM.json"
-    reject_symlink_path(root, system_path)
-    if destination == system_path or destination in {
-        path for path, _ in guidance_creates
-    } | {path for path, _, _ in guidance_replacements}:
-        raise ProjectOSError("SYSTEM paths collide with Project OS-managed files")
+    if not system_path.is_file():
+        raise ProjectOSError("Project OS is not configured in the target repository")
+    print("sync-knowledge is deprecated and never writes in Project OS 2.1.0")
+    print("Use `knowledge import --source <repository-or-bundle>` for user-owned lessons.")
+    print("Use `upgrade` to refresh Project OS guidance, schema and release metadata.")
+    return 0
 
-    desired = composed_knowledge(packs, overlays)
-    validate_composed_knowledge(desired, packs, overlays)
-    pre_read_sha256: str | None = None
-    if destination.exists():
-        if not destination.is_file():
-            raise ProjectOSError(f"Shared knowledge destination is not a file: {destination}")
-        current, pre_read_sha256 = load_json_snapshot(destination)
-        snapshots[destination] = pre_read_sha256
-    else:
-        current = {
-            "schema_version": 1,
-            "knowledge_version": "0.0.0",
-            "packs": [],
-            "overlays": [],
-            "entries": [],
-        }
-    if not isinstance(current, dict) or not isinstance(current.get("entries"), list):
-        raise ProjectOSError(f"Invalid shared knowledge structure: {destination}")
-    validation_errors: list[str] = []
-    if destination.exists():
-        validate_failure_registry(
-            destination,
-            "shared knowledge",
-            validation_errors,
-            verify_hashes=True,
-            strict_managed=True,
-        )
-    if destination.exists():
-        if current.get("packs") != ["core", *selected_packs]:
-            validation_errors.append("shared knowledge packs do not match SYSTEM packs")
-        if current.get("overlays") != selected_overlays:
-            validation_errors.append("shared knowledge overlays do not match SYSTEM overlays")
-    for label in private_material_labels(current):
-        validation_errors.append(f"shared knowledge contains a {label}")
-    if validation_errors:
-        for error in validation_errors:
-            print(f"knowledge conflict: {error}")
-        print("knowledge sync aborted: invalid or locally changed knowledge")
-        return 1
 
-    current_by_id: dict[str, dict[str, Any]] = {}
-    for index, entry in enumerate(current["entries"]):
-        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
-            raise ProjectOSError(f"Invalid shared knowledge entry at index {index}")
-        if entry["id"] in current_by_id:
-            raise ProjectOSError(f"Duplicate shared knowledge id: {entry['id']}")
-        current_by_id[entry["id"]] = entry
+def parse_identifier_list(value: str | None, label: str) -> list[str]:
+    if value is None:
+        return []
+    identifiers = [item.strip() for item in value.split(",") if item.strip()]
+    if not identifiers or len(identifiers) != len(set(identifiers)):
+        raise ProjectOSError(f"{label} must contain unique comma-separated ids")
+    return identifiers
 
-    desired_by_id = {entry["id"]: entry for entry in desired["entries"]}
-    additions: list[dict[str, Any]] = []
-    updates: list[dict[str, Any]] = []
-    conflicts: list[str] = []
-    for entry in desired["entries"]:
-        existing = current_by_id.get(entry["id"])
-        if existing is None:
-            additions.append(entry)
-        elif existing == entry:
-            continue
-        else:
-            recorded_hash = recorded_knowledge.get(entry["id"])
-            if isinstance(recorded_hash, str) and entry_content_hash(existing) == recorded_hash:
-                updates.append(entry)
-            else:
-                conflicts.append(entry["id"])
 
-    retained = sorted(set(current_by_id).difference(desired_by_id))
-    for entry_id in retained:
-        source = current_by_id[entry_id].get("source")
-        source_kind = source.get("kind") if isinstance(source, dict) else None
-        if (
-            isinstance(source_kind, str)
-            and source_kind in {"project-os-pack", "incident-derived"}
-            and entry_id not in recorded_knowledge
-        ):
-            conflicts.append(entry_id)
-
-    print(f"knowledge additions: {len(additions)}")
-    for entry in additions:
-        print(f"knowledge add: {entry['id']} {entry['title']}")
-    print(f"knowledge updates: {len(updates)}")
-    for entry in updates:
-        print(f"knowledge update: {entry['id']} {entry['title']}")
-    for entry_id in conflicts:
-        print(f"conflict: {entry_id} differs locally and was not overwritten")
-    for entry_id in retained:
-        print(f"retain: {entry_id} is not in the selected upstream set")
-
-    if conflicts:
-        print("knowledge sync aborted: resolve conflicts before applying any changes")
-        return 1
-
-    next_managed_knowledge = {
-        entry_id: entry_hash
-        for entry_id, entry_hash in recorded_knowledge.items()
-        if entry_id in retained
-    }
-    next_managed_knowledge.update(expected_system["managed_knowledge"])
-    next_system = copy.deepcopy(system)
-    next_system["project_os_version"] = VERSION
-    next_system["generated_on"] = date.today().isoformat()
-    next_system["managed_guidance"] = expected_guidance
-    next_system["managed_knowledge"] = dict(sorted(next_managed_knowledge.items()))
-
-    next_by_id = dict(current_by_id)
-    for entry in additions:
-        next_by_id[entry["id"]] = entry
-    for entry in updates:
-        next_by_id[entry["id"]] = entry
-    current["entries"] = sorted(next_by_id.values(), key=lambda entry: str(entry.get("id", "")))
-    current["knowledge_version"] = VERSION
-    current["packs"] = ["core", *packs]
-    current["overlays"] = list(overlays)
-    serialized = json.dumps(current, indent=2, ensure_ascii=False) + "\n"
-    serialized_system = json.dumps(next_system, indent=2, ensure_ascii=False) + "\n"
-
-    destination_changed = (
-        pre_read_sha256 is None
-        or hashlib.sha256(serialized.encode("utf-8")).hexdigest() != pre_read_sha256
+def validate_reusable_value(value: Any, label: str) -> None:
+    errors: list[str] = []
+    if not isinstance(value, dict):
+        raise ProjectOSError(f"{label} must contain an object")
+    if set(value) != {"schema_version", "entries"}:
+        errors.append(f"{label} may contain only schema_version and entries")
+    validate_registry_schema(value, label, errors)
+    entries = value.get("entries")
+    check_unique_ids(
+        entries,
+        label,
+        errors,
+        (
+            "id", "title", "status", "applies_to", "trigger", "mechanism",
+            "prevention", "verification", "boundaries", "source",
+        ),
+        FAILURE_STATUSES,
     )
-    system_pre_read = snapshots[system_path]
-    system_changed = hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != system_pre_read
+    if isinstance(entries, list):
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            for key in ("id", "title", "trigger", "mechanism", "prevention"):
+                if not isinstance(entry.get(key), str) or not entry.get(key).strip():
+                    errors.append(f"{label}[{index}] has invalid {key}")
+            for key in ("applies_to", "verification", "boundaries"):
+                values = entry.get(key)
+                if (
+                    not isinstance(values, list)
+                    or not values
+                    or any(not isinstance(item, str) or not item.strip() for item in values)
+                ):
+                    errors.append(f"{label}[{index}] has invalid {key}")
+    validate_strict_reusable_entries(entries, label, errors, verify_hashes=True)
+    for material_label in private_material_labels(value):
+        errors.append(f"{label} contains a {material_label}")
+    if errors:
+        raise ProjectOSError(f"Invalid {label}: " + "; ".join(errors))
 
-    creates = list(guidance_creates)
-    replacements = list(guidance_replacements)
-    if destination_changed:
-        if pre_read_sha256 is None:
-            creates.append((destination, serialized))
-        else:
-            replacements.append((destination, serialized, pre_read_sha256))
-    if system_changed:
-        replacements.append((system_path, serialized_system, system_pre_read))
-    print_transaction_preview(root, creates, replacements)
+
+def load_reusable_registry(
+    root: Path, snapshots: dict[Path, str] | None = None,
+) -> tuple[dict[str, Any], Path, dict[str, Any], str]:
+    _, _, system = read_selected_system(root, snapshots)
+    raw_path = system["paths"].get("reusable_knowledge")
+    path = safe_relative(root, raw_path)
+    if path is None or not path.is_file():
+        raise ProjectOSError("Reusable knowledge registry is unsafe or missing")
+    reject_symlink_path(root, path)
+    value, digest = load_json_snapshot(path)
+    validate_reusable_value(value, "reusable knowledge")
+    if snapshots is not None:
+        snapshots[path] = digest
+    return value, path, system, digest
+
+
+def validate_proposal(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, dict):
+        raise ProjectOSError("Knowledge proposal must contain an object")
+    if set(value) != {"format", "schema_version", "entries"}:
+        raise ProjectOSError(
+            "Knowledge proposal may contain only format, schema_version and entries"
+        )
+    if value.get("format") != "project-os-knowledge-proposal":
+        raise ProjectOSError("Knowledge proposal format is invalid")
+    if value.get("schema_version") != 1:
+        raise ProjectOSError("Knowledge proposal schema_version must be 1")
+    entries = value.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise ProjectOSError("Knowledge proposal entries must be a non-empty array")
+    required = {
+        "id", "title", "applies_to", "trigger", "mechanism", "prevention",
+        "verification", "boundaries",
+    }
+    identifiers: set[str] = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or set(entry) != required:
+            raise ProjectOSError(
+                f"Knowledge proposal entry {index} must contain exactly: "
+                + ", ".join(sorted(required))
+            )
+        entry_id = entry.get("id")
+        if not is_canonical_knowledge_token(entry_id) or entry_id in identifiers:
+            raise ProjectOSError(f"Knowledge proposal entry {index} has an invalid or duplicate id")
+        identifiers.add(entry_id)
+        for key in ("title", "trigger", "mechanism", "prevention"):
+            if not isinstance(entry.get(key), str) or not entry.get(key).strip():
+                raise ProjectOSError(f"Knowledge proposal {entry_id} has invalid {key}")
+        for key in ("applies_to", "verification", "boundaries"):
+            items = entry.get(key)
+            if (
+                not isinstance(items, list)
+                or not items
+                or any(not isinstance(item, str) or not item.strip() for item in items)
+            ):
+                raise ProjectOSError(f"Knowledge proposal {entry_id} has invalid {key}")
+        applies_to = entry["applies_to"]
+        if any(not is_canonical_knowledge_token(tag) for tag in applies_to):
+            raise ProjectOSError(
+                f"Knowledge proposal {entry_id} applies_to tags must be trimmed and contain no whitespace, commas or controls"
+            )
+        if len(applies_to) != len(set(applies_to)):
+            raise ProjectOSError(f"Knowledge proposal {entry_id} applies_to tags must be unique")
+    privacy = private_material_labels(value)
+    if privacy:
+        raise ProjectOSError("Knowledge proposal contains: " + ", ".join(privacy))
+    return entries
+
+
+def selected_proposal_entries(
+    proposal: Sequence[dict[str, Any]], ids_value: str | None, select_all: bool,
+) -> list[dict[str, Any]]:
+    requested = parse_identifier_list(ids_value, "--ids")
+    if bool(requested) == select_all:
+        raise ProjectOSError("Choose exactly one of --ids or --all")
+    by_id = {entry["id"]: entry for entry in proposal}
+    if select_all:
+        return list(proposal)
+    missing = sorted(set(requested).difference(by_id))
+    if missing:
+        raise ProjectOSError("Proposal does not contain ids: " + ", ".join(missing))
+    return [by_id[entry_id] for entry_id in requested]
+
+
+def merge_active_entries(
+    current: Sequence[dict[str, Any]],
+    incoming: Sequence[dict[str, Any]],
+    *,
+    allow_draft_approval: bool = False,
+) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+    by_id = {entry["id"]: copy.deepcopy(entry) for entry in current}
+    semantics = {semantic_lesson_hash(entry): entry["id"] for entry in current}
+    report: dict[str, list[str]] = {
+        "additions": [], "updates": [], "duplicates": [], "conflicts": [], "unchanged": [],
+    }
+    for entry in sorted(incoming, key=lambda item: item["id"]):
+        entry_id = entry["id"]
+        existing = by_id.get(entry_id)
+        incoming_hash = entry.get("source", {}).get("content_hash")
+        if existing is not None:
+            existing_hash = existing.get("source", {}).get("content_hash")
+            if incoming_hash == existing_hash:
+                report["unchanged"].append(entry_id)
+                continue
+            if allow_draft_approval and existing.get("status") == "draft":
+                incoming_semantic_hash = semantic_lesson_hash(entry)
+                duplicate_id = next(
+                    (
+                        candidate["id"]
+                        for candidate in sorted(by_id.values(), key=lambda item: item["id"])
+                        if candidate["id"] != entry_id
+                        and semantic_lesson_hash(candidate) == incoming_semantic_hash
+                    ),
+                    None,
+                )
+                if duplicate_id is not None:
+                    report["duplicates"].append(f"{entry_id}:{duplicate_id}")
+                    continue
+                existing_semantic_hash = semantic_lesson_hash(existing)
+                if semantics.get(existing_semantic_hash) == entry_id:
+                    semantics.pop(existing_semantic_hash)
+                by_id[entry_id] = copy.deepcopy(entry)
+                semantics[incoming_semantic_hash] = entry_id
+                report["updates"].append(entry_id)
+                continue
+            if (
+                existing.get("status") == "active"
+                and entry.get("status") in {"retired", "replaced"}
+                and entry.get("previous_content_hash") == existing_hash
+            ):
+                by_id[entry_id] = copy.deepcopy(entry)
+                report["updates"].append(entry_id)
+                continue
+            report["conflicts"].append(entry_id)
+            continue
+        semantic_hash = semantic_lesson_hash(entry)
+        if entry.get("status") in {"retired", "replaced"}:
+            by_id[entry_id] = copy.deepcopy(entry)
+            report["additions"].append(entry_id)
+            continue
+        duplicate_id = semantics.get(semantic_hash)
+        if duplicate_id is not None:
+            report["duplicates"].append(f"{entry_id}:{duplicate_id}")
+            continue
+        by_id[entry_id] = copy.deepcopy(entry)
+        semantics[semantic_hash] = entry_id
+        report["additions"].append(entry_id)
+    return sorted(by_id.values(), key=lambda item: item["id"]), report
+
+
+def apply_registry_change(
+    root: Path,
+    registry_path: Path,
+    registry_digest: str,
+    next_entries: Sequence[dict[str, Any]],
+    report: dict[str, Any],
+    dry_run: bool,
+    extra_precondition: Callable[[], None] | None = None,
+) -> int:
+    next_value = {
+        "schema_version": 1,
+        "entries": sorted((copy.deepcopy(entry) for entry in next_entries), key=lambda item: item["id"]),
+    }
+    print(canonical_json(report), end="")
+    if report.get("conflicts"):
+        print("knowledge operation aborted: resolve conflicts before applying changes")
+        return 1
+    validate_reusable_value(next_value, "reusable knowledge")
+    serialized = canonical_json(next_value)
+    replacements: list[tuple[Path, str, str]] = []
+    current_value, current_digest = load_json_snapshot(registry_path)
+    if current_digest != registry_digest:
+        raise ProjectOSError("Reusable knowledge changed after preview")
+    if current_value != next_value:
+        replacements.append((registry_path, serialized, registry_digest))
+    print_transaction_preview(root, [], replacements)
     if dry_run:
         print("dry-run: no files written")
         return 0
-    execute_sync_transaction(root, creates, replacements, preconditions=snapshots)
+    if extra_precondition is not None:
+        extra_precondition()
+
+    def validate_after_write() -> None:
+        require_passing_check(root, "Knowledge operation")
+        if extra_precondition is not None:
+            extra_precondition()
+
+    execute_sync_transaction(
+        root,
+        [],
+        replacements,
+        after_write=validate_after_write,
+        preconditions={registry_path: registry_digest},
+    )
     return 0
+
+
+def knowledge_list(root: Path, scope: str) -> int:
+    root = root.resolve()
+    reusable, _, system, _ = load_reusable_registry(root)
+    result: dict[str, Any] = {"scope": scope}
+    if scope in {"reusable", "all"}:
+        result["reusable"] = reusable["entries"]
+    if scope in {"project", "all"}:
+        project: list[dict[str, Any]] = []
+        for raw_path in system["paths"].get("project_knowledge", []):
+            path = safe_relative(root, raw_path)
+            if path is None or not path.is_file():
+                raise ProjectOSError(f"Project knowledge path is unsafe or missing: {raw_path!r}")
+            if path.suffix == ".json":
+                value = load_json(path)
+                entries = value.get("entries", []) if isinstance(value, dict) else []
+                project.append({"path": raw_path, "entries": entries})
+            else:
+                project.append({"path": raw_path, "format": "markdown"})
+        result["project"] = project
+    print(canonical_json(result), end="")
+    return 0
+
+
+def knowledge_approve(
+    root: Path, proposal_path: Path, ids_value: str | None, select_all: bool, dry_run: bool,
+) -> int:
+    root = root.resolve()
+    proposal_path = proposal_path.resolve()
+    proposal, proposal_digest = load_json_snapshot(proposal_path)
+    selected = selected_proposal_entries(validate_proposal(proposal), ids_value, select_all)
+    incoming = [
+        make_user_owned_entry(entry, status="active", source_kind="user-reviewed")
+        for entry in selected
+    ]
+    reusable, registry_path, _, registry_digest = load_reusable_registry(root)
+    next_entries, merge_report = merge_active_entries(
+        reusable["entries"], incoming, allow_draft_approval=True
+    )
+    report: dict[str, Any] = {"operation": "approve", "selected": [e["id"] for e in incoming]}
+    report.update(merge_report)
+
+    def verify_proposal() -> None:
+        _, current_digest = load_json_snapshot(proposal_path)
+        if current_digest != proposal_digest:
+            raise ProjectOSError("Knowledge proposal changed after preview")
+
+    return apply_registry_change(
+        root, registry_path, registry_digest, next_entries, report, dry_run, verify_proposal
+    )
+
+
+def incomplete_lifecycle_links(entries: Sequence[dict[str, Any]]) -> list[str]:
+    selected_ids = {entry["id"] for entry in entries}
+    return sorted(
+        {
+            f"{entry['id']}:{relation}->{entry[relation]}"
+            for entry in entries
+            for relation in ("replaces", "replaced_by")
+            if relation in entry and entry[relation] not in selected_ids
+        }
+    )
+
+
+def resolve_external_export_output(root: Path, output: Path) -> Path:
+    requested = output.expanduser().absolute()
+    if requested.is_symlink():
+        raise ProjectOSError(f"Refusing to overwrite an existing export: {requested}")
+    resolved = requested.resolve(strict=False)
+    if resolved.is_relative_to(root):
+        raise ProjectOSError(
+            f"Knowledge export output must be outside the target repository: {resolved}"
+        )
+    return resolved
+
+
+def knowledge_export(
+    root: Path,
+    output: Path,
+    ids_value: str | None,
+    active_only: bool,
+    dry_run: bool,
+) -> int:
+    root = root.resolve()
+    reusable, registry_path, _, registry_digest = load_reusable_registry(root)
+    requested = parse_identifier_list(ids_value, "--ids")
+    by_id = {entry["id"]: entry for entry in reusable["entries"]}
+    if requested:
+        missing = sorted(set(requested).difference(by_id))
+        if missing:
+            raise ProjectOSError("Reusable knowledge does not contain ids: " + ", ".join(missing))
+        selected = [by_id[entry_id] for entry_id in requested]
+    else:
+        selected = list(reusable["entries"])
+    drafts = [entry["id"] for entry in selected if entry["status"] == "draft"]
+    selected = [entry for entry in selected if entry["status"] != "draft"]
+    if requested and drafts:
+        raise ProjectOSError("Draft lessons require approval before export: " + ", ".join(drafts))
+    if active_only:
+        selected = [entry for entry in selected if entry["status"] == "active"]
+    missing_lifecycle = incomplete_lifecycle_links(selected)
+    if missing_lifecycle:
+        raise ProjectOSError(
+            "Export selection has an incomplete lifecycle chain: "
+            + ", ".join(missing_lifecycle)
+        )
+    bundle = {
+        "format": "project-os-reusable-knowledge",
+        "schema_version": 1,
+        "created_with": VERSION,
+        "entries": sorted((copy.deepcopy(entry) for entry in selected), key=lambda item: item["id"]),
+    }
+    privacy = private_material_labels(bundle)
+    if privacy:
+        raise ProjectOSError("Knowledge bundle contains: " + ", ".join(privacy))
+    serialized = canonical_json(bundle)
+    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    output = resolve_external_export_output(root, output)
+    filesystem = AnchoredFilesystem(output.parent)
+    try:
+        parent_fd = filesystem.parent(output)
+        filesystem.verify()
+        try:
+            os.stat(output.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ProjectOSError(f"Refusing to overwrite an existing export: {output}")
+        print(
+            canonical_json(
+                {
+                    "operation": "export",
+                    "entries": len(selected),
+                    "output": str(output),
+                    "sha256": "sha256:" + digest,
+                }
+            ),
+            end="",
+        )
+        if dry_run:
+            print("dry-run: no files written")
+            return 0
+        _, current_digest = load_json_snapshot(registry_path)
+        if current_digest != registry_digest:
+            raise ProjectOSError("Reusable knowledge changed after preview")
+
+        temporary = f".project-os-export-{uuid.uuid4().hex}.tmp"
+        temporary_identity: tuple[int, int] | None = None
+        ownership_descriptor: int | None = None
+        published_owned = False
+        publication_complete = False
+        try:
+            filesystem.verify()
+            ownership_descriptor = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o644,
+                dir_fd=parent_fd,
+            )
+            details = os.fstat(ownership_descriptor)
+            temporary_identity = (details.st_dev, details.st_ino)
+            writer_descriptor = os.dup(ownership_descriptor)
+            try:
+                handle = os.fdopen(writer_descriptor, "wb")
+            except BaseException:
+                os.close(writer_descriptor)
+                raise
+            with handle:
+                handle.write(serialized.encode("utf-8"))
+                handle.flush()
+                os.fsync(handle.fileno())
+            filesystem.verify()
+            content, details = read_regular_at(parent_fd, temporary)
+            if (details.st_dev, details.st_ino) != temporary_identity or (
+                hashlib.sha256(content).hexdigest() != digest
+            ):
+                raise ProjectOSError("Temporary knowledge export changed before publication")
+            try:
+                os.link(
+                    temporary,
+                    output.name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+            except FileExistsError as error:
+                raise ProjectOSError(
+                    f"Refusing to overwrite an existing export: {output}"
+                ) from error
+            published, published_details = read_regular_at(parent_fd, output.name)
+            if (
+                (published_details.st_dev, published_details.st_ino)
+                != temporary_identity
+                or hashlib.sha256(published).hexdigest() != digest
+            ):
+                raise ProjectOSError(
+                    "Published knowledge export changed before verification"
+                )
+            published_owned = True
+            filesystem.verify()
+            unlink_owned_at(parent_fd, temporary, temporary_identity)
+            filesystem.verify()
+            publication_complete = True
+        except OSError as error:
+            raise ProjectOSError(f"Knowledge export failed: {error}") from error
+        finally:
+            if (
+                temporary_identity is not None
+                and published_owned
+                and not publication_complete
+            ):
+                unlink_owned_at(parent_fd, output.name, temporary_identity)
+            if temporary_identity is not None:
+                unlink_owned_at(parent_fd, temporary, temporary_identity)
+            if ownership_descriptor is not None:
+                os.close(ownership_descriptor)
+    finally:
+        filesystem.close()
+    return 0
+
+
+def load_import_source(source: Path) -> tuple[list[dict[str, Any]], Path, str]:
+    source = source.expanduser().absolute()
+    if source.is_dir():
+        system_path = source / ".agents" / "SYSTEM.json"
+        system = load_json(system_path)
+        if not isinstance(system, dict) or system.get("schema_version") != SCHEMA_VERSION:
+            raise ProjectOSError("Source repository must be upgraded to schema 4 before import")
+        paths = system.get("paths")
+        reusable_path = safe_relative(source, paths.get("reusable_knowledge")) if isinstance(paths, dict) else None
+        if reusable_path is None:
+            raise ProjectOSError("Source repository reusable knowledge path is unsafe or missing")
+        source_path = reusable_path
+    else:
+        source_path = source
+    if not source_path.is_file() or source_path.is_symlink():
+        raise ProjectOSError(f"Knowledge import source is not a regular file: {source_path}")
+    value, digest = load_json_snapshot(source_path)
+    if isinstance(value, dict) and value.get("format") == "project-os-reusable-knowledge":
+        if set(value) != {"format", "schema_version", "created_with", "entries"}:
+            raise ProjectOSError("Knowledge bundle has non-canonical top-level fields")
+        if value.get("schema_version") != 1 or not isinstance(value.get("created_with"), str):
+            raise ProjectOSError("Knowledge bundle metadata is invalid")
+        registry_value = {"schema_version": 1, "entries": value.get("entries")}
+    else:
+        registry_value = value
+    validate_reusable_value(registry_value, "imported reusable knowledge")
+    return registry_value["entries"], source_path, digest
+
+
+def target_applicability_tags(system: dict[str, Any]) -> set[str]:
+    tags = {"engineering", *system.get("packs", [])}
+    for overlay in system.get("overlays", []):
+        tags.add(overlay)
+        if overlay == "react-native-expo":
+            tags.update({"react-native", "expo"})
+    return tags
+
+
+def knowledge_import(
+    root: Path,
+    source: Path,
+    ids_value: str | None,
+    select_all: bool,
+    dry_run: bool,
+) -> int:
+    root = root.resolve()
+    reusable, registry_path, system, registry_digest = load_reusable_registry(root)
+    incoming, source_path, source_digest = load_import_source(source)
+    requested = parse_identifier_list(ids_value, "--ids")
+    if requested and select_all:
+        raise ProjectOSError("Choose at most one of --ids or --all")
+    by_id = {entry["id"]: entry for entry in incoming}
+    if requested:
+        missing = sorted(set(requested).difference(by_id))
+        if missing:
+            raise ProjectOSError("Import source does not contain ids: " + ", ".join(missing))
+        selected = [by_id[entry_id] for entry_id in requested]
+        drafts = [entry["id"] for entry in selected if entry["status"] == "draft"]
+        if drafts:
+            raise ProjectOSError(
+                "Draft lessons require source approval before import: " + ", ".join(drafts)
+            )
+        incomplete = incomplete_lifecycle_links(selected)
+        if incomplete:
+            raise ProjectOSError(
+                "Import selection has an incomplete lifecycle chain: "
+                + ", ".join(incomplete)
+            )
+        skipped: list[dict[str, str]] = []
+        lifecycle_selected: list[dict[str, str]] = []
+    elif select_all:
+        selected = [entry for entry in incoming if entry["status"] != "draft"]
+        skipped = [
+            {"id": entry["id"], "reason": "draft requires source approval"}
+            for entry in incoming if entry["status"] == "draft"
+        ]
+        lifecycle_selected = []
+    else:
+        tags = target_applicability_tags(system)
+        selected = []
+        skipped = []
+        lifecycle_selected = []
+        for entry in incoming:
+            if entry["status"] == "draft":
+                skipped.append({"id": entry["id"], "reason": "draft requires source approval"})
+            elif entry["status"] in {"retired", "replaced"}:
+                selected.append(entry)
+                if not tags.intersection(entry["applies_to"]):
+                    lifecycle_selected.append(
+                        {"id": entry["id"], "reason": "lifecycle tombstone"}
+                    )
+            elif tags.intersection(entry["applies_to"]):
+                selected.append(entry)
+            else:
+                skipped.append(
+                    {"id": entry["id"], "reason": "not applicable to target packs or overlays"}
+                )
+        selected_ids = {entry["id"] for entry in selected}
+        pending = sorted(selected_ids)
+        while pending:
+            selected_id = pending.pop(0)
+            entry = by_id[selected_id]
+            for relation in ("replaces", "replaced_by"):
+                linked_id = entry.get(relation)
+                if not isinstance(linked_id, str) or linked_id in selected_ids:
+                    continue
+                linked = by_id[linked_id]
+                selected.append(linked)
+                selected_ids.add(linked_id)
+                pending.append(linked_id)
+                pending.sort()
+                skipped = [item for item in skipped if item["id"] != linked_id]
+                lifecycle_selected.append(
+                    {"id": linked_id, "reason": f"{relation} of {selected_id}"}
+                )
+        incomplete = incomplete_lifecycle_links(selected)
+        if incomplete:
+            raise ProjectOSError(
+                "Default import could not close the lifecycle chain: "
+                + ", ".join(incomplete)
+            )
+    next_entries, merge_report = merge_active_entries(reusable["entries"], selected)
+    report: dict[str, Any] = {
+        "operation": "import",
+        "source": str(source_path),
+        "target_tags": sorted(target_applicability_tags(system)),
+        "selected": [entry["id"] for entry in sorted(selected, key=lambda item: item["id"])],
+        "lifecycle_selected": sorted(lifecycle_selected, key=lambda item: item["id"]),
+        "skipped": sorted(skipped, key=lambda item: item["id"]),
+    }
+    report.update(merge_report)
+
+    def verify_source() -> None:
+        _, current_digest = load_json_snapshot(source_path)
+        if current_digest != source_digest:
+            raise ProjectOSError("Knowledge import source changed after preview")
+
+    return apply_registry_change(
+        root, registry_path, registry_digest, next_entries, report, dry_run, verify_source
+    )
+
+
+def knowledge_revise(root: Path, entry_id: str, proposal_path: Path, dry_run: bool) -> int:
+    root = root.resolve()
+    proposal_path = proposal_path.resolve()
+    proposal, proposal_digest = load_json_snapshot(proposal_path)
+    proposed = validate_proposal(proposal)
+    if len(proposed) != 1:
+        raise ProjectOSError("Knowledge revise proposal must contain exactly one entry")
+    replacement = proposed[0]
+    if replacement["id"] == entry_id:
+        raise ProjectOSError("A revision needs a new stable id")
+    reusable, registry_path, _, registry_digest = load_reusable_registry(root)
+    by_id = {entry["id"]: copy.deepcopy(entry) for entry in reusable["entries"]}
+    current = by_id.get(entry_id)
+    if current is None or current.get("status") != "active":
+        raise ProjectOSError("Knowledge revise requires an active existing lesson")
+    if replacement["id"] in by_id:
+        raise ProjectOSError(f"Replacement id already exists: {replacement['id']}")
+    if semantic_lesson_hash(replacement) in {
+        semantic_lesson_hash(entry) for key, entry in by_id.items() if key != entry_id
+    }:
+        raise ProjectOSError("Replacement duplicates another reusable lesson")
+    previous_hash = current["source"]["content_hash"]
+    current["status"] = "replaced"
+    current["replaced_by"] = replacement["id"]
+    current["reason"] = f"Revised as {replacement['id']}"
+    current["previous_content_hash"] = previous_hash
+    current["source"]["kind"] = "user-reviewed"
+    current["source"]["created_with"] = VERSION
+    current["source"].pop("content_hash", None)
+    current["source"]["content_hash"] = entry_content_hash(current)
+    next_entry = make_user_owned_entry(
+        replacement, status="active", source_kind="user-reviewed"
+    )
+    next_entry["replaces"] = entry_id
+    next_entry["source"].pop("content_hash")
+    next_entry["source"]["content_hash"] = entry_content_hash(next_entry)
+    by_id[entry_id] = current
+    by_id[next_entry["id"]] = next_entry
+
+    def verify_proposal() -> None:
+        _, current_digest = load_json_snapshot(proposal_path)
+        if current_digest != proposal_digest:
+            raise ProjectOSError("Knowledge proposal changed after preview")
+
+    return apply_registry_change(
+        root,
+        registry_path,
+        registry_digest,
+        list(by_id.values()),
+        {
+            "operation": "revise",
+            "selected": [entry_id, next_entry["id"]],
+            "additions": [next_entry["id"]],
+            "updates": [entry_id],
+            "duplicates": [],
+            "conflicts": [],
+            "unchanged": [],
+        },
+        dry_run,
+        verify_proposal,
+    )
+
+
+def knowledge_retire(root: Path, entry_id: str, reason: str, dry_run: bool) -> int:
+    root = root.resolve()
+    if not reason.strip():
+        raise ProjectOSError("Knowledge retire requires a reason")
+    reusable, registry_path, _, registry_digest = load_reusable_registry(root)
+    by_id = {entry["id"]: copy.deepcopy(entry) for entry in reusable["entries"]}
+    entry = by_id.get(entry_id)
+    if entry is None or entry.get("status") != "active":
+        raise ProjectOSError("Knowledge retire requires an active existing lesson")
+    entry["previous_content_hash"] = entry["source"]["content_hash"]
+    entry["status"] = "retired"
+    entry["reason"] = reason.strip()
+    entry["source"]["kind"] = "user-reviewed"
+    entry["source"]["created_with"] = VERSION
+    entry["source"].pop("content_hash", None)
+    entry["source"]["content_hash"] = entry_content_hash(entry)
+    return apply_registry_change(
+        root,
+        registry_path,
+        registry_digest,
+        list(by_id.values()),
+        {
+            "operation": "retire", "selected": [entry_id], "additions": [],
+            "updates": [entry_id], "duplicates": [], "conflicts": [], "unchanged": [],
+        },
+        dry_run,
+    )
+
+
+def knowledge_remove(root: Path, entry_id: str, confirmation: str, dry_run: bool) -> int:
+    root = root.resolve()
+    if confirmation != entry_id:
+        raise ProjectOSError("--confirm must exactly match the lesson id")
+    reusable, registry_path, _, registry_digest = load_reusable_registry(root)
+    by_id = {entry["id"]: entry for entry in reusable["entries"]}
+    entry = by_id.get(entry_id)
+    if entry is None:
+        raise ProjectOSError(f"Reusable knowledge does not contain id: {entry_id}")
+    referenced_by = sorted(
+        candidate["id"]
+        for candidate in reusable["entries"]
+        if candidate["id"] != entry_id
+        and entry_id in {candidate.get("replaces"), candidate.get("replaced_by")}
+    )
+    if entry.get("replaces") or entry.get("replaced_by") or referenced_by:
+        detail = ", ".join(referenced_by) if referenced_by else "its lifecycle fields"
+        raise ProjectOSError(
+            f"Cannot remove lifecycle-linked lesson {entry_id}; referenced by {detail}"
+        )
+    next_entries = [entry for entry in reusable["entries"] if entry["id"] != entry_id]
+    return apply_registry_change(
+        root,
+        registry_path,
+        registry_digest,
+        next_entries,
+        {
+            "operation": "remove", "selected": [entry_id], "additions": [],
+            "updates": [], "removed": [entry_id], "duplicates": [], "conflicts": [],
+            "unchanged": [],
+        },
+        dry_run,
+    )
 
 
 def nonempty_string_list(value: Any, label: str) -> list[str]:
@@ -3619,8 +4427,12 @@ def plan_managed_release_update(
     original_system: dict[str, Any],
     next_system: dict[str, Any],
     snapshots: dict[Path, str] | None = None,
-) -> tuple[list[tuple[Path, str]], list[tuple[Path, str, str]]]:
-    """Plan conflict-safe managed guidance and knowledge updates without writing."""
+) -> tuple[
+    list[tuple[Path, str | bytes]],
+    list[tuple[Path, str, str]],
+    list[tuple[Path, str]],
+]:
+    """Plan conflict-safe guidance refresh and schema-4 knowledge migration."""
     packs, overlays = validate_system_selection(original_system)
     expected = default_system(
         root,
@@ -3641,17 +4453,9 @@ def plan_managed_release_update(
         raise ProjectOSError("SYSTEM managed_guidance is missing or inconsistent")
     if any(not isinstance(value, str) for value in recorded_guidance.values()):
         raise ProjectOSError("SYSTEM managed_guidance contains an invalid baseline")
-    recorded_knowledge = original_system.get("managed_knowledge")
-    if not isinstance(recorded_knowledge, dict) or any(
-        not isinstance(entry_id, str) or not isinstance(entry_hash, str)
-        for entry_id, entry_hash in (
-            recorded_knowledge.items() if isinstance(recorded_knowledge, dict) else ()
-        )
-    ):
-        raise ProjectOSError("SYSTEM managed_knowledge is missing or invalid")
-
     creates: list[tuple[Path, str | bytes]] = []
     replacements: list[tuple[Path, str, str]] = []
+    deletions: list[tuple[Path, str]] = []
     conflicts: list[str] = []
     guidance_contents = guidance_content_map(packs, overlays)
     for raw_path, recorded_hash in recorded_guidance.items():
@@ -3675,115 +4479,283 @@ def plan_managed_release_update(
         else:
             conflicts.append(f"managed guidance differs locally: {raw_path}")
 
-    paths = original_system.get("paths")
-    if not isinstance(paths, dict):
+    original_paths = original_system.get("paths")
+    next_paths = next_system.get("paths")
+    if not isinstance(original_paths, dict) or not isinstance(next_paths, dict):
         raise ProjectOSError("SYSTEM paths must contain an object")
-    destination = safe_relative(root, paths.get("shared_knowledge"))
-    if destination is None:
-        raise ProjectOSError("SYSTEM shared knowledge path is unsafe or missing")
-    reject_symlink_path(root, destination)
-    desired = composed_knowledge(packs, overlays)
-    validate_composed_knowledge(desired, packs, overlays)
-    destination_digest: str | None = None
-    if destination.exists():
-        if not destination.is_file():
-            raise ProjectOSError("Shared knowledge destination must be a regular file")
-        current, destination_digest = load_json_snapshot(destination)
-        if snapshots is not None:
-            snapshots[destination] = destination_digest
-        registry_errors: list[str] = []
-        validate_failure_registry(
-            destination,
-            "shared knowledge",
-            registry_errors,
-            verify_hashes=True,
-            strict_managed=True,
-        )
-        if registry_errors:
-            conflicts.extend(registry_errors)
-    else:
-        current = {
-            "schema_version": 1,
-            "knowledge_version": "0.0.0",
-            "packs": ["core", *packs],
-            "overlays": overlays,
-            "entries": [],
-        }
-    if not isinstance(current, dict) or not isinstance(current.get("entries"), list):
-        raise ProjectOSError("Shared knowledge must contain an entries array")
-    if destination.exists() and current.get("packs") != ["core", *packs]:
-        conflicts.append("shared knowledge packs do not match SYSTEM packs")
-    if destination.exists() and current.get("overlays") != overlays:
-        conflicts.append("shared knowledge overlays do not match SYSTEM overlays")
-    for label in private_material_labels(current):
-        conflicts.append(f"shared knowledge contains a {label}")
-
-    current_by_id: dict[str, dict[str, Any]] = {}
-    for index, entry in enumerate(current["entries"]):
-        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
-            raise ProjectOSError(f"Invalid shared knowledge entry at index {index}")
-        if entry["id"] in current_by_id:
-            raise ProjectOSError(f"Duplicate shared knowledge id: {entry['id']}")
-        current_by_id[entry["id"]] = entry
-    desired_by_id = {entry["id"]: entry for entry in desired["entries"]}
-    additions: list[dict[str, Any]] = []
-    updates: list[dict[str, Any]] = []
-    for entry in desired["entries"]:
-        existing = current_by_id.get(entry["id"])
-        if existing is None:
-            additions.append(entry)
-        elif existing == entry:
-            continue
-        elif entry_content_hash(existing) == recorded_knowledge.get(entry["id"]):
-            updates.append(entry)
-        else:
-            conflicts.append(f"shared knowledge differs locally: {entry['id']}")
-    retained = sorted(set(current_by_id).difference(desired_by_id))
-    for entry_id in retained:
-        source = current_by_id[entry_id].get("source")
-        source_kind = source.get("kind") if isinstance(source, dict) else None
-        if (
-            isinstance(source_kind, str)
-            and source_kind in {"project-os-pack", "incident-derived"}
-            and entry_id not in recorded_knowledge
+    reusable_path = safe_relative(root, next_paths.get("reusable_knowledge"))
+    if reusable_path is None:
+        raise ProjectOSError("SYSTEM reusable knowledge path is unsafe or missing")
+    reject_symlink_path(root, reusable_path)
+    original_schema = original_system.get("schema_version")
+    migrated_entries: list[dict[str, Any]] = []
+    if original_schema in {2, 3}:
+        recorded_knowledge = original_system.get("managed_knowledge", {})
+        if not isinstance(recorded_knowledge, dict) or any(
+            not isinstance(entry_id, str)
+            or not isinstance(entry_hash, str)
+            or not entry_hash.startswith("sha256:")
+            for entry_id, entry_hash in (
+                recorded_knowledge.items() if isinstance(recorded_knowledge, dict) else ()
+            )
         ):
-            conflicts.append(f"shared knowledge has an unreviewed managed entry: {entry_id}")
+            raise ProjectOSError("Legacy SYSTEM managed_knowledge is missing or invalid")
+        old_shared_path = safe_relative(root, original_paths.get("shared_knowledge"))
+        if old_shared_path is None or not old_shared_path.is_file():
+            raise ProjectOSError("Legacy shared knowledge path is unsafe or missing")
+        reject_symlink_path(root, old_shared_path)
+        old_shared, old_shared_digest = load_json_snapshot(old_shared_path)
+        if snapshots is not None:
+            snapshots[old_shared_path] = old_shared_digest
+        if not isinstance(old_shared, dict):
+            raise ProjectOSError("Legacy shared knowledge must contain an object")
+        canonical_shared_fields = {
+            "schema_version", "knowledge_version", "packs", "overlays", "entries",
+        }
+        missing_shared_fields = sorted(canonical_shared_fields.difference(old_shared))
+        if missing_shared_fields:
+            raise ProjectOSError(
+                "Legacy shared knowledge is missing canonical fields: "
+                + ", ".join(missing_shared_fields)
+            )
+        extra_shared_fields = sorted(set(old_shared).difference(canonical_shared_fields))
+        if extra_shared_fields:
+            raise ProjectOSError(
+                "Legacy shared knowledge requires explicit review because unsupported "
+                "top-level fields would be discarded: " + ", ".join(extra_shared_fields)
+            )
+        if old_shared.get("schema_version") != 1:
+            raise ProjectOSError("Legacy shared knowledge schema_version must be 1")
+        if old_shared.get("knowledge_version") != original_system.get("project_os_version"):
+            raise ProjectOSError(
+                "Legacy shared knowledge knowledge_version must match SYSTEM project_os_version"
+            )
+        if old_shared.get("packs") != ["core", *packs]:
+            raise ProjectOSError(
+                "Legacy shared knowledge requires explicit review because packs must "
+                "exactly match core plus canonical SYSTEM packs"
+            )
+        if old_shared.get("overlays") != overlays:
+            raise ProjectOSError(
+                "Legacy shared knowledge requires explicit review because overlays must "
+                "exactly match canonical SYSTEM overlays"
+            )
+        old_entries = old_shared.get("entries") if isinstance(old_shared, dict) else None
+        if not isinstance(old_entries, list):
+            raise ProjectOSError("Legacy shared knowledge must contain an entries array")
+        old_by_id: dict[str, dict[str, Any]] = {}
+        old_targets: dict[str, str] = {}
+        for index, entry in enumerate(old_entries):
+            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+                raise ProjectOSError(f"Invalid legacy shared knowledge entry at index {index}")
+            if entry["id"] in old_by_id:
+                raise ProjectOSError(f"Duplicate legacy shared knowledge id: {entry['id']}")
+            old_by_id[entry["id"]] = entry
+            source = entry.get("source")
+            source_pack = source.get("pack") if isinstance(source, dict) else None
+            if isinstance(source_pack, str):
+                old_targets[entry["id"]] = source_pack
+
+        promoted_ids: set[str] = set()
+        coverage_raw = original_paths.get("knowledge_coverage")
+        coverage_path = safe_relative(root, coverage_raw) if isinstance(coverage_raw, str) else None
+        if coverage_path is not None:
+            reject_symlink_path(root, coverage_path)
+            if not coverage_path.is_file():
+                raise ProjectOSError("Legacy knowledge coverage path is missing")
+            coverage, coverage_digest = load_json_snapshot(coverage_path)
+            if snapshots is not None:
+                snapshots[coverage_path] = coverage_digest
+            inventory = scan_markdown_lessons(root, original_paths.get("legacy_knowledge", []))
+            coverage_errors: list[str] = []
+            validate_knowledge_coverage(
+                root, inventory, coverage_path, old_targets, coverage_errors
+            )
+            if coverage_errors:
+                raise ProjectOSError(
+                    "Invalid legacy knowledge coverage: " + "; ".join(coverage_errors)
+                )
+            coverage_entries = coverage.get("entries", []) if isinstance(coverage, dict) else []
+            promoted_ids = {
+                entry.get("canonical_id")
+                for entry in coverage_entries
+                if isinstance(entry, dict)
+                and entry.get("disposition") in {"promoted", "merged"}
+                and isinstance(entry.get("canonical_id"), str)
+            }
+
+        migration_statuses: dict[str, str] = {}
+        migration_previous_hashes: dict[str, str] = {}
+        for entry_id in sorted(old_by_id):
+            entry = old_by_id[entry_id]
+            baseline = recorded_knowledge.get(entry_id)
+            current_hash = entry_content_hash(entry)
+            preserve_owned = entry_id in promoted_ids
+            preserve_draft = baseline is None or current_hash != baseline
+            if not preserve_owned and not preserve_draft:
+                continue
+            legacy_status = entry.get("status")
+            migrated_status = (
+                legacy_status
+                if preserve_owned and legacy_status in FAILURE_STATUSES
+                else "draft"
+            )
+            if migrated_status in {"retired", "replaced"}:
+                source = entry.get("source")
+                origin_pack = source.get("pack") if isinstance(source, dict) else None
+                migrated_previous = migrated_predecessor_hash(
+                    entry, origin_pack if isinstance(origin_pack, str) else None
+                )
+                if migrated_previous is None:
+                    migrated_status = "draft"
+                else:
+                    migration_previous_hashes[entry_id] = migrated_previous
+            migration_statuses[entry_id] = migrated_status
+
+        changed = True
+        while changed:
+            changed = False
+            for entry_id in sorted(migration_statuses):
+                status = migration_statuses[entry_id]
+                if status == "draft":
+                    continue
+                entry = old_by_id[entry_id]
+                invalid = False
+                if status == "active" and any(
+                    key in entry for key in ("replaced_by", "reason", "previous_content_hash")
+                ):
+                    invalid = True
+                if status == "retired" and (
+                    "replaced_by" in entry
+                    or not isinstance(entry.get("reason"), str)
+                    or not entry.get("reason", "").strip()
+                ):
+                    invalid = True
+                if status == "replaced" and (
+                    not isinstance(entry.get("reason"), str)
+                    or not entry.get("reason", "").strip()
+                    or not is_canonical_knowledge_token(entry.get("replaced_by"))
+                ):
+                    invalid = True
+                replaces = entry.get("replaces")
+                if replaces is not None and (
+                    not is_canonical_knowledge_token(replaces)
+                    or migration_statuses.get(replaces) != "replaced"
+                    or old_by_id.get(replaces, {}).get("replaced_by") != entry_id
+                ):
+                    invalid = True
+                replaced_by = entry.get("replaced_by")
+                if replaced_by is not None and (
+                    status != "replaced"
+                    or not is_canonical_knowledge_token(replaced_by)
+                    or migration_statuses.get(replaced_by) in {None, "draft"}
+                    or old_by_id.get(replaced_by, {}).get("replaces") != entry_id
+                ):
+                    invalid = True
+                if invalid:
+                    migration_statuses[entry_id] = "draft"
+                    migration_previous_hashes.pop(entry_id, None)
+                    changed = True
+
+        discarded_entries = []
+        for entry_id in sorted(migration_statuses):
+            discarded = discarded_schema_three_migration_fields(
+                old_by_id[entry_id],
+                draft_fallback=migration_statuses[entry_id] == "draft",
+                exact_managed_baseline=(
+                    entry_content_hash(old_by_id[entry_id])
+                    == recorded_knowledge.get(entry_id)
+                ),
+            )
+            if discarded:
+                discarded_entries.append(f"{entry_id}: {', '.join(discarded)}")
+        if discarded_entries:
+            raise ProjectOSError(
+                "Schema 3 knowledge migration requires explicit review because it would "
+                "discard user-owned fields: "
+                + "; ".join(discarded_entries)
+                + ". Review the named legacy entries, restore a valid lifecycle chain or "
+                "move the information into supported schema-4 lesson fields, then explicitly "
+                "remove legacy-only fields before retrying."
+            )
+
+        for entry_id in sorted(migration_statuses):
+            entry = old_by_id[entry_id]
+            migrated_status = migration_statuses[entry_id]
+            migration_value = copy.deepcopy(entry)
+            if migrated_status == "draft":
+                for key in ("replaces", "replaced_by", "reason", "previous_content_hash"):
+                    migration_value.pop(key, None)
+            elif migrated_status in {"retired", "replaced"}:
+                migration_value["previous_content_hash"] = migration_previous_hashes[entry_id]
+            source = entry.get("source")
+            origin_pack = source.get("pack") if isinstance(source, dict) else None
+            converted = make_user_owned_entry(
+                migration_value,
+                status=migrated_status,
+                source_kind=(
+                    "migration-review-required"
+                    if migrated_status == "draft"
+                    else "user-reviewed"
+                ),
+                origin_pack=origin_pack if isinstance(origin_pack, str) else None,
+            )
+            privacy = private_material_labels(converted)
+            if privacy:
+                raise ProjectOSError(
+                    f"Legacy knowledge {entry_id} requires sanitization before migration: "
+                    + ", ".join(privacy)
+                )
+            migrated_entries.append(converted)
+
+        if reusable_path.exists():
+            raise ProjectOSError(
+                "Schema-4 reusable knowledge destination already exists; resolve ownership first"
+            )
+        reusable = {
+            "schema_version": 1,
+            "entries": sorted(migrated_entries, key=lambda entry: entry["id"]),
+        }
+        validate_reusable_value(reusable, "migrated reusable knowledge")
+        creates.append((reusable_path, canonical_json(reusable)))
+        deletions.append((old_shared_path, old_shared_digest))
+        print(f"knowledge migrated active: {sum(entry['status'] == 'active' for entry in migrated_entries)}")
+        print(f"knowledge migrated draft: {sum(entry['status'] == 'draft' for entry in migrated_entries)}")
+        print(f"release-managed knowledge removed: {len(old_entries) - len(migrated_entries)}")
+    else:
+        if not reusable_path.is_file():
+            raise ProjectOSError("Reusable knowledge registry is missing")
+        reusable_value, reusable_digest = load_json_snapshot(reusable_path)
+        if snapshots is not None:
+            snapshots[reusable_path] = reusable_digest
+        reusable_errors: list[str] = []
+        validate_failure_registry(
+            reusable_path,
+            "reusable knowledge",
+            reusable_errors,
+            verify_hashes=True,
+            strict_reusable=True,
+        )
+        if not isinstance(reusable_value, dict) or set(reusable_value) != {
+            "schema_version", "entries"
+        }:
+            reusable_errors.append("reusable knowledge has non-canonical top-level fields")
+        if reusable_errors:
+            conflicts.extend(reusable_errors)
+
     if conflicts:
         raise ProjectOSError("Upgrade conflicts: " + "; ".join(conflicts))
-    print(f"knowledge additions: {len(additions)}")
-    print(f"knowledge updates: {len(updates)}")
-    next_by_id = dict(current_by_id)
-    for entry in [*additions, *updates]:
-        next_by_id[entry["id"]] = entry
-    current["entries"] = sorted(
-        next_by_id.values(), key=lambda entry: str(entry.get("id", ""))
-    )
-    current["knowledge_version"] = VERSION
-    current["packs"] = ["core", *packs]
-    current["overlays"] = overlays
-    serialized = json.dumps(current, indent=2, ensure_ascii=False) + "\n"
-    if destination_digest is None:
-        creates.append((destination, serialized))
-    elif hashlib.sha256(serialized.encode("utf-8")).hexdigest() != destination_digest:
-        replacements.append((destination, serialized, destination_digest))
-
-    next_managed_knowledge = {
-        entry_id: entry_hash
-        for entry_id, entry_hash in recorded_knowledge.items()
-        if entry_id in retained
-    }
-    next_managed_knowledge.update(expected["managed_knowledge"])
     next_system["schema_version"] = SCHEMA_VERSION
     next_system["project_os_version"] = VERSION
     next_system["managed_guidance"] = expected_guidance
-    next_system["managed_knowledge"] = dict(sorted(next_managed_knowledge.items()))
+    next_system.pop("managed_knowledge", None)
     comparison_before = copy.deepcopy(original_system)
     comparison_after = copy.deepcopy(next_system)
     comparison_before.pop("generated_on", None)
     comparison_after.pop("generated_on", None)
-    if comparison_after != comparison_before or creates or replacements:
+    if comparison_after != comparison_before or creates or replacements or deletions:
         next_system["generated_on"] = date.today().isoformat()
-    return creates, replacements
+    return creates, replacements, deletions
 
 
 def release_order(value: Any) -> tuple[Any, ...]:
@@ -3827,9 +4799,9 @@ def upgrade_project(
         )
     snapshots = {system_path: original_digest}
     schema = original_system.get("schema_version")
-    if not isinstance(schema, int) or schema not in {2, SCHEMA_VERSION}:
+    if not isinstance(schema, int) or schema not in {2, 3, SCHEMA_VERSION}:
         raise ProjectOSError(
-            f"Upgrade supports SYSTEM schema 2 or {SCHEMA_VERSION}, got {schema!r}"
+            f"Upgrade supports SYSTEM schema 2, 3 or {SCHEMA_VERSION}, got {schema!r}"
         )
     if not isinstance(original_system.get("installation"), str) or original_system.get(
         "installation"
@@ -3842,11 +4814,28 @@ def upgrade_project(
     next_system = copy.deepcopy(original_system)
     next_paths = next_system["paths"]
     next_paths.setdefault("history_index", None)
+    if schema in {2, 3}:
+        next_paths.pop("shared_knowledge", None)
+        next_paths["reusable_knowledge"] = DEFAULT_PATHS["reusable_knowledge"]
     creates: list[tuple[Path, str | bytes]] = []
     replacements: list[tuple[Path, str, str]] = []
     deletions: list[tuple[Path, str]] = []
 
     if schema == SCHEMA_VERSION:
+        if any(
+            value is not None
+            for value in (legacy_program_state, disposition, closed_on, reason)
+        ):
+            raise ProjectOSError("Legacy Program flags are valid only for a schema 2 upgrade")
+        if not isinstance(next_system.get("mode"), str) or next_system.get("mode") not in {
+            "standard",
+            "program",
+        }:
+            raise ProjectOSError("Schema 4 SYSTEM mode must be standard or program")
+        if "active_program" not in next_system:
+            raise ProjectOSError("Schema 4 SYSTEM must declare active_program")
+        require_safe_system_owners(root, next_system)
+    elif schema == 3:
         if any(
             value is not None
             for value in (legacy_program_state, disposition, closed_on, reason)
@@ -3969,11 +4958,12 @@ def upgrade_project(
                 next_system["active_program"] = None
                 next_paths["program"] = None
 
-    managed_creates, managed_replacements = plan_managed_release_update(
+    managed_creates, managed_replacements, managed_deletions = plan_managed_release_update(
         root, original_system, next_system, snapshots
     )
     creates.extend(managed_creates)
     replacements.extend(managed_replacements)
+    deletions.extend(managed_deletions)
     serialized_system = json.dumps(next_system, indent=2, ensure_ascii=False) + "\n"
     if hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != original_digest:
         replacements.append((system_path, serialized_system, original_digest))
@@ -4005,10 +4995,10 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", help="Create a new Project OS control plane")
     init_parser.add_argument("--target", required=True, type=Path)
     init_parser.add_argument(
-        "--packs", default="auto", help="auto, none, or comma-separated capability packs"
+        "--packs", default="auto", help="auto, none or comma-separated capability packs"
     )
     init_parser.add_argument(
-        "--overlays", default="auto", help="auto, none, or comma-separated ecosystem overlays"
+        "--overlays", default="auto", help="auto, none or comma-separated ecosystem overlays"
     )
     init_parser.add_argument("--dry-run", action="store_true")
     init_parser.add_argument(
@@ -4031,15 +5021,76 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument("--config", type=Path, help="validate against a proposed SYSTEM manifest")
 
     sync_parser = subparsers.add_parser(
-        "sync-knowledge", help="Add selected guidance and lessons without overwriting conflicts"
+        "sync-knowledge", help="Deprecated read-only compatibility notice"
     )
     sync_parser.add_argument("--target", required=True, type=Path)
     sync_parser.add_argument("--packs", default="selected")
     sync_parser.add_argument("--overlays", default="selected")
     sync_parser.add_argument("--dry-run", action="store_true")
 
+    knowledge_parser = subparsers.add_parser(
+        "knowledge", help="Manage user-owned reusable failure knowledge"
+    )
+    knowledge_subparsers = knowledge_parser.add_subparsers(
+        dest="knowledge_command", required=True
+    )
+    knowledge_list_parser = knowledge_subparsers.add_parser(
+        "list", help="List project-specific or reusable knowledge"
+    )
+    knowledge_list_parser.add_argument("--target", required=True, type=Path)
+    knowledge_list_parser.add_argument(
+        "--scope", choices=("project", "reusable", "all"), default="all"
+    )
+    knowledge_approve_parser = knowledge_subparsers.add_parser(
+        "approve", help="Approve reviewed proposal entries into reusable knowledge"
+    )
+    knowledge_approve_parser.add_argument("--target", required=True, type=Path)
+    knowledge_approve_parser.add_argument("--proposal", required=True, type=Path)
+    approve_selection = knowledge_approve_parser.add_mutually_exclusive_group(required=True)
+    approve_selection.add_argument("--ids")
+    approve_selection.add_argument("--all", action="store_true", dest="select_all")
+    knowledge_approve_parser.add_argument("--dry-run", action="store_true")
+    knowledge_export_parser = knowledge_subparsers.add_parser(
+        "export", help="Create a deterministic portable knowledge bundle"
+    )
+    knowledge_export_parser.add_argument("--target", required=True, type=Path)
+    knowledge_export_parser.add_argument("--output", required=True, type=Path)
+    knowledge_export_parser.add_argument("--ids")
+    knowledge_export_parser.add_argument("--active-only", action="store_true")
+    knowledge_export_parser.add_argument("--dry-run", action="store_true")
+    knowledge_import_parser = knowledge_subparsers.add_parser(
+        "import", help="Preview or import lessons from a repository or bundle"
+    )
+    knowledge_import_parser.add_argument("--target", required=True, type=Path)
+    knowledge_import_parser.add_argument("--source", required=True, type=Path)
+    import_selection = knowledge_import_parser.add_mutually_exclusive_group()
+    import_selection.add_argument("--ids")
+    import_selection.add_argument("--all", action="store_true", dest="select_all")
+    knowledge_import_parser.add_argument("--dry-run", action="store_true")
+    knowledge_revise_parser = knowledge_subparsers.add_parser(
+        "revise", help="Replace an active lesson with a reviewed revision"
+    )
+    knowledge_revise_parser.add_argument("--target", required=True, type=Path)
+    knowledge_revise_parser.add_argument("--id", required=True)
+    knowledge_revise_parser.add_argument("--proposal", required=True, type=Path)
+    knowledge_revise_parser.add_argument("--dry-run", action="store_true")
+    knowledge_retire_parser = knowledge_subparsers.add_parser(
+        "retire", help="Retire an active reusable lesson"
+    )
+    knowledge_retire_parser.add_argument("--target", required=True, type=Path)
+    knowledge_retire_parser.add_argument("--id", required=True)
+    knowledge_retire_parser.add_argument("--reason", required=True)
+    knowledge_retire_parser.add_argument("--dry-run", action="store_true")
+    knowledge_remove_parser = knowledge_subparsers.add_parser(
+        "remove", help="Permanently remove a local reusable lesson"
+    )
+    knowledge_remove_parser.add_argument("--target", required=True, type=Path)
+    knowledge_remove_parser.add_argument("--id", required=True)
+    knowledge_remove_parser.add_argument("--confirm", required=True)
+    knowledge_remove_parser.add_argument("--dry-run", action="store_true")
+
     upgrade_parser = subparsers.add_parser(
-        "upgrade", help="Upgrade schema, managed guidance, knowledge, and release metadata"
+        "upgrade", help="Upgrade schema, managed guidance and release metadata"
     )
     upgrade_parser.add_argument("--target", required=True, type=Path)
     upgrade_parser.add_argument(
@@ -4099,6 +5150,29 @@ def main() -> int:
             return check_project(args.target, args.config)
         if args.command == "sync-knowledge":
             return sync_knowledge(args.target, args.packs, args.overlays, args.dry_run)
+        if args.command == "knowledge":
+            if args.knowledge_command == "list":
+                return knowledge_list(args.target, args.scope)
+            if args.knowledge_command == "approve":
+                return knowledge_approve(
+                    args.target, args.proposal, args.ids, args.select_all, args.dry_run
+                )
+            if args.knowledge_command == "export":
+                return knowledge_export(
+                    args.target, args.output, args.ids, args.active_only, args.dry_run
+                )
+            if args.knowledge_command == "import":
+                return knowledge_import(
+                    args.target, args.source, args.ids, args.select_all, args.dry_run
+                )
+            if args.knowledge_command == "revise":
+                return knowledge_revise(args.target, args.id, args.proposal, args.dry_run)
+            if args.knowledge_command == "retire":
+                return knowledge_retire(args.target, args.id, args.reason, args.dry_run)
+            if args.knowledge_command == "remove":
+                return knowledge_remove(
+                    args.target, args.id, args.confirm, args.dry_run
+                )
         if args.command == "upgrade":
             return upgrade_project(
                 args.target,

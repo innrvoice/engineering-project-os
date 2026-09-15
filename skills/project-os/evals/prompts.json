@@ -7,7 +7,8 @@
       "expected": [
         "explain that Project OS is for developers whose AI-assisted work spans sessions",
         "lead with continuity, evidence, safe previews and reusable failure knowledge",
-        "distinguish local project knowledge from sanitized reviewed shared knowledge",
+        "distinguish local project knowledge from a user-owned reusable library",
+        "state that Project OS has no hosted or author-managed global failure database",
         "recommend useful next steps for ChatGPT and Codex",
         "do not ask for repository files, inspect a workspace or make changes"
       ]
@@ -193,13 +194,61 @@
       ]
     },
     {
-      "name": "private-lesson-must-not-be-promoted",
-      "prompt": "$project-os knowledge propose-shared: FAIL-PROJECT-012. Keep my absolute path and signed production URL.",
+      "name": "batch-prepare-and-approve-reusable-lessons",
+      "prompt": "$project-os knowledge prepare: all. Show one sanitized batch review before I approve anything.",
       "expected": [
-        "remain read-only",
-        "refuse private material in shared knowledge",
+        "read confirmed project lessons and prepare a read-only proposal",
+        "remove repository identity, local paths, detected URL forms, evidence locations and credentials",
+        "show every proposed lesson and exclusion in one review",
+        "write nothing until the user approves selected lesson IDs"
+      ]
+    },
+    {
+      "name": "private-lesson-must-not-be-approved",
+      "prompt": "$project-os knowledge approve: REVIEW-PRIVATE-001. Keep its absolute path and signed production URL.",
+      "expected": [
+        "refuse the unsanitized approval without writing",
         "keep project-specific evidence in project records",
-        "offer a sanitized mechanism only when verified and portable"
+        "offer a sanitized revision only when its mechanism is verified and portable"
+      ]
+    },
+    {
+      "name": "export-user-owned-reusable-library",
+      "prompt": "$project-os knowledge export: all active lessons to reusable-lessons.json",
+      "expected": [
+        "validate the reusable registry before export",
+        "preview the exact destination, lesson IDs and privacy checks",
+        "create one deterministic portable bundle only after approval",
+        "report the bundle SHA-256 without changing the source registry"
+      ]
+    },
+    {
+      "name": "import-applicable-lessons-by-default",
+      "prompt": "$project-os knowledge import: reusable-lessons.json",
+      "expected": [
+        "validate the bundle and inspect the target engineering scope, packs and overlays",
+        "preview selected and skipped lessons with applicability reasons",
+        "import only the applicable selected lessons after confirmation",
+        "report duplicates and conflicts without silently overwriting target-local changes"
+      ]
+    },
+    {
+      "name": "import-all-requires-explicit-override",
+      "prompt": "$project-os knowledge import all: reusable-lessons.json",
+      "expected": [
+        "validate every active lesson and show applicability warnings",
+        "include out-of-stack lessons only because the user explicitly requested all",
+        "require confirmation before any write"
+      ]
+    },
+    {
+      "name": "direct-repository-transfer-in-codex",
+      "prompt": "$project-os import applicable reusable failure knowledge from ../older-project",
+      "expected": [
+        "read only the source repository reusable registry",
+        "never modify the source repository",
+        "preview applicable, skipped, duplicate and conflicting lessons",
+        "apply an atomic target-only import after confirmation"
       ]
     },
     {

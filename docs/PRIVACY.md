@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective date: September 14, 2026.
+Effective date: September 15, 2026.
 
 ## Scope
 
@@ -8,13 +8,13 @@ Engineering Project OS is a skills-only plugin for ChatGPT and Codex that helps 
 
 ## Data processing
 
-Project OS does not operate a hosted service, MCP server, user account system or analytics service. Its bundled Python helper initiates no network requests. In ChatGPT, Project OS can process only project information, files or archives supplied to the conversation and can return changed files as chat artifacts. In Codex, it may read the selected local workspace and may write Project OS records inside that target after the applicable preview and approval steps.
+Project OS does not operate a hosted service, MCP server, user account system, analytics service or central failure database. Its bundled Python helper initiates no network requests. In ChatGPT, Project OS can process only project information, files, archives or reusable knowledge bundles supplied to the conversation and can return changed files as chat artifacts. In Codex, it may read the selected local workspace, a user-selected source repository or a user-selected bundle and may write Project OS records inside the target after the applicable preview and approval steps. Knowledge import never writes to the source repository.
 
 The publisher does not receive, transmit or store repository contents, prompts, credentials or usage telemetry through Project OS. Data processed by ChatGPT, Codex, GitHub or another environment remains subject to that provider's terms and privacy policy.
 
 ## Retention and deletion
 
-Project OS has no publisher-controlled data store and therefore retains no user data on behalf of the publisher. Repository files created by Project OS remain under the user's control and can be reviewed, versioned or removed using the repository's normal tools and policies.
+Project OS has no publisher-controlled data store and therefore retains no user data on behalf of the publisher. Project knowledge, reusable knowledge and exported bundles remain under the user's control and can be reviewed, versioned, transferred, retired or removed using the repository's normal tools and policies. Removing one copy does not recall copies the user already imported elsewhere.
 
 ## Security and permissions
 

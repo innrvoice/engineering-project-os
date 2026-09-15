@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Only Project OS 2.0.5 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
+Only Project OS 2.1.0 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
 
 ## Report a vulnerability
 
@@ -20,9 +20,9 @@ Include:
 
 ## Runtime boundary
 
-The 2.0.5 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config` or `--definition` may also read that user-selected file outside the target. Mutating operations write only inside the target repository. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
+The 2.1.0 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
 
-Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database or automatic cross-project synchronization. The helper runs only when a person, ChatGPT or Codex invokes it.
+Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database, central failure database or automatic cross-project synchronization. The helper runs only when a person, ChatGPT or Codex invokes it.
 
 ## File safety
 
@@ -32,16 +32,16 @@ Project OS is designed to fail closed on:
 - symlink replacement boundaries;
 - malformed Program, plan, finding, history or knowledge records;
 - incompatible ownership during adoption;
-- locally divergent managed guidance or knowledge;
+- locally divergent managed guidance or conflicting reusable knowledge;
 - incomplete or ambiguous legacy Program migration;
 - concurrent changes before an atomic replacement;
-- common detectable credential, private-path and private-URL patterns in shared knowledge.
+- detected URL forms plus common detectable credential and private-path patterns in reusable knowledge and bundles.
 
 Writes require POSIX directory descriptors and no-follow opens (macOS or Linux with Python 3.9+). Unsupported write environments fail before mutation. Create, replace, delete and rollback stay anchored to opened directories; a swapped parent cannot redirect them into a symlink target. Parsed JSON and its concurrency hash come from one byte snapshot. Program closure guards the plan registry as well as the files it changes and upgrade refuses a newer repository release.
 
 These checks detect ordinary concurrent edits and directory swaps. They are not a lock or isolation boundary against a process with equal filesystem privileges: that process can move an open directory, edit an inode during a syscall sequence or alter files after validation. Keep other writers idle while applying an operation. Caught failures trigger guarded rollback; abrupt termination or power loss may leave partial state that needs checker-guided recovery from a reviewed source or backup.
 
-A mutating Project OS request must inspect, preview or dry-run, apply only a clean result and finish with the checker. In ChatGPT, changed files remain conversation artifacts until the user deliberately applies them to the real repository. Direct helper users must review `--dry-run` output before init, adopt, upgrade, Program start, Program close or synchronization.
+A mutating Project OS request must inspect, preview or dry-run, apply only a clean result and finish with the checker. In ChatGPT, changed files remain conversation artifacts until the user deliberately applies them to the real repository. Direct helper users must review `--dry-run` output before init, adopt, upgrade, Program start, Program close or a mutating knowledge operation.
 
 ## Program archive boundary
 
@@ -61,8 +61,8 @@ A passing checker proves structural consistency, not application correctness, ar
 
 ## Knowledge safety
 
-Do not put credentials, tokens, personal data, private machine paths, private URLs, signed URLs, raw production logs or copied project history in shared knowledge, fixtures or vulnerability examples.
+Do not put credentials, tokens, personal data, private machine paths, any URL, evidence paths, deployment identifiers, raw production logs or copied project history in reusable knowledge, bundles, fixtures or vulnerability examples.
 
-The helper rejects a bounded set of recognizable sensitive patterns. Pattern matching cannot prove that arbitrary text is sanitized, so human review remains mandatory before a lesson is shared or published.
+The helper rejects detected URL forms plus a bounded set of other recognizable sensitive patterns. Automated screening cannot identify every project name or contextual disclosure, so human review remains mandatory before a lesson is approved or exported.
 
-Sanitization preserves the mechanism, applicability, trigger, prevention, decisive verification and limits. If removing private context makes a lesson misleading, keep it in project-specific knowledge.
+Sanitization preserves the mechanism, applicability, trigger, prevention, decisive verification and limits. If removing private context makes a lesson misleading, keep it in project-specific knowledge. Reusable lessons belong to the user and are never submitted to a publisher-managed knowledge service.

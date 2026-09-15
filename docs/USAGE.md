@@ -15,9 +15,9 @@ The detailed short request menu below uses Codex syntax. In ChatGPT, select `@En
 
 | Intent | ChatGPT | Codex |
 | --- | --- | --- |
-| Understand Project OS | `@Engineering Project OS What does Project OS do, how does it work and when should I use it?` | `$project-os overview` |
-| Create starter package | `@Engineering Project OS Create a safe Project OS starter package for my project.` | `$project-os bootstrap` |
-| Review existing setup | Attach `AGENTS.md` and `.agents/`, then send `@Engineering Project OS Review my existing Project OS setup and tell me what to fix.` | `$project-os check` |
+| Understand Project OS | `@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.` | `$project-os overview` |
+| Set up a repository | `@Engineering Project OS Help me set up Project OS for this project and start with a safe preview.` | `$project-os bootstrap` |
+| Reuse earlier lessons | Upload an approved knowledge bundle, then send `@Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.` | `$project-os knowledge import: /path/to/earlier-repository` |
 
 ChatGPT returns analysis or changed file artifacts in the chat. Apply those artifacts to the real repository deliberately, then validate the resulting repository. Codex can preview and apply authorized changes directly in its selected workspace.
 
@@ -30,7 +30,7 @@ Use ordinary chat for the product and its code. Invoke `$project-os` when the ob
 **Type this in ChatGPT:**
 
 ~~~text
-@Engineering Project OS What does Project OS do, how does it work and when should I use it?
+@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.
 ~~~
 
 **Type this in Codex chat:**
@@ -41,7 +41,7 @@ $project-os overview
 
 - Result: Project OS explains the developer audience, practical benefits, repository-local state, reusable failure knowledge and the next suitable workflow.
 - Files: none change and no repository input is required.
-- Proof: the response distinguishes project knowledge from reviewed shared knowledge and does not claim automatic cross-project learning.
+- Proof: the response distinguishes project knowledge from user-owned reusable knowledge and does not claim automatic cross-project learning or a central database.
 - Skip it when: you already know whether you need a starter package, an existing-setup review or another Project OS operation.
 
 ## Ask for the Codex menu
@@ -85,7 +85,16 @@ These are recommended natural-language shortcuts. They are not a strict command 
 | `$project-os plan supersede: <reason>` | Retire a replaced plan | Reason |
 | `$project-os finding add: <observation>` | Record a concrete finding without inventing cause | Observation |
 | `$project-os knowledge capture: <finding-id>` | Convert a confirmed finding into project knowledge | Finding ID |
-| `$project-os knowledge propose-shared: <lesson-id>` | Draft a sanitized portable lesson for review | Project lesson ID |
+| `$project-os knowledge list: project\|reusable` | List one user-owned knowledge scope without writes | Scope |
+| `$project-os knowledge prepare: <lesson-id\|all>` | Prepare a sanitized proposal outside the repository | Lesson ID or `all` |
+| `$project-os knowledge approve: <proposal> <lesson-id\|all>` | Add only reviewed proposal entries to the reusable library | Proposal artifact and selection |
+| `$project-os knowledge revise: <lesson-id>` | Prepare a reviewed replacement revision | Reusable lesson ID |
+| `$project-os knowledge retire: <lesson-id> because <reason>` | Retire a lesson while preserving its lifecycle | Lesson ID and reason |
+| `$project-os knowledge remove: <lesson-id>` | Permanently remove an unlinked local lesson after exact confirmation | Lesson ID |
+| `$project-os knowledge export: <destination>` | Export approved reusable lessons to a deterministic bundle | New output path |
+| `$project-os knowledge import: <repo-or-bundle>` | Preview and import lessons applicable to the target | Source repository or bundle |
+| `$project-os knowledge import all: <repo-or-bundle>` | Explicitly preview every non-draft source entry | Source repository or bundle |
+| `$project-os knowledge propose-shared: <lesson-id>` | Deprecated read-only alias for `knowledge prepare` | Project lesson ID |
 
 Text after a shortcut may add boundaries in any language.
 
@@ -299,7 +308,7 @@ $project-os program close stopped: the migration was replaced by the vendor-mana
 
 The archive is tamper-evident, not technically immutable. The checker catches uncoordinated archive changes but cannot prevent a deliberate rewrite of both content and index. Treat an archive hash mismatch as an integrity event. Determine which content is authoritative before repairing anything; never silence it by automatically recording the changed bytes.
 
-## Record a finding and failure knowledge
+## Record a finding and build reusable failure knowledge
 
 **Type this in Codex chat:**
 
@@ -325,29 +334,79 @@ $project-os knowledge capture: FIND-012
 - Proof: the lesson links decisive evidence and contains no unverified mechanism.
 - Skip it when: the finding is still a hypothesis.
 
-Review portability separately.
+Review portability separately. Project-specific context stays in this repository until the user explicitly prepares it for reuse.
 
 **Type this in Codex chat:**
 
 ~~~text
-$project-os knowledge propose-shared: FAIL-PROJECT-012
+$project-os knowledge prepare: all
 ~~~
 
-- Result: Codex proposes a sanitized portable entry or explains why the lesson must remain local.
-- Files: none change during the proposal.
-- Proof: project names, credentials, personal data, private paths, private URLs and product history are absent while the mechanism and limits remain intact.
-- Skip it when: the lesson depends on a repository-specific contract.
+- Result: Codex prepares one batch of portable proposals from confirmed project lessons and explains why any lesson must remain local.
+- Files: none change during preparation. The proposal lives outside the repository until review.
+- Proof: project names, credentials, personal data, private paths, every URL, deployment identifiers, evidence paths and product history are absent while each mechanism and its limits remain accurate.
+- Skip it when: no confirmed lesson is useful outside this repository.
 
-Shared knowledge never travels to another repository automatically. The complete reuse path is:
+Review the batch, select the entries to keep and approve only that selection.
+
+**Type this in Codex chat:**
+
+~~~text
+$project-os knowledge approve: /path/to/proposal.json all
+~~~
+
+- Result: Codex previews the selected entries, invokes the deterministic approval helper and writes only the reviewed lessons.
+- Files: `.agents/knowledge/reusable/failures.json` may change.
+- Proof: every active entry records user-reviewed provenance and a canonical content hash, then `$project-os check` passes.
+- Skip it when: the proposal still contains private context or inaccurate boundaries.
+
+The reusable library belongs to the user. It is not submitted to Project OS authors and does not wait for a plugin release.
+
+## Reuse lessons in another project
+
+The common Codex path reads a source repository directly. Upgrade both repositories to Project OS 2.1.0, open the destination as the Codex workspace and provide the source path.
+
+**Type this in the destination Codex task:**
+
+~~~text
+$project-os knowledge import: /path/to/earlier-repository
+~~~
+
+- Result: Codex previews active source lessons whose applicability matches the destination's `engineering` scope, selected capability packs or ecosystem overlays. It also considers retired and replaced tombstones regardless of applicability, then recursively includes every linked entry needed to keep selected replacement chains complete. It reports selected and skipped entries with reasons.
+- Files: the source never changes. The destination reusable registry changes only after confirmation.
+- Proof: the destination passes `$project-os check` and a repeated import preview is idempotent.
+- Skip it when: you need a portable file for ChatGPT or another machine; export a bundle instead.
+
+To create a portable bundle in Codex:
+
+~~~text
+$project-os knowledge export: /path/to/failure-knowledge.json
+~~~
+
+Project OS previews the active entries plus retired and replaced tombstones, writes a deterministic `project-os-reusable-knowledge` JSON bundle only after confirmation and reports its SHA-256. The output must resolve outside the source repository and its path must not already exist. A selected export must include each linked predecessor and replacement record required for a complete lifecycle chain or it fails. An active-only export works only for active lessons with no omitted lifecycle dependencies.
+
+In ChatGPT, upload that bundle and any destination Project OS files needed for the operation, then use the Directory starter prompt:
+
+~~~text
+@Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
+~~~
+
+ChatGPT previews selected and skipped lessons against the supplied destination context, then returns changed artifacts after approval. It cannot modify a live local repository or claim that the returned artifact has already been applied.
+
+Use `$project-os knowledge import all: <repo-or-bundle>` only when you deliberately want every non-draft source entry considered. Default import is safer because it filters active lessons by explicit applicability, still considers lifecycle tombstones, closes selected replacement chains and shows every skipped entry.
+
+Import rejects detected URL forms in reusable content and never overwrites a target-local revision silently. Identical entries are skipped, duplicate content is deduplicated and the same ID with different content blocks all writes. A retired or replaced tombstone updates an existing predecessor only when its previous content hash matches. If that predecessor is absent, the tombstone is retained to block stale resurrection.
+
+The complete reuse path is:
 
 1. Record the observed failure as a finding with evidence and a decisive next check.
 2. Confirm the mechanism, then capture a project lesson.
-3. Propose a sanitized portable lesson without writing or publishing it.
-4. Review the proposal for privacy, portability, accuracy and useful scope boundaries.
-5. Include an approved lesson in a reviewed Project OS release.
-6. Install that release and run an explicit upgrade in another connected repository or synchronize managed knowledge when the repository already matches the release.
+3. Prepare a sanitized batch without writing or publishing it.
+4. Review and approve only lessons that remain safe, accurate and useful.
+5. Import directly from the source repository or export a portable bundle.
+6. Review the destination applicability preview, confirm the selection and run the checker after import.
 
-The receiving repository gets the reusable mechanism, prevention, verification and boundaries. It does not get the source project's name, credentials, private paths, private URLs, deployment identifiers or copied history.
+The destination gets the reusable mechanism, prevention, verification and boundaries. It does not get the source project's name, credentials, private paths, any URL, deployment identifiers, evidence paths or copied history. Nothing uploads or synchronizes automatically.
 
 ## Upgrade
 
@@ -360,8 +419,8 @@ $project-os upgrade
 ~~~
 
 - Result: Codex inspects release, schema and Program state, previews every managed file change, applies only a conflict-free result with caught-failure rollback and runs the checker.
-- Files: version and schema metadata, managed guidance, managed shared knowledge and an explicitly required lifecycle migration may change. Project-owned state and application code remain intact.
-- Proof: the checker passes at release 2.0.5 and a repeated dry run reports no pending changes.
+- Files: version and schema metadata, managed guidance, reusable knowledge classification and an explicitly required lifecycle migration may change. Project-owned state and application code remain intact.
+- Proof: the checker passes at release 2.1.0 and a repeated dry run reports no pending changes.
 - Skip it when: the installed checker already passes and the repository is current.
 
 A legacy Program whose state cannot be proved is a decision boundary, not something Codex guesses. For a closed legacy Program, Codex also requires the actual closure date in `YYYY-MM-DD` form and derives it only from repository evidence.

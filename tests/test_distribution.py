@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import stat
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,15 @@ class DistributionTests(unittest.TestCase):
             self.assertIn("docs/USAGE.md", names)
             self.assertIn("docs/PACKAGING.md", names)
             self.assertIn("skills/project-os/evals/prepare_fixture.py", names)
+            self.assertIn(
+                "skills/project-os/assets/templates/core/.agents/knowledge/reusable/failures.json",
+                names,
+            )
+            self.assertFalse(any(
+                name.startswith("skills/project-os/assets/knowledge/")
+                or "/knowledge/shared/" in name
+                for name in names
+            ))
             for name in names:
                 self.assertEqual(archive.read(name), (ROOT / name).read_bytes(), name)
         with self.assertRaises(FileExistsError):
@@ -56,6 +66,18 @@ class DistributionTests(unittest.TestCase):
                 if member.filename != "docs/USAGE.md":
                     output.writestr(member, source.read(member.filename))
         with self.assertRaisesRegex(ValueError, "Broken packaged document link"):
+            PACKAGE.validate_zip(broken)
+
+    def test_package_rejects_author_managed_failure_knowledge(self):
+        broken = self.base / "central-knowledge.zip"
+        with zipfile.ZipFile(self.archive) as source, zipfile.ZipFile(broken, "w") as output:
+            for member in source.infolist():
+                output.writestr(member, source.read(member.filename))
+            member = zipfile.ZipInfo("skills/project-os/assets/knowledge/core.json")
+            member.create_system = 3
+            member.external_attr = (stat.S_IFREG | 0o644) << 16
+            output.writestr(member, '{"schema_version": 1, "entries": []}\n')
+        with self.assertRaisesRegex(ValueError, "release-managed failure knowledge"):
             PACKAGE.validate_zip(broken)
 
     def test_markdown_layout_rejects_wrapped_prose_and_list_items(self):

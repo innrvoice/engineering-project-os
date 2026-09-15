@@ -1,6 +1,6 @@
 ---
 name: project-os
-description: Explain, inspect, bootstrap, adopt, validate, upgrade or maintain a repository-local engineering operating system that keeps context, plans, state, evidence and reusable knowledge available across ChatGPT and Codex sessions. Use when the user explicitly asks for Project OS or clearly wants repository-local continuity, a safe engineering handoff or resumable work across sessions. Do not use for ordinary coding in a repository with a healthy workflow or for generic project management.
+description: Explain, inspect, bootstrap, adopt, validate, upgrade or maintain a repository-local engineering operating system that keeps context, plans, state, evidence and user-owned reusable knowledge available across ChatGPT and Codex sessions. Use when developers need durable repository state, a safe engineering handoff or verified failure lessons transferred between their own projects. Do not use for ordinary one-session coding, generic project management or automatic global knowledge sharing.
 ---
 
 # Project OS
@@ -15,7 +15,7 @@ Installing the plugin makes the skill available to ChatGPT and Codex. It does no
 
 Use this skill only for Project OS requests. ChatGPT may expose it automatically when the installed plugin is selected or the request clearly matches, but do not apply it to unrelated coding work.
 
-Before inspecting or changing a repository, identify the available project input. In ChatGPT, setup advice and a new starter package may begin from the user's project description, selected project files or an archive provided in the current chat. Ask only for the missing details required to choose a safe setup and mark conclusions that are not backed by files as unverified. Reviewing, validating, repairing, adopting or upgrading an existing Project OS setup requires the relevant repository files, normally `AGENTS.md` and `.agents/`; ask for them when they are missing. Never inspect an empty host workspace or claim that the plugin is unavailable. In Codex, use the repository workspace selected for the current task. Installation alone does not attach or connect a repository on either surface.
+Before inspecting or changing a repository, identify the available project input. In ChatGPT, setup advice and a new starter package may begin from the user's project description, selected project files or an archive provided in the current chat. Ask only for the missing details required to choose a safe setup and mark conclusions that are not backed by files as unverified. Reviewing, validating, repairing, adopting or upgrading an existing Project OS setup requires the relevant repository files, normally `AGENTS.md` and `.agents/`; ask for them when they are missing. Knowledge import requires an approved reusable bundle plus the destination Project OS context. Knowledge export requires the source reusable registry. Never inspect an empty host workspace or claim that the plugin is unavailable. In Codex, use the repository workspace selected for the current task and accept an explicit path to another schema 4 repository as a read-only knowledge source. Installation alone does not attach or connect a repository on either surface.
 
 ## Interpret short requests
 
@@ -39,11 +39,20 @@ Treat the following as canonical, memorable prompts rather than parser tokens:
 - `plan block: <reason>`, `plan supersede: <reason>`: require a reason.
 - `finding add: <observation>`: require a concrete observation.
 - `knowledge capture: <finding-id>`: require a confirmed finding.
-- `knowledge propose-shared: <lesson-id>`: require a project lesson and remain read-only.
+- `knowledge list: project|reusable`: list the selected user-owned knowledge without writing.
+- `knowledge prepare: <lesson-id|all>`: prepare a sanitized proposal outside the repository and remain read-only.
+- `knowledge approve: <proposal> <lesson-id|all>`: write only the reviewed proposal entries selected by the user.
+- `knowledge revise: <lesson-id>`: prepare a reviewed replacement revision rather than silently overwriting an entry.
+- `knowledge retire: <lesson-id> because <reason>`: retire a reusable lesson while preserving its lifecycle.
+- `knowledge remove: <lesson-id>`: require a separate destructive preview and explicit confirmation, then refuse removal when the lesson belongs to a replacement chain.
+- `knowledge export: <destination>`: export approved reusable lessons and complete lifecycle chains to a deterministic portable bundle.
+- `knowledge import: <repo-or-bundle>`: preview active lessons applicable to the target plus lifecycle tombstones, then include every linked entry needed to keep selected replacement chains complete.
+- `knowledge import all: <repo-or-bundle>`: explicitly preview every non-draft lesson and lifecycle tombstone before importing.
+- `knowledge propose-shared: <lesson-id>`: deprecated read-only alias for `knowledge prepare` during the 2.1.0 transition.
 
 Additional text, synonyms, punctuation and another language may refine the same intent. Prefer the clear intended operation over exact wording. A user constraint such as `do not change files` always keeps the request read-only.
 
-For `overview`, never inspect a repository, ask for files or write anything. Explain that Project OS is for developers whose AI-assisted engineering work spans sessions. Lead with the practical benefits: resume from verified repository state, preserve decisions and evidence, preview control-plane changes and turn confirmed failures into reusable knowledge. Explain that project knowledge stays local while a sanitized portable lesson reaches another repository only through human review, inclusion in a Project OS release and an explicit upgrade or synchronization. Do not imply a hidden database or automatic learning. End with concise next steps for ChatGPT and Codex.
+For `overview`, never inspect a repository, ask for files or write anything. Explain that Project OS is for developers whose AI-assisted engineering work spans sessions. Lead with the practical benefits: resume from verified repository state, preserve decisions and evidence, preview control-plane changes and turn confirmed failures into user-owned reusable knowledge. Explain that project knowledge stays local while a sanitized lesson moves directly from one user-controlled repository to another or through a portable bundle, always after human review and an explicit import. Do not imply a central database, publication requirement, hidden service or automatic learning. End with concise next steps for ChatGPT and Codex.
 
 For `help`, never write files or run an applying helper operation. Return a concise menu of every supported short request above, its purpose, required argument and one or two examples. Explicitly separate requests typed in Codex chat from Python helper commands run in Terminal.
 
@@ -86,7 +95,7 @@ For reasoned plan, finding or knowledge edits without a dedicated helper subcomm
 - Never overwrite `AGENTS.md`, context, state, a Program, plan, finding, evidence or knowledge blindly.
 - Keep application code, production configuration, credentials, personal data and runtime artifacts outside Project OS operations unless the user's request independently authorizes them.
 - Record only verified repository facts. Mark unresolved claims as unverified.
-- Keep project incidents separate from portable lessons. Promote only confirmed, sanitized mechanisms.
+- Keep project incidents separate from portable lessons. Approve only confirmed, sanitized mechanisms and never require a Project OS release to transfer user knowledge.
 - Do not imply a daemon, watcher, hook, MCP server, hidden database, automatic upload or automatic cross-repository synchronization.
 - Project OS does not grant authority to install dependencies, delete files, commit, push, deploy, publish or contact external systems.
 

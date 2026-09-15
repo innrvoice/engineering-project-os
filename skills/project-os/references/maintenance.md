@@ -105,11 +105,11 @@ Use one helper command for every connected repository:
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
 ~~~
 
-Inspect release, schema, managed baselines and Program state first. Review the complete file preview. Abort on managed conflict, unsafe ownership or stale state. Apply the same command without `--dry-run`; a successful apply ends with the checker.
+Inspect release, schema, managed guidance baselines, user-owned knowledge and Program state first. Review the complete file preview. Abort on managed conflict, unsafe ownership or stale state. Apply the same command without `--dry-run`; a successful apply ends with the checker.
 
 If the repository release is newer than the helper, stop and use a matching or newer helper. Upgrade never downgrades repository state. Do not lower version fields manually to bypass this check.
 
-Upgrade preserves `AGENTS.md`, context, state, plans, findings, evidence, project knowledge and application code except for an explicitly required lifecycle migration.
+Upgrade preserves `AGENTS.md`, context, state, plans, findings, evidence, project knowledge, reusable knowledge and application code except for an explicitly required lifecycle migration. The schema 3 to 4 migration removes release-managed seed entries, promotes user-owned lessons proven by adoption coverage and keeps compatible unresolved local entries as drafts that require review. It aborts without writes if classifying any retained local entry would discard lifecycle metadata or unsupported user fields.
 
 A schema 2 repository with a legacy Program contract needs explicit classification:
 
@@ -120,7 +120,7 @@ Never infer this classification from the file alone. The closed date is the actu
 
 `--closed-on` is valid only for a closed schema 2 migration. Do not pass it for an active legacy Program or a current-schema upgrade.
 
-Do not edit version or schema fields manually. Do not reduce upgrade to `sync-knowledge`; schema, lifecycle, managed content and metadata are one transaction in this release.
+Do not edit version or schema fields manually. `sync-knowledge` is a read-only deprecation route in 2.1.0 and cannot replace upgrade. Schema, lifecycle, managed guidance, user-owned knowledge migration and metadata remain one transaction.
 
 ## Self-hosting
 

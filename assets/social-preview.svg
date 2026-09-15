@@ -24,10 +24,10 @@
     </svg>
   </g>
 
-  <text x="410" y="220" fill="#B7F34A" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="650" letter-spacing="2.4">FOR DEVELOPERS USING CHATGPT AND CODEX</text>
-  <text x="410" y="312" fill="#F5F8F3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="64" font-weight="720" letter-spacing="-1.9">Engineering</text>
-  <text x="410" y="378" fill="#F5F8F3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="64" font-weight="720" letter-spacing="-1.9">Project OS</text>
-  <text x="410" y="436" fill="#B7C2B3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="450">Resume work with durable state and reusable failure knowledge</text>
+  <text x="410" y="226" fill="#B7F34A" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="650" letter-spacing="2.4">FOR DEVELOPERS USING CHATGPT AND CODEX</text>
+  <text x="408" y="312" fill="#F5F8F3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="64" font-weight="720" letter-spacing="-1.9">Engineering</text>
+  <text x="408" y="378" fill="#F5F8F3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="64" font-weight="720" letter-spacing="-1.9">Project OS</text>
+  <text x="410" y="433" fill="#B7C2B3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="450">Resume work with durable state and reusable failure knowledge</text>
 
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="600" letter-spacing="0.8">
     <rect x="410" y="493" width="126" height="42" rx="12" fill="#B7F34A" fill-opacity="0.1" stroke="#B7F34A" stroke-opacity="0.28"/>
@@ -40,5 +40,5 @@
     <text x="829" y="520" fill="#C9FA6B">KNOWLEDGE</text>
   </g>
 
-  <text x="1112" y="112" fill="#8F9B8B" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="600">v2.0.5</text>
+  <text x="1112" y="112" fill="#8F9B8B" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="600">v2.1.0</text>
 </svg>

@@ -34,13 +34,13 @@ To update the Directory plugin, install the new published version when it appear
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.0.5/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.1.0/skills/project-os
 ~~~
 
 - Result: Codex installs the complete versioned skill in the local profile.
 - Files: the user-level skill directory changes; the open repository does not.
 - Proof: start a new Codex task and confirm that `project-os` is available.
-- Skip it when: release 2.0.5 is already installed in this profile.
+- Skip it when: release 2.1.0 is already installed in this profile.
 
 The URL is pinned to a release tag and does not follow `main` automatically. This route installs the skill in Codex only. It does not install the plugin in ChatGPT.
 
@@ -51,10 +51,10 @@ An installed skill is replaced as one directory. It is not merged file by file.
 **Type this in Codex chat:**
 
 ~~~text
-$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.0.5/skills/project-os and replace only that installed skill; do not change any repository.
+$skill-installer Update my installed project-os skill from https://github.com/innrvoice/engineering-project-os/tree/v2.1.0/skills/project-os and replace only that installed skill; do not change any repository.
 ~~~
 
-- Result: Codex replaces the installed `project-os` directory with release 2.0.5.
+- Result: Codex replaces the installed `project-os` directory with release 2.1.0.
 - Files: only the user-level skill installation changes.
 - Proof: start a new Codex task so Codex rebuilds its available-skill list.
 - Skip it when: the installed skill already comes from the same tag.
@@ -70,16 +70,16 @@ Describe the project or attach the files relevant to the requested workflow. Cho
 **Choose a starter request in ChatGPT:**
 
 ~~~text
-@Engineering Project OS What does Project OS do, how does it work and when should I use it?
-@Engineering Project OS Create a safe Project OS starter package for my project.
-@Engineering Project OS Review my existing Project OS setup and tell me what to fix.
+@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.
+@Engineering Project OS Help me set up Project OS for this project and start with a safe preview.
+@Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
 ~~~
 
 ### Codex
 
 Use the target repository as the Codex task workspace. Codex loads available skills and applicable `AGENTS.md` files when a task starts.
 
-Do not copy `AGENTS.md`, state, plans, findings, evidence or project knowledge from another repository. The reusable system is already inside the skill. Project truth must come from the target repository.
+Do not copy `AGENTS.md`, state, plans, findings, evidence or project knowledge from another repository. Project truth must come from the target repository. Transfer only sanitized lessons that the user approved for the reusable library, either through an explicit direct-repository import or a portable bundle.
 
 ## 3. Inspect before changing files
 
@@ -167,7 +167,7 @@ $project-os adopt
 ~~~
 
 - Result: Codex inventories existing owners and legacy knowledge, runs an adoption dry-run and presents its mappings and conflicts. It applies only a reviewed result with `safe_to_adopt: true`, then runs the checker.
-- Files: the Project OS manifest, managed guidance and shared seed knowledge may be created. Mapped project-owned records remain byte-for-byte unchanged.
+- Files: the Project OS manifest, managed guidance and an empty user-owned reusable registry may be created. Mapped project-owned records remain byte-for-byte unchanged.
 - Proof: the applied mapping matches the preview, no existing owner was overwritten and the checker passes.
 - Skip it when: required owners are missing, ambiguous or incompatible. Repair the named structural problem rather than forcing adoption.
 
@@ -180,9 +180,9 @@ After bootstrap or adoption, confirm that:
 - `AGENTS.md` preserves actual authority and routes to the current records.
 - `.agents/CONTEXT.md` contains verified durable facts and exact commands.
 - `.agents/STATE.md` is a compact checkpoint, not a task diary.
-- `.agents/SYSTEM.json` reports schema 3, Standard mode and only justified packs and overlays.
+- `.agents/SYSTEM.json` reports schema 4, Standard mode and only justified packs and overlays.
 - plans, findings, evidence and project knowledge were not copied from another product.
-- shared knowledge contains no credentials, personal data, private paths, signed URLs or private project history. The helper rejects common detectable patterns, but this is not exhaustive; human review is mandatory.
+- reusable knowledge contains only user-reviewed portable lessons and no credentials, personal data, private paths, URLs, evidence paths or private project history. A new repository starts with this registry empty. The helper rejects any actual URL plus common detectable sensitive patterns, but it cannot identify every project name or contextual disclosure; human review is mandatory.
 
 Project OS does not replace product, API, architecture, security, legal or release sources of truth.
 
@@ -214,13 +214,30 @@ $project-os upgrade
 ~~~
 
 - Result: Codex inspects the current schema and Program state, runs the helper upgrade as a dry run, reviews every managed change, applies only a clean transaction and runs the checker.
-- Files: Project OS version and schema metadata, managed guidance, managed shared knowledge and any explicitly required lifecycle migration may change. Project-owned context, state, plans, findings, evidence and application code are preserved.
-- Proof: the final checker passes, the repository reports release 2.0.5 and a repeated dry run has no pending changes.
-- Skip it when: the repository already passes the installed 2.0.5 checker.
+- Files: Project OS version and schema metadata, managed guidance, reusable knowledge classification and any explicitly required lifecycle migration may change. Project-owned context, state, plans, findings, evidence and application code are preserved.
+- Proof: the final checker passes, the repository reports release 2.1.0 and a repeated dry run has no pending changes.
+- Skip it when: the repository already passes the installed 2.1.0 checker.
 
 A schema 2 repository with the former basic setup upgrades directly to Standard. If a legacy `PROGRAM.md` exists, Codex must determine whether it is active or already closed from repository evidence. It does not guess. A closed contract is archived with an explicit `completed` or `stopped` disposition and its verified actual closure date; an active contract remains active in Program mode. If repository evidence does not establish the closure date, Codex stops for that decision instead of using the migration date.
 
-Managed-content conflicts abort the transaction without partial changes. Resolve the ownership conflict, then run the same `$project-os upgrade` request again.
+Managed-content conflicts abort the transaction without partial changes. The schema 3 to 4 migration removes unchanged release-managed seed entries, converts lessons proven as user-owned by adoption coverage into reusable entries and preserves compatible unknown or locally changed entries as drafts requiring review. If classifying any retained local entry would discard lifecycle metadata or unsupported user fields, upgrade refuses every write and reports the affected lesson and fields for explicit review. Resolve every ownership conflict, then run the same `$project-os upgrade` request again.
+
+## 8. Bring reusable lessons into a new repository
+
+Upgrade the source and destination to 2.1.0 before transfer. In Codex, import directly from the old repository without changing it:
+
+**Type this in the destination Codex task:**
+
+~~~text
+$project-os knowledge import: /path/to/old-repository
+~~~
+
+- Result: Codex previews active lessons against the destination's engineering scope, selected packs and overlays, closes any selected replacement chain, considers lifecycle tombstones regardless of applicability, then shows selected and skipped entries with reasons.
+- Files: none change until the user confirms the reviewed import. Only `.agents/knowledge/reusable/failures.json` changes on apply.
+- Proof: the source repository remains unchanged, the destination passes `$project-os check` and a repeated import preview reports no pending writes.
+- Skip it when: the source has no approved reusable lessons.
+
+For ChatGPT or transfer to another machine, export a deterministic JSON bundle from the source, upload it in the destination conversation and use the third Directory starter prompt. Project OS does not upload, publish or centrally synchronize the bundle.
 
 ## Program is a later, explicit decision
 

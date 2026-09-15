@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 PUBLIC_RECORD = ".agents/plugins/marketplace.json"
+FORBIDDEN_PUBLIC_PREFIXES = ("skills/project-os/assets/knowledge/",)
 
 
 def main():
@@ -31,6 +32,25 @@ def main():
     if unexpected:
         print("FAIL: local working records must not be published:")
         for path in unexpected:
+            print(path)
+        return 1
+    if args.tree is not None:
+        public_paths = [
+            path.relative_to(root).as_posix()
+            for path in root.rglob("*")
+            if path.is_file() or path.is_symlink()
+        ]
+    else:
+        result = subprocess.run(["git", "-C", str(root), "ls-files", "-z"],
+                                capture_output=True, check=True)
+        public_paths = result.stdout.decode("utf-8").strip("\0").split("\0")
+    forbidden = sorted(
+        path for path in public_paths
+        if path.endswith(".zip") or path.startswith(FORBIDDEN_PUBLIC_PREFIXES)
+    )
+    if forbidden:
+        print("FAIL: release artifacts or author-managed failure knowledge are public:")
+        for path in forbidden:
             print(path)
         return 1
     print("PASS: source tree excludes local working records")
