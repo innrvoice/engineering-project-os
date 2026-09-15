@@ -2,209 +2,131 @@
 
 # Engineering Project OS
 
+**Built for Codex.**
+
+Resume engineering work with durable state and reusable failure knowledge.
+
 [Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 
-The source-tree release is 2.1.0. The Directory page shows the version currently available for installation.
+The source-tree release is 2.1.1. The Directory page shows the version currently available for installation.
 
-Project OS is for developers who need AI-assisted engineering work to survive the next session.
+The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
-It keeps context, decisions, plans, evidence and failure knowledge inside the repository, so ChatGPT and Codex can continue from verified state instead of starting over.
+Tomorrow the code is still there, but the working state is not. Which decision was current? Which failure was confirmed? Did green CI prove the change worked or did the result still need a physical device, deployment or human check? A long chat may contain the answer, but chat history is a poor project database.
 
-The difficult part was rarely the first task. It was the fifth one.
+Engineering Project OS keeps that working truth in visible repository files. Codex can resume from the current plan, checkpoint, findings and evidence instead of reconstructing them from conversation fragments. The repository owns the state. The plugin knows how to inspect, create, validate and maintain it safely.
 
-I would reopen a repository, reconstruct what had already been decided, search for the command that had actually passed and try to remember which "done" item still needed a device, deployment or human check. The code was still there. The working state was not.
+## What it gives a developer
 
-Chat history is a poor project database.
+- **Resumable work:** return in a new Codex task and continue from an exact checkpoint instead of retelling the project.
+- **Visible plans and decisions:** keep the current route, constraints and next action beside the code that depends on them.
+- **Evidence-backed completion:** distinguish a passing source check from a deployed result, a physical-device check or another acceptance gate.
+- **Reusable failure knowledge:** turn a confirmed mechanism into a reviewed lesson that you can carry into another repository you own.
 
-Engineering Project OS adds a small, visible control plane to the repository. ChatGPT can help from a project description, selected files or a repository snapshot. Codex can work directly in an open repository workspace. Either way, a new chat can read current repository truth instead of treating an old conversation as current state.
+Project OS is useful when work spans sessions, has several acceptance boundaries or produces lessons worth preserving. It is not a generic project manager, an automatic global knowledge service or a requirement for an ordinary one-session code fix.
 
-## What you get
+## What that looks like in practice
 
-- Resume work from verified repository state instead of reconstructing context from old chats.
-- Preserve decisions, checkpoints and evidence alongside the code.
-- Preview Project OS changes before applying them.
-- Keep long engineering work organized across sessions and agents.
-- Turn confirmed failures into a knowledge library that belongs to you.
-- Carry reviewed failure patterns into another project without copying its private history.
+### Continue a long Codex task
 
-It is stack-agnostic. A TypeScript frontend, Python service, Clojure backend, native mobile app or mixed monorepo uses the same core system. Repository evidence selects only the capability guidance that fits its real boundaries.
+A migration is halfway through. The current plan records what has changed, why one approach was rejected, which phase is active and the exact next check. A fresh Codex task reads those records and continues from repository truth rather than a summary remembered by a previous conversation.
 
-## Knowledge that compounds
+### Keep "green" honest
 
-This part began with a fairly irritating thought. If I spent two months finding and fixing failures in one React Native project, why should a new React Native project make me pay for the same lessons again?
+A React Native fix passes TypeScript and unit tests. That is useful evidence, but it does not prove a native modal behaves correctly on the affected device. Project OS can preserve both facts: the source checks passed and physical acceptance remains open. "Done" stops being a mood.
 
-A failed approach should not disappear into a closed chat. Project OS records the finding, preserves the evidence and turns a confirmed mechanism into project knowledge with its trigger, prevention, decisive verification and applicability boundaries.
+### Reuse a failure without copying the old project
 
-Project knowledge stays with its repository and may retain names, paths and local history. When a mechanism could help elsewhere, Project OS prepares a sanitized proposal. You review the batch, approve only the lessons that remain accurate without private context and keep those lessons in your own reusable library.
+One repository confirms a recurring React Native lifecycle failure and records the trigger, mechanism, prevention and decisive verification. You review and sanitize that lesson, then import it into a new repository. The second project receives the reusable mechanism, not the first project's names, paths or private history.
 
-Codex can import that library directly from another repository. ChatGPT and cross-machine workflows can use a deterministic JSON bundle. The destination previews which lessons match its stack, shows what it would skip and changes nothing until you approve the import.
+## Start in Codex
 
-There is no failure database maintained by us, no lesson submission queue and no Project OS release between your old project and your new one. Nothing uploads, learns or synchronizes in the background. The knowledge is yours.
-
-The first repository records the lesson. The next repository does not need to repeat the failure. That was the whole point.
-
-## Start with these requests
-
-The first request explains the product without requiring repository files. The second begins setup and the third moves reviewed knowledge from an earlier project.
-
-**In ChatGPT, choose one of these starter requests:**
+1. [Install Engineering Project OS from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9).
+2. Open the repository in Codex and start a new task.
+3. Inspect the repository without changing it:
 
 ~~~text
-@Engineering Project OS Tell me what Project OS does, how it works and when I should use it.
-@Engineering Project OS Help me set up Project OS for this project and start with a safe preview.
-@Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
+$project-os inspect
 ~~~
 
-**In Codex, open the repository workspace, then type:**
+Project OS will recommend one connection path: a clean bootstrap, a bootstrap that preserves an existing `AGENTS.md` or adoption of compatible records already in the repository. Review the preview before any write, then run the matching workflow and validate the result.
 
 ~~~text
-$project-os overview
-$project-os inspect
 $project-os bootstrap
 $project-os check
 ~~~
 
-`@Engineering Project OS` explicitly selects the plugin or bundled skill in ChatGPT. `$project-os` selects the bundled skill in Codex. Neither form is a Terminal command, environment variable or permanent mode. The remaining text is an ordinary natural-language request. It can be short, detailed and written in any language.
+Use `$project-os adopt` instead of bootstrap when the inspection finds compatible existing state. Installing the plugin and connecting a repository are separate actions: installation makes the skill available while bootstrap or adoption creates the visible repository-local control plane.
 
-The overview needs no project input. In ChatGPT, starter-package advice can begin from a project description. A review of an existing setup needs its actual files, usually `AGENTS.md` and `.agents/`. A full repository ZIP is optional and useful only when the whole tree matters. Project OS does not pretend that an empty host workspace is the repository. In Codex, the selected workspace provides that context.
-
-The exact Codex skill name is `project-os` with a hyphen. `$project os` is not the same invocation.
-
-The examples above are recommended phrases, not a rigid command parser:
-
-- `$project-os overview` explains who Project OS is for, what it does and which workflow to choose without inspecting or changing a repository.
-- `$project-os check` runs the same read-only workflow as a longer request to validate the current repository and report errors.
-- `$project-os check only the plan registry` narrows that request.
-- `$project-os проверь Project OS и ничего не меняй` expresses the same intent in Russian.
-- An ambiguous request does not authorize a guess or a write. Codex explains the available requests or asks one focused question.
-- An unrelated engineering request remains ordinary engineering work. The prefix is unnecessary and does not justify creating plans, findings or other Project OS records.
-
-Every Project OS request that can change files follows the same safety sequence:
-
-`inspect -> preview or helper dry-run -> apply only a clean result -> check`
-
-## Standard is the system. Program is temporary.
-
-Every connected repository starts in **Standard**. Standard is the complete everyday system:
-
-- repository routing through `AGENTS.md`;
-- durable context and the current checkpoint;
-- just-in-time plans for work that must survive more than one task;
-- findings, evidence and project-specific knowledge;
-- managed capability packs and overlays plus user-owned project and reusable failure knowledge.
-
-Bootstrap always creates Standard. It never creates `PROGRAM.md`.
-
-A **Program** is a temporary umbrella contract for one explicitly started multi-phase initiative. It is useful when several separate plans need one shared outcome, authority boundary, phase sequence, evidence policy, cost boundary and exit condition.
-
-For example, fixing one pagination bug is ordinary Standard work. Even a long implementation can stay in Standard with one durable plan. Migrating authentication across an API, workers, web and mobile in separate rollout phases may justify a Program.
-
-**Type this in Codex chat:**
+After setup, ordinary development does not need a Project OS prefix. Ask Codex to implement, investigate or verify work normally. Use `$project-os` when the subject is the operating system itself: inspection, plans, checkpoints, findings, knowledge, upgrades or Program lifecycle.
 
 ~~~text
-$project-os program start: migrate authentication across the API, workers, web and mobile without downtime
+$project-os overview
+$project-os check
+$project-os plan open: ship offline retry without duplicate writes
+$project-os plan checkpoint
 ~~~
 
-- Result: Codex inspects the repository and prepares the Program contract. It creates `.agents/PROGRAM.md` only when the initiative, outcome, authority, phases, evidence, cost boundary, exclusions and overall exit conditions are sufficiently defined.
-- Files: `.agents/PROGRAM.md` and Program metadata in `.agents/SYSTEM.json` may change. No history archive, plan or application code is created automatically.
-- Proof: the repository is in `program` mode and the Project OS checker passes.
-- Skip it when: one plan can own the outcome or the work has no genuine multi-phase coordination boundary.
+Every mutating Project OS workflow follows the same boundary:
 
-Closing a Program archives its exact contract under `.agents/history/programs/` with a SHA-256 digest recorded in the history index, then returns the repository to Standard. The checker can detect an uncoordinated archive edit, deletion or substitution. This is tamper-evident Git-tracked history, not technically immutable storage, a signature or a remote audit service.
+`inspect -> preview or dry-run -> review -> apply -> check`
 
-## Install once, provide repository context in each new chat
+The exact Codex requests and helper commands are documented in [Usage](docs/USAGE.md) and [Reference](docs/REFERENCE.md).
 
-Requirements:
+## Knowledge that compounds
 
-- A supported ChatGPT or Codex surface with plugin access.
-- A project description, relevant files or an optional repository snapshot for ChatGPT or a local checkout opened as the Codex workspace.
-- Python 3.9 or newer on macOS or Linux when the deterministic helper runs locally.
+If a team spends weeks proving why a failure happens, the lesson should survive more than the conversation that found it. Project OS separates two kinds of knowledge:
 
-### 1. Install from the Universal Plugin Directory
+- **Project knowledge** stays with its repository and may include local names, paths, evidence and history.
+- **Reusable knowledge** contains only reviewed, sanitized failure mechanisms that the user has deliberately approved for transfer.
 
-1. Open [Engineering Project OS](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9).
-2. Select the plus button or `Install`.
-3. Start a new chat so the bundled skill becomes available.
+The transfer is explicit: capture a confirmed finding, prepare a sanitized lesson, approve it, export it or read it directly from another repository, preview it against the destination and import it. Nothing synchronizes in the background. There is no Project OS-owned shared database and no author-managed lesson service.
 
-In ChatGPT, type `@Engineering Project OS` to select the plugin. In Codex, type `$project-os` to select its bundled skill. Installation does not attach a repository or change repository files.
+For repositories available on the same machine, Codex can transfer reviewed lessons directly from the source repository. Portable JSON bundles support cross-machine work and the ChatGPT companion. Destination-owned changes win, skipped lessons are explained and repeated imports are idempotent.
 
-This is the primary installation route for ChatGPT and Codex.
+The first repository records the lesson. The next repository does not need to repeat the failure. Software will still invent new ones, but at least it has to be creative.
 
-### Alternative: install the standalone Codex skill
+See [How it works](docs/HOW_IT_WORKS.md) for the knowledge model and [Usage](docs/USAGE.md) for the transfer workflows.
 
-`$skill-installer` is a separate built-in Codex skill. Send this message in Codex, not Terminal.
+## Standard and Program
 
-**Type this in Codex chat:**
+Every connected repository starts in **Standard**. Standard is the complete everyday system: repository routing, durable context, checkpoint state, just-in-time plans, findings, evidence and knowledge.
+
+A **Program** is an optional temporary contract for one genuinely multi-phase initiative. Use it when several separate plans need one shared outcome, authority boundary, phase sequence, evidence policy and exit condition. A long task does not automatically need a Program.
+
+For example, one pagination fix belongs in Standard. An authentication migration across an API, workers, web and mobile may justify a Program. Closing a Program archives its exact contract with a SHA-256 digest, then returns the repository to Standard.
+
+## ChatGPT companion
+
+ChatGPT is a companion for explanations, supplied project files and portable knowledge bundles. It does not gain access to a live local repository merely because the plugin is installed.
+
+Use the three Directory starter prompts to understand the system, prepare a setup from supplied material or work with a reviewed knowledge bundle:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.1.0/skills/project-os
+@Engineering Project OS Tell me how Project OS helps Codex resume real engineering work across sessions.
+@Engineering Project OS Help me set up Project OS for this repository and start with a safe preview.
+@Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
 ~~~
 
-- Result: Codex installs the versioned standalone skill in the local Codex profile.
-- Files: only the user-level skill installation changes; the open repository does not.
-- Proof: start a new Codex task and confirm that `project-os` is available.
-- Skip it when: this exact release is already installed.
+An overview needs no files. Advice about an existing setup requires the relevant Project OS files. If they are missing, ChatGPT must ask for them instead of pretending that an empty host workspace is your repository. Any changed files returned by ChatGPT remain artifacts until you deliberately apply them.
 
-This alternative is for Codex only. The URL is pinned to a versioned Git tag and does not follow `main` automatically.
+## Alternative: standalone Codex skill
 
-### 2. Inspect and connect a repository
-
-In ChatGPT, describe the project or attach the files relevant to the requested workflow. Setup advice and a starter package can begin from a description. Reviewing an existing setup requires its actual Project OS files. Attach a full repository archive only when the complete tree is needed. ChatGPT does not gain access to a live local checkout merely because the plugin is installed.
-
-In Codex, open the target repository as the task workspace.
-
-**Type this in ChatGPT:**
+The Universal Plugin Directory is the primary installation route. If you need a standalone Codex-only installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
 
 ~~~text
-@Engineering Project OS Help me set up Project OS for this project and start with a safe preview.
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.1.1/skills/project-os
 ~~~
 
-**Type this in Codex:**
+Start a new Codex task after installation. The versioned URL does not follow `main` automatically.
 
-~~~text
-$project-os inspect
-~~~
+## What is installed
 
-- Result: Project OS reads the supplied repository context, existing instructions, documentation and available engineering configuration. In Codex it can also inspect Git state and local task runners. It recommends bootstrap, an `AGENTS.md`-preserving bootstrap or adoption.
-- Files: none change.
-- Proof: the response identifies the setup path, justified packs and overlays and the files that would change.
-- Skip it when: the repository already passes `$project-os check` at the installed version.
+The plugin contains a skill with focused instructions, references, templates, capability guidance and a deterministic Python helper. A connected repository contains visible records under `AGENTS.md` and `.agents/`.
 
-For a new control plane, review the inspection and continue with:
+There is no daemon, watcher, MCP server, hidden database, automatic upload, automatic Git operation or background cross-project synchronization. The helper runs only when explicitly invoked and never grants authority to change application code, install dependencies, commit, push, deploy or publish.
 
-**In ChatGPT:**
-
-~~~text
-@Engineering Project OS Bootstrap Project OS in these files. Start with a safe dry run.
-~~~
-
-**In Codex:**
-
-~~~text
-$project-os bootstrap
-~~~
-
-Bootstrap creates Standard only. It preserves safe unrelated `.agents` namespaces such as `.agents/plugins` and refuses to overwrite existing project authority. In ChatGPT, any changed files remain chat artifacts until the user deliberately applies them to a repository. [Setup](docs/SETUP.md) covers clean repositories, an existing `AGENTS.md` and adoption of compatible existing records.
-
-### 3. Work normally
-
-After setup, start a fresh chat. In Codex, this lets the repository's `AGENTS.md` enter the instruction chain. Ordinary product and code work does not need an explicit Project OS mention.
-
-**Type this in Codex chat:**
-
-~~~text
-Fix the pagination bug in the activity feed and run the focused tests.
-~~~
-
-Use `$project-os` again when the object of the request is Project OS itself: setup, validation, repair, upgrade, Program lifecycle, durable plan state, findings or failure knowledge.
-
-## What is actually installed
-
-The installed plugin contains a bundled skill with reasoning instructions, focused references, templates, capability guidance and a deterministic Python helper. It does not contain a central failure database. The standalone Codex installation contains the same skill. A connected repository contains visible files under `AGENTS.md` and `.agents/`.
-
-Codex discovers applicable `AGENTS.md` files when a task starts. ChatGPT uses the project description and files provided in the chat. When Project OS records are present, those instructions route the agent to the specific `.agents` records needed for the current work. The entire directory is not inserted into every prompt.
-
-There is no Project OS daemon, watcher, MCP server, hidden database, automatic upload, automatic Git operation or background cross-project synchronization. The helper runs only when explicitly invoked. It does not decide product truth or grant authority to change application code, install dependencies, commit, push, deploy or publish.
+Requirements are Python 3.9 or newer on macOS or Linux when the deterministic helper runs locally.
 
 ## Continue reading
 
@@ -218,6 +140,5 @@ There is no Project OS daemon, watcher, MCP server, hidden database, automatic u
 - [Security policy](SECURITY.md)
 - [Privacy policy](docs/PRIVACY.md)
 - [Terms of use](docs/TERMS.md)
-- [Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 - [Support](https://github.com/innrvoice/engineering-project-os/issues)
 - [MIT License](LICENSE)

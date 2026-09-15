@@ -1,72 +1,82 @@
 # Universal Plugin Directory and release packaging
 
-Project OS 2.1.0 is the current source-tree release candidate for ChatGPT and Codex. The Universal Plugin Directory is the primary installation route. Product gating is omitted because the accepted skill policy contains only `allow_implicit_invocation`; implicit invocation lets the selected plugin expose the skill for an explicit or clearly matching Project OS request. ChatGPT users can select `@Engineering Project OS` and Codex users can select `$project-os` explicitly.
+Project OS 2.1.0 is the current public baseline. Project OS 2.1.1 is the source-tree candidate. Release 2.1.1 keeps schema 4 and runtime behavior unchanged while making the product explicitly Codex-first across documentation, discovery metadata and public assets.
 
-GitHub releases and Universal Plugin Directory submissions are separate gates. At preparation time, by owner report, Directory version 2.0.5 is public and its skill works in ChatGPT Classic and Codex. Versions 2.0.2 and 2.0.3 were intermediate Directory-only releases and have no GitHub tags or GitHub Releases. The Directory does not expose the server-side package hash, so installed behavior does not prove that hash independently.
+The Universal Plugin Directory is the primary installation route. The tagged standalone skill remains a Codex-only alternative. GitHub publication, Directory review and Directory publication are separate gates, so none may be inferred from the others.
 
-## Build from the working tree
+## Build the candidate
 
-From the source checkout, run the full local suite and build to a new path outside the checkout:
+Run the full suite, then build to a new path outside the checkout:
 
 ~~~shell
 python3 -B -m unittest discover -s tests -v
-python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.1.0-plugin.zip
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.1.0-plugin.zip
+python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.1.1-plugin.zip
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.1.1-plugin.zip
 ~~~
 
-The output path must not exist. Use a different temporary directory for a subsequent build. The builder reads the current files, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python/zlib environment. Record the reported SHA-256, entry count, compressed bytes and extracted bytes for the reviewed ZIP.
+The output path must not exist. The builder reads the current working tree, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python and zlib environment. Record the SHA-256, entry count, compressed bytes and extracted bytes for the exact reviewed ZIP.
 
-These commands verify packaging from the source tree. Do not replace the contents of a published Directory version in place. Any package-content change after publication requires a new patch version.
+The package allowlist includes both manifests, the complete skill and its assets, public documentation, README, license, security policy, changelog, contributing guide and the packaging tool. It excludes the repository's local `.agents` control plane, Git metadata, tests and bytecode caches. Hidden `.agents` paths inside skill templates are public product assets and remain included.
 
-The allowlist includes the portable and Codex manifests, complete skills and assets, public docs, README, license, security policy, changelog, contributing guide and this packaging tool. It excludes the repository's root `.agents` control plane, Git metadata, tests and bytecode caches. Hidden `.agents` paths under skill templates are required bootstrap assets and are included.
+The checker validates regular file entries, normalized unique paths, path traversal, symlinks, size limits, CRCs, manifest agreement, relative documentation links and Markdown layout. Public prose paragraphs and list items stay on one physical line so renderers cannot expose source wrapping as isolated words or conjunctions.
 
-The check validates regular file entries, normalized unique paths, size limits, CRCs, manifest version agreement, relative public-document links and Markdown layout. Public prose paragraphs and list items must each stay on one physical line so plugin renderers cannot expose source wrapping as stray fragments. The source suite also prepares every bundled [reviewer fixture](../skills/project-os/evals/README.md) from an extracted ZIP and exercises fresh bootstrap, check and idempotent upgrade there. No dependencies are installed.
+The package must not contain a release-managed failure knowledge database. Capability packs and overlays are product guidance. Project knowledge, the user's reusable knowledge registry and exported bundles exist only in connected repositories or user-selected artifact locations.
 
-The package must not contain release-managed failure-knowledge JSON. Capability packs and overlays remain product guidance in Markdown. User-owned project and reusable registries exist only inside connected repositories or user-created bundles.
+## Version and schema contract
 
-## Coordinate the 2.1.0 release
+Release version must be `2.1.1` in the helper, both plugin manifests, marketplace reference, knowledge provenance, tests and active documentation. `SCHEMA_VERSION` remains `4`.
 
-Directory availability, the Git tag and the GitHub Release remain separate outcomes. Complete them through explicit gates:
+The repository upgrade from 2.1.0 is schema-preserving. It may update the recorded Project OS release and managed guidance, but it must not modify application code, plans, findings, evidence or project-owned knowledge. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
-1. Finish local source and ZIP validation, review the complete diff and run `python3 -B scripts/check_public_tree.py` against the staged file list before any commit.
-2. Test the candidate in fresh ChatGPT and Codex conversations. Confirm that overview works without repository files and that repository operations request the input they actually need.
-3. Obtain explicit authorization for a release branch, pull request, merge, tag and GitHub Release.
-4. Wait for required checks, publish `v2.1.0` and verify the standalone Codex installation from the tagged URL in a fresh task.
-5. Submit and publish Directory 2.1.0 only through the owner's separate Portal action and acceptance gate.
+## Selected metadata
 
-The repo may retain packaging tools, reviewer fixtures and Directory preparation documentation as development material. Keep release notes focused on shipped behavior and explicitly separate Directory availability from GitHub publication. The generated ZIP belongs outside the source checkout.
-
-## Prepare Directory 2.1.0
-
-Keep published Directory version 2.0.5 available while 2.1.0 is tested and reviewed.
-
-1. Keep the release version synchronized in the helper, manifests, marketplace metadata, reusable knowledge migration fixtures, tests and documentation.
-2. Confirm the verified individual developer display name and align both plugin manifests.
-3. Confirm the public listing, Directory link, Privacy Policy and Terms match the exact package. Revalidate the ZIP after every metadata or policy edit.
-4. Upload the new ZIP through `Upload draft` and keep published 2.0.5 available during review.
-5. Walk through Plugin Info, Prompts, Skills and Submit. Verify images, capabilities, the three exact starter prompts, release notes and policy declarations before submission.
-6. Record review approval separately from publication. Do not claim 2.1.0 is public before the owner publishes it and verifies a fresh installation.
-
-The skill metadata file `skills/project-os/agents/openai.yaml` uses only `policy.allow_implicit_invocation: true`. Do not add `policy.products`; the Directory validator accepts no other policy field in this file. Its `short_description` must contain 25 to 64 characters and its `default_prompt` must mention `$project-os` explicitly. Do not add unsupported interface fields such as `brandColorDark` or `supportURL`; enter customer support information in the Portal listing and use supported `brandColor` or `logoDark` metadata when needed. Local validation does not establish portal compatibility.
-
-Use these exact public metadata values:
+Use these values in both manifests and the Directory form:
 
 - Name: `Engineering Project OS`
+- Descriptor: `Built for Codex.`
 - Subtitle: `Resume work. Reuse lessons.`
-- Skill short description: `Resume work and reuse failure knowledge`
-- Description: `Use this when developers need durable repository state across ChatGPT and Codex sessions or want verified failure lessons to move safely between their own projects. It inspects, bootstraps, validates, repairs and upgrades Project OS records with previews before writes. Do not use it for ordinary one-session coding or as an automatic global knowledge service.`
-- Capabilities: `Resume engineering work across sessions`; `Set up and validate repository state`; `Capture verified failure knowledge`; `Reuse user-owned lessons across projects`.
+- Skill short description: `Resume Codex work and reuse failure knowledge`
+- Plugin description: `Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.`
+- Long description: `Use this when Codex work must survive multiple sessions, preserve verified decisions and evidence or carry reviewed failure lessons into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.`
+- Capabilities: `Resume Codex work across sessions`; `Keep plans, decisions and evidence with the repository`; `Capture verified failure knowledge`; `Reuse reviewed lessons across your own projects`.
+
+Keep `codex` before `chatgpt` in discovery keywords. The skill metadata file `skills/project-os/agents/openai.yaml` may contain only `policy.allow_implicit_invocation: true` under `policy`. Its `short_description` must contain 25 to 64 characters and its `default_prompt` must mention `$project-os` explicitly.
 
 The three Directory starter prompts must match both manifests exactly:
 
-1. `Tell me what Project OS does, how it works and when I should use it.`
-2. `Help me set up Project OS for this project and start with a safe preview.`
+1. `Tell me how Project OS helps Codex resume real engineering work across sessions.`
+2. `Help me set up Project OS for this repository and start with a safe preview.`
 3. `Help me reuse verified failure knowledge from an earlier project in this one.`
 
-Replay the discovery golden set in `skills/project-os/evals/discovery.json` before submission. It covers direct requests, implicit continuity requests, incomplete requests, negative controls and edge cases. This skills-only plugin has no MCP tools and no plugin-owned UI, so tool metadata and UI screenshots do not apply.
+The social preview is versionless. It uses the eyebrow `BUILT FOR CODEX`, the title `Engineering Project OS`, the tagline `Resume work with durable state and reusable failure knowledge` and the existing `CONTEXT`, `PLANS`, `EVIDENCE`, `KNOWLEDGE` labels.
 
-The reviewer submission must include at least five positive cases and three negative cases. Cover overview without files, safe setup, batch knowledge preparation, direct repository import, bundle import, a privacy refusal, an ID conflict and an unrelated coding request that must not activate Project OS.
+## Discovery checks
 
-Use these release notes: `2.1.0 replaces release-managed shared failure knowledge with a user-owned reusable library. Developers can review, export and import verified lessons between their own projects with applicability previews, conflict checks and no automatic upload or global database. It also refreshes discovery metadata, documentation and the social preview.`
+Replay `skills/project-os/evals/discovery.json` in a fresh Codex task. The set covers direct Codex overview and setup, indirect continuity loss, cross-project failure knowledge, one-session negative control, explicit ChatGPT use with supplied files, missing ChatGPT files and rejection of automatic global sharing.
 
-Use the official [metadata optimization guide](https://developers.openai.com/plugins/guides/optimize-metadata), [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/app-guidelines) for the external review.
+The metadata follows the official [metadata optimization guide](https://developers.openai.com/plugins/guides/optimize-metadata): it begins the long description with when the plugin should be used, states negative cases and includes direct, indirect and negative golden prompts. Change one metadata field at a time during later tuning and keep experiment notes only in ignored local `.agents` records.
+
+Test all three public starter prompts in a fresh ChatGPT chat. The overview must describe Project OS as built for Codex and ChatGPT as the companion. Existing-repository requests without supplied files must ask for them rather than inspecting an empty host workspace.
+
+## Release sequence
+
+1. Finish source checks, validate the ZIP, inspect the rendered 1280 x 640 social preview and review the complete diff.
+2. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit.
+3. Install the exact candidate locally and run the golden Codex discovery set in a fresh task.
+4. Test the three starter prompts in a fresh ChatGPT chat and confirm companion behavior.
+5. Obtain explicit owner authorization for commit, push, pull request, merge, tag and GitHub Release.
+6. Wait for required checks, create tag and GitHub Release `v2.1.1`, then verify the tagged standalone Codex installation in a fresh task.
+7. Submit the same verified ZIP to the Directory through the owner-controlled Portal flow.
+8. Record approval separately from publication, then verify public Directory availability in fresh Codex and ChatGPT sessions.
+
+Do not replace package contents under an existing version. Any content change after publication requires another version.
+
+## Directory form and release notes
+
+Walk through Plugin Info, Prompts, Skills and Submit. Verify images, capabilities, prompt text, policy declarations and the package version before submission. Customer support information belongs in the Portal listing, not in unsupported manifest fields.
+
+Use these release notes exactly:
+
+`2.1.1 makes Engineering Project OS explicitly Codex-first, rewrites onboarding around real developer workflows and keeps ChatGPT as a companion for supplied files and portable knowledge bundles. It aligns discovery metadata, starter prompts, tests and release assets without changing schema 4 behavior.`
+
+Use the official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/app-guidelines) for the external review. Local validation cannot establish Portal acceptance or public availability.

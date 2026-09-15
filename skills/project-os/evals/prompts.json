@@ -5,11 +5,11 @@
       "name": "overview-needs-no-repository-input",
       "prompt": "$project-os overview",
       "expected": [
-        "explain that Project OS is for developers whose AI-assisted work spans sessions",
+        "explain that Engineering Project OS was built for Codex and is for developers whose AI-assisted work spans sessions",
         "lead with continuity, evidence, safe previews and reusable failure knowledge",
         "distinguish local project knowledge from a user-owned reusable library",
         "state that Project OS has no hosted or author-managed global failure database",
-        "recommend useful next steps for ChatGPT and Codex",
+        "recommend the next useful Codex workflow, then mention the ChatGPT companion for supplied files and portable bundles",
         "do not ask for repository files, inspect a workspace or make changes"
       ]
     },

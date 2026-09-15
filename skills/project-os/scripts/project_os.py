@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.1.0"
+VERSION = "2.1.1"
 SCHEMA_VERSION = 4
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
@@ -3258,7 +3258,7 @@ def sync_knowledge(
     system_path = root / ".agents" / "SYSTEM.json"
     if not system_path.is_file():
         raise ProjectOSError("Project OS is not configured in the target repository")
-    print("sync-knowledge is deprecated and never writes in Project OS 2.1.0")
+    print(f"sync-knowledge is deprecated and never writes in Project OS {VERSION}")
     print("Use `knowledge import --source <repository-or-bundle>` for user-owned lessons.")
     print("Use `upgrade` to refresh Project OS guidance, schema and release metadata.")
     return 0

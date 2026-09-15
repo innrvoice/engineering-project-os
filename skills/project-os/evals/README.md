@@ -1,6 +1,6 @@
 # Reviewer cases
 
-`submission.json` contains nine positive and four negative Codex workspace cases. Each case has an independent synthetic fixture, prompt, expected workflow and expected result. `prompts.json` contains additional ChatGPT and Codex workflow cases. `discovery.json` is the golden prompt set for direct, indirect, incomplete, negative and edge routing behavior. No private repository, account, dependency installation or network service is needed.
+`submission.json` contains nine positive and four negative Codex workspace cases. Each case has an independent synthetic fixture, prompt, expected workflow and expected result. `prompts.json` contains additional Codex and ChatGPT companion cases. `discovery.json` is the golden prompt set for direct, indirect, incomplete, negative and edge routing behavior. No private repository, account, dependency installation or network service is needed.
 
 The three public starter prompts also require a fresh ChatGPT check. Install the exact candidate ZIP through the local marketplace and start a new chat. Confirm that the overview prompt explains the product without requesting files. Then use a synthetic project description for safe setup and attach a synthetic reusable knowledge bundle for cross-project import. Confirm that the selected plugin exposes Project OS instead of a generic fallback audit.
 
@@ -45,4 +45,4 @@ python3 -B <plugin-root>/skills/project-os/scripts/project_os.py check --target 
 
 ## Evidence boundary
 
-The source test suite builds a ZIP and executes its fixtures, bootstrap, checker and upgrade paths. Those deterministic checks do not execute ChatGPT or Codex reasoning workflows and do not prove plugin discovery. Record fresh ChatGPT and Codex plugin-loader results separately, including the exact ZIP hash and host. Portal ingestion, review approval and publication also remain separate checks.
+The source test suite builds a ZIP and executes its fixtures, bootstrap, checker and upgrade paths. Those deterministic checks do not execute Codex or ChatGPT reasoning workflows and do not prove plugin discovery. Record fresh Codex and ChatGPT plugin-loader results separately, including the exact ZIP hash and host. Portal ingestion, review approval and publication also remain separate checks.
