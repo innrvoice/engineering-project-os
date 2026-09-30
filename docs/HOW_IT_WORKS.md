@@ -28,6 +28,14 @@ Green CI proves that CI passed. It does not prove that the physical failure is f
 
 The helper validates structure and internal consistency. It cannot decide that a screenshot proves the product outcome or that a source build is equivalent to production. Codex and the user make those judgments from current evidence. Project OS preserves the distinction so the judgment survives the session.
 
+## Preserve a requirement before the conversation forgets it
+
+Halfway through a task, the user adds an offline case or corrects an audience rule. Codex saves that material instruction while processing the message, without requiring a separate request to write it down. The requests registry retains the source formulation, interpretation and route. Compatible additions join the active contract. Independent outcomes get a planned slice; conflicts stay visible until a decision resolves them.
+
+After context compaction, Codex reads unresolved requests with the plan and checkpoint. Integrated means assigned, not delivered. Implemented requires linked verified gates. This is an agent workflow over files, not a background chat recorder, so the agent must perform the capture on each material turn.
+
+A feature may pass local tests while its remote schema is still old. The active contract keeps that required migration pending and plan complete refuses closure. A separate planned slice cannot hide a prerequisite of the original outcome. Source-only preparation may close only when it was the actual agreed result.
+
 ## Scene three: coordinate a real multi-phase migration
 
 Most work belongs in Standard mode. One bug fix may not need a plan at all. A long implementation may need one resumable plan, but length alone does not make it a Program.
@@ -67,9 +75,11 @@ Project OS uses ordinary files with narrow ownership:
 
 - `AGENTS.md` owns startup routing, authority and working rules.
 - `.agents/SYSTEM.json` owns the Project OS release, schema, mode, paths and managed guidance baselines.
+- `.agents/WORKFLOW.md` owns managed intake, recovery and closure rules.
+- `.agents/requests.json` owns material user additions and their routes.
 - `.agents/CONTEXT.md` owns durable verified facts and exact commands.
 - `.agents/STATE.md` owns the current checkpoint and exact next action.
-- `.agents/plans/` owns resumable outcome packages.
+- `.agents/plans/` contains the status registry, Markdown implementation narratives and adjacent JSON acceptance contracts. Completion receipts bind the contract, proof and scoped requests without making later independent slices part of the old result.
 - `.agents/findings/` owns concrete defects, candidates and accepted risks.
 - `.agents/evidence/` stores sanitized proof referenced by an owning record.
 - `.agents/knowledge/project/` owns repository-specific lessons.
@@ -98,7 +108,7 @@ The Python helper performs deterministic operations such as `detect`, `init`, `a
 
 The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
 
-Project OS 2.1.1 keeps schema 4 and the existing knowledge bundle formats. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
+Project OS 2.2.0 introduces schema 5 while preserving the existing knowledge bundle formats. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
 
 ## ChatGPT is the companion surface
 

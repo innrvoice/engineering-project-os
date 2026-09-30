@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Only Project OS 2.1.1 is supported by this source tree. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
+This source tree develops candidate Project OS 2.2.0. It does not establish that the candidate is published. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
 
 ## Report a vulnerability
 
@@ -20,7 +20,7 @@ Include:
 
 ## Runtime boundary
 
-The 2.1.1 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
+The 2.2.0 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal`, `--checkpoint` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
 
 Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database, central failure database or automatic cross-project synchronization. The helper runs only when a person or Codex invokes it locally. ChatGPT can work only with material supplied in its conversation.
 
@@ -37,11 +37,11 @@ Project OS is designed to fail closed on:
 - concurrent changes before an atomic replacement;
 - detected URL forms plus common detectable credential and private-path patterns in reusable knowledge and bundles.
 
-Writes require POSIX directory descriptors and no-follow opens (macOS or Linux with Python 3.9+). Unsupported write environments fail before mutation. Create, replace, delete and rollback stay anchored to opened directories; a swapped parent cannot redirect them into a symlink target. Parsed JSON and its concurrency hash come from one byte snapshot. Program closure guards the plan registry as well as the files it changes and upgrade refuses a newer repository release.
+Writes require POSIX directory descriptors and no-follow opens (macOS or Linux with Python 3.9+). Unsupported write environments fail before mutation. Create, replace, delete and rollback stay anchored to opened directories; a swapped parent cannot redirect them into a symlink target. Parsed JSON and its concurrency hash come from one byte snapshot. Program closure guards the plan registry as well as the files it changes; plan closure guards contracts, scoped requests, proof and checkpoint owners and upgrade refuses a newer repository release.
 
 These checks detect ordinary concurrent edits and directory swaps. They are not a lock or isolation boundary against a process with equal filesystem privileges: that process can move an open directory, edit an inode during a syscall sequence or alter files after validation. Keep other writers idle while applying an operation. Caught failures trigger guarded rollback; abrupt termination or power loss may leave partial state that needs checker-guided recovery from a reviewed source or backup.
 
-A mutating Project OS request must inspect, preview or dry-run, apply only a clean result and finish with the checker. In ChatGPT, changed files remain conversation artifacts until the user deliberately applies them to the real repository. Direct helper users must review `--dry-run` output before init, adopt, upgrade, Program start, Program close or a mutating knowledge operation.
+A mutating Project OS request must inspect, preview or dry-run, apply only a clean result and finish with the checker. In ChatGPT, changed files remain conversation artifacts until the user deliberately applies them to the real repository. Direct helper users must review `--dry-run` output before init, adopt, upgrade, Program start, Program close, plan complete or a mutating knowledge operation.
 
 ## Program archive boundary
 

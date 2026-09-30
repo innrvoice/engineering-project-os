@@ -131,8 +131,8 @@ def validate_zip(path: Path) -> dict[str, object]:
         helper_schema = re.search(r"^SCHEMA_VERSION = (\d+)$", helper, re.MULTILINE)
         if helper_version is None or helper_version.group(1) != portable["version"]:
             raise ValueError("Package helper and manifest versions disagree")
-        if helper_schema is None or int(helper_schema.group(1)) != 4:
-            raise ValueError("Package helper must use Project OS schema 4")
+        if helper_schema is None or int(helper_schema.group(1)) != 5:
+            raise ValueError("Package helper must use Project OS schema 5")
         skill_policy = archive.read("skills/project-os/agents/openai.yaml").decode("utf-8")
         if "allow_implicit_invocation: true" not in skill_policy or "products:" in skill_policy:
             raise ValueError("Package skill policy is not portable")

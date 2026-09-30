@@ -1,6 +1,6 @@
 # Universal Plugin Directory and release packaging
 
-Project OS 2.1.0 is the current public baseline. Project OS 2.1.1 is the source-tree candidate. Release 2.1.1 keeps schema 4 and runtime behavior unchanged while making the product explicitly Codex-first across documentation, discovery metadata and public assets.
+Project OS 2.1.1 is the current public baseline. Project OS 2.2.0 is the source-tree candidate. The candidate introduces schema 5, durable user-request intake and guarded plan completion. Passing local checks does not publish it.
 
 The Universal Plugin Directory is the primary installation route. The tagged standalone skill remains a Codex-only alternative. GitHub publication, Directory review and Directory publication are separate gates, so none may be inferred from the others.
 
@@ -10,8 +10,8 @@ Run the full suite, then build to a new path outside the checkout:
 
 ~~~shell
 python3 -B -m unittest discover -s tests -v
-python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.1.1-plugin.zip
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.1.1-plugin.zip
+python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.0-plugin.zip
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.0-plugin.zip
 ~~~
 
 The output path must not exist. The builder reads the current working tree, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python and zlib environment. Record the SHA-256, entry count, compressed bytes and extracted bytes for the exact reviewed ZIP.
@@ -24,9 +24,9 @@ The package must not contain a release-managed failure knowledge database. Capab
 
 ## Version and schema contract
 
-Release version must be `2.1.1` in the helper, both plugin manifests, marketplace reference, knowledge provenance, tests and active documentation. `SCHEMA_VERSION` remains `4`.
+Release version must be `2.2.0` in the helper, both plugin manifests, marketplace reference, knowledge provenance, tests and active documentation. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1.
 
-The repository upgrade from 2.1.0 is schema-preserving. It may update the recorded Project OS release and managed guidance, but it must not modify application code, plans, findings, evidence or project-owned knowledge. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
+The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata without rewriting Markdown plans, context, state, findings, evidence or application code. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
 ## Selected metadata
 
@@ -50,6 +50,10 @@ The three Directory starter prompts must match both manifests exactly:
 
 The social preview is versionless. It uses the eyebrow `BUILT FOR CODEX`, the title `Engineering Project OS`, the tagline `Resume work with durable state and reusable failure knowledge` and the existing `CONTEXT`, `PLANS`, `EVIDENCE`, `KNOWLEDGE` labels.
 
+## Continuity and host checks
+
+Replay the multi-message cases in evals/continuity.json using the exact candidate package. Verify request records and plan status after each message. End the initial session, start a fresh session with only the repository files and verify recovery, routing and the exact next action. A passing deterministic fixture test is not a host workflow pass. Keep inaccessible Codex or ChatGPT acceptance pending with the exact required action.
+
 ## Discovery checks
 
 Replay `skills/project-os/evals/discovery.json` in a fresh Codex task. The set covers direct Codex overview and setup, indirect continuity loss, cross-project failure knowledge, one-session negative control, explicit ChatGPT use with supplied files, missing ChatGPT files and rejection of automatic global sharing.
@@ -60,12 +64,12 @@ Test all three public starter prompts in a fresh ChatGPT chat. The overview must
 
 ## Release sequence
 
-1. Finish source checks, validate the ZIP, inspect the rendered 1280 x 640 social preview and review the complete diff.
+1. Finish source checks, validate the exact reproducible ZIP and review the complete diff. Existing versionless artwork remains unchanged.
 2. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit.
-3. Install the exact candidate locally and run the golden Codex discovery set in a fresh task.
+3. Load the exact candidate in an isolated test environment and run discovery plus continuity cases in fresh Codex sessions. Preserve the installed stable copy.
 4. Test the three starter prompts in a fresh ChatGPT chat and confirm companion behavior.
 5. Obtain explicit owner authorization for commit, push, pull request, merge, tag and GitHub Release.
-6. Wait for required checks, create tag and GitHub Release `v2.1.1`, then verify the tagged standalone Codex installation in a fresh task.
+6. Wait for required checks, create tag and GitHub Release `v2.2.0`, then verify the tagged standalone Codex installation in a fresh task.
 7. Submit the same verified ZIP to the Directory through the owner-controlled Portal flow.
 8. Record approval separately from publication, then verify public Directory availability in fresh Codex and ChatGPT sessions.
 
@@ -75,8 +79,8 @@ Do not replace package contents under an existing version. Any content change af
 
 Walk through Plugin Info, Prompts, Skills and Submit. Verify images, capabilities, prompt text, policy declarations and the package version before submission. Customer support information belongs in the Portal listing, not in unsupported manifest fields.
 
-Use these release notes exactly:
+Use these candidate release notes after the release gates pass:
 
-`2.1.1 makes Engineering Project OS explicitly Codex-first, rewrites onboarding around real developer workflows and keeps ChatGPT as a companion for supplied files and portable knowledge bundles. It aligns discovery metadata, starter prompts, tests and release assets without changing schema 4 behavior.`
+`2.2.0 preserves material user additions across sessions, routes them into current or following slices and guards plan completion with explicit target evidence. It adds schema 5, acceptance contracts, request intake, completion receipts and a transactional migration that preserves legacy history without inventing proof.`
 
 Use the official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/app-guidelines) for the external review. Local validation cannot establish Portal acceptance or public availability.

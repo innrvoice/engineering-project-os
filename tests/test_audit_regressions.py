@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 import test_project_os as test_helpers
-from test_project_os import PROJECT_OS, file_hashes, run_cli, write_program_definition
+from test_project_os import PROJECT_OS, file_hashes, run_cli, write_program_definition, write_test_contract
 
 
 class AuditRegressionTests(unittest.TestCase):
@@ -200,13 +200,14 @@ class AuditRegressionTests(unittest.TestCase):
             definition = write_program_definition(root)
             self.assertEqual(run_cli("program", "start", "--target", str(root), "--definition", str(definition)).returncode, 0)
             (root / ".agents/plans/001.md").write_text("# Plan 001\n\nOutcome: concurrent work.\n")
+            write_test_contract(root)
             before = file_hashes(root)
             plans_path = root / ".agents/plans/index.json"
 
             def activate_plan(*args):
                 value = json.loads(plans_path.read_text())
                 value["execution_state"] = "running"
-                value["plans"] = [{"id": "001", "outcome": "Concurrent work", "status": "active", "path": ".agents/plans/001.md"}]
+                value["plans"] = [{"id": "001", "outcome": "Concurrent work", "status": "active", "path": ".agents/plans/001.md", "contract_path": write_test_contract(root)}]
                 plans_path.write_text(json.dumps(value, indent=2) + "\n")
 
             with mock.patch.object(PROJECT_OS, "print_transaction_preview", side_effect=activate_plan):
@@ -259,6 +260,7 @@ class AuditRegressionTests(unittest.TestCase):
                 if legacy:
                     test_helpers.UpgradeTest().make_schema2(root, "full")
                 (root / ".agents/plans/001.md").write_text("# Concurrent plan\n\nOutcome: concurrent work.\n")
+                write_test_contract(root)
                 before = file_hashes(root)
                 plans_path = root / ".agents/plans/index.json"
                 original_check = PROJECT_OS.require_passing_check
@@ -267,7 +269,7 @@ class AuditRegressionTests(unittest.TestCase):
                     original_check(*args)
                     value = json.loads(plans_path.read_text())
                     value.update({"execution_state": "running", "active_plan": "001", "plans": [{
-                        "id": "001", "status": "active", "outcome": "Concurrent work", "path": ".agents/plans/001.md"
+                        "id": "001", "status": "active", "outcome": "Concurrent work", "path": ".agents/plans/001.md", "contract_path": write_test_contract(root)
                     }]})
                     plans_path.write_text(json.dumps(value, indent=2) + "\n")
 

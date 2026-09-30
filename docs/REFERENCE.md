@@ -1,6 +1,6 @@
 # Reference
 
-This is the technical contract for Project OS 2.1.1. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.2.0. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
@@ -42,6 +42,7 @@ The helper lives at `scripts/project_os.py` inside the installed skill. Terminal
 | `program close completed` | None | Close after all exit evidence exists |
 | `program close stopped: <reason>` | Reason | Stop and archive an incomplete Program |
 | `plan open: <outcome>` | Outcome | Open one resumable execution package |
+| `plan status[: <plan-id>]` | ID when no single active plan exists | Read-only gates, requests and blockers |
 | `plan checkpoint` | None | Save a reconciled checkpoint |
 | `plan resume[: <plan-id>]` | Plan ID when ambiguous | Continue active work or reactivate a blocked plan after its blocker resolves |
 | `plan complete` | None | Complete only with required evidence |
@@ -103,10 +104,13 @@ Closing requires no active plan. Use `completed` only after Program exit evidenc
 | --- | --- |
 | `AGENTS.md` | Startup routing, authority, working method, safety and verification expectations |
 | `.agents/SYSTEM.json` | Release, schema, state, active Program, mappings, selections and managed guidance baselines |
+| `.agents/WORKFLOW.md` | Managed request intake, recovery and closure rules |
+| `.agents/requests.json` | Material user instructions, routing and resolutions |
 | `.agents/CONTEXT.md` | Durable verified facts, authority, architecture and exact commands |
 | `.agents/STATE.md` | Current scope, verified progress, exact next action and blockers |
 | `.agents/plans/index.json` | Canonical execution state and plan statuses |
-| `.agents/plans/NNN-*.md` | One observable outcome, its work and acceptance evidence |
+| `.agents/plans/NNN-*.md` | Implementation narrative, scope and decisions |
+| Adjacent plan JSON named by contract_path | Canonical gates, target proof and contract revision |
 | `.agents/findings/findings.json` | Concrete defects, candidates and accepted risks |
 | `.agents/evidence/` | Sanitized, dated evidence linked from plans or findings |
 | `.agents/knowledge/project/` | Confirmed repository-specific lessons |
@@ -138,6 +142,48 @@ Reusable failure knowledge statuses are `active`, `draft`, `retired` and `replac
 
 A status transition does not manufacture evidence. `done`, `verified` and completed Program closure require the evidence class named by the owning record.
 
+## Contracts, intake and guarded completion
+
+SYSTEM schema 5 declares the requests owner and manages `.agents/WORKFLOW.md` alongside capability guidance. The plan index uses schema_version 2 and retains execution_state, optional active_plan, next_id and plans. Each new plan has id, status, path, outcome and contract_path. legacy_closed maps historical IDs to original done or superseded statuses; legacy_uncontracted lists migrated unfinished IDs without contracts. Those exemptions are migration provenance, not a way to create new unverified closed plans.
+
+Each adjacent contract has schema_version 1, plan_id matching the index, a positive integer revision and non-empty gates. Gate IDs are unique within the contract. Required fields are id, condition, evidence_class, target, status, evidence, next_action and reason. condition, evidence_class and target are non-empty text. Gate statuses are pending, verified and not_applicable. Pending requires next_action; verified requires at least one proof; not_applicable requires a scope-grounded reason. Missing access or authorization is pending. Every gate is an obligation of the stated outcome unless genuinely inapplicable.
+
+A proof has path, sha256, checked_on, target and revision. path is a safe repository-relative regular file without symlinks. sha256 is sha256: plus its 64-digit hexadecimal digest. checked_on is canonical YYYY-MM-DD, target equals the gate's target and revision equals the current contract revision. Local proof cannot satisfy a differently named remote target. Changed, missing or stale proof fails validation. The helper checks recorded consistency; it cannot judge whether the file establishes the claimed behavior or whether external state has changed since observation.
+
+The requests registry has schema_version 1, positive next_id and requests. Every entry has id in R-NNN form, recorded_on in YYYY-MM-DD form, source_text, interpretation, origin_plan, target_plan, relation, status, gate_ids and decision. The counter exceeds all assigned numeric IDs. origin_plan and target_plan may be null during intake; non-null references identify existing plans. gate_ids contains unique IDs within the target contract. decision is text and explains routing or the user's cancellation or replacement.
+
+Request statuses are captured, needs_clarification, integrated, implemented and withdrawn. Relations are same_outcome, prerequisite and independent. Routed entries require target_plan and linked gates. same_outcome and prerequisite remain in their origin plan; moving either to a successor fails validation. Implemented requires verified linked gates and their valid proof. Withdrawn requires a non-empty record of the user's explicit cancellation or replacement. An unresolved scoped request prevents closure even when the source checks pass. A routed independent successor does not block or later invalidate its predecessor's completion receipt.
+
+The agent records material instructions immediately without a separate save command, resolves compatible additions into the active outcome and keeps conflicts visible for the required decision. It must read unresolved entries after compaction or in a fresh task. Alternatives discussed during brainstorming are not automatically work orders. The files do not capture chat in the background.
+
+### Plan status
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --json
+python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --id 001
+~~~
+
+Without --id, exactly one active plan must exist. JSON reports plan_id, outcome, status, can_complete, errors, blockers, gates, related requests and following_slices. It is read-only. Invalid records return a failure status; ordinary pending work is a valid report with can_complete false. The prose report lists targets, pending actions and routed additions. Agents add their evidence-based implementation summary rather than treating this structural report as live product verification.
+
+### Plan complete
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py plan complete --target /path/to/repository --id 001 --checkpoint /path/to/checkpoint.md --dry-run
+~~~
+
+The checkpoint draft is a separate regular UTF-8 file, not a Project OS record owner. It contains at most 80 lines, no reserved template tokens and these metadata lines:
+
+~~~text
+Execution state: idle.
+Active plan: none.
+~~~
+
+Review the full transition, receipt and checkpoint, then remove only --dry-run. Completion requires a structurally valid repository, an active selected plan, a reviewed contract, all applicable gates verified and all scoped requirements implemented or explicitly withdrawn. It atomically writes done, idle, an optional null active_plan pointer and the reviewed STATE content. It leaves independent planned slices planned and does not perform migrations, deployment or production checks.
+
+The new completion receipt contains closed_on, revision, contract_sha256, evidence path/hash pairs and hashes of scoped request records. The checker rejects new done records without a matching receipt. The operation guards all consumed record and evidence snapshots and validates written destinations after its final checker. A conflict or caught failure aborts or rolls back without overwriting divergent concurrent data. Receipt hashes are consistency checks, not signatures or proof of who ran the helper.
+
+For material changes, raise revision and record the reason and controlling request in the Markdown plan. Reassess evidence for the new revision. Revalidate evidence made stale by code or external changes as well. Once closed, preserve the historical receipt and use a new corrective slice for later requirements rather than rewriting the completed outcome.
+
 ## User-owned reusable knowledge
 
 Project knowledge and reusable knowledge have different privacy boundaries. Project knowledge may retain repository-specific evidence and context. Reusable knowledge contains only lessons explicitly prepared, reviewed and approved by the user for transfer.
@@ -165,7 +211,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.1.1",
+  "created_with": "2.2.0",
   "entries": []
 }
 ~~~
@@ -199,7 +245,9 @@ Languages and frameworks are detection signals, not behavioral profiles. Any jus
 | `detect` | No | Inspect toolchain and capability signals |
 | `init` | Unless `--dry-run` | Create Standard |
 | `adopt` | Unless `--dry-run` | Attach to compatible existing owners |
-| `check` | No | Validate structure, lifecycle, archive hashes and release alignment |
+| `check` | No | Validate structure, lifecycle, proof, receipts, requests and release alignment |
+| `plan status` | No | Report gates, requests and remaining closure blockers |
+| `plan complete` | Unless `--dry-run` | Guarded atomic closure of an active plan |
 | `sync-knowledge` | No | Explain the migration from deprecated synchronization language to explicit user-owned import |
 | `upgrade` | Unless `--dry-run` | Migrate to the installed release with caught-failure rollback |
 | `knowledge list` | No | List project knowledge, reusable knowledge or both |
@@ -265,7 +313,7 @@ Include `--inventory` when older Markdown lessons need explicit coverage.
 python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory --dry-run
 ~~~
 
-Apply only when the output reports `safe_to_adopt: true`, the mapping is correct and no project-owned destination is listed for modification.
+Apply only when the output reports `safe_to_adopt: true`, the mapping is correct and the proposed plan-format and AGENTS routing changes preserve existing content. Review every listed modification before applying.
 
 **Run this in Terminal:**
 
@@ -367,7 +415,7 @@ This compatibility command is read-only. It explains that there is no centrally 
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
 ~~~
 
-For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade combines schema migration, managed guidance, user-owned knowledge classification and `SYSTEM.json` changes in one conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures roll back completed changes. Applying a clean upgrade finishes by running the checker.
+For an ordinary connected repository, apply the same command without `--dry-run`. The upgrade combines schema migration, managed guidance, plan-index migration, request-owner creation, minimal workflow routing, user-owned knowledge classification and SYSTEM changes in one conflict-checked transaction. A conflict aborts all writes. Caught write and final-validation failures roll back completed changes. Applying a clean upgrade finishes by running the checker.
 
 The schema 3 to 4 migration removes unchanged release-managed seed entries. Entries proven as user-owned through adoption coverage become reusable lessons. Private entries remain project-local. Compatible unknown or locally modified former shared entries become `draft` with `source.kind: migration-review-required`. If classifying any retained local entry would discard lifecycle metadata or unsupported user fields, upgrade refuses the entire transaction and reports the affected lesson and fields. Drafts require explicit preparation and approval before export.
 
@@ -452,7 +500,7 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.1.1 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- Release 2.2.0 identifies the installed skill, helper, package metadata and connected `project_os_version`.
 - `SYSTEM.schema_version` is 4.
 - Knowledge registries retain their own `schema_version: 1`.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.

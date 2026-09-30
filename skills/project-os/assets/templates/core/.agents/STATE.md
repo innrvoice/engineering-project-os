@@ -1,6 +1,8 @@
 # Current checkpoint
 
-Updated: __UPDATED_DATE__. Execution state: idle. Active plan: none.
+Updated: __UPDATED_DATE__.
+Execution state: idle.
+Active plan: none.
 
 ## Current scope
 
@@ -15,7 +17,7 @@ Updated: __UPDATED_DATE__. Execution state: idle. Active plan: none.
 
 ## Next action
 
-Inspect the first concrete request and current Git state. For multi-session work, create one plan for one observable outcome and set it active in `.agents/plans/index.json`. Keep bounded work plan-free.
+Inspect the first concrete request, unresolved requests and current Git state. For multi-session work, create one plan for one observable outcome and set it active in `.agents/plans/index.json`. Keep bounded work plan-free.
 
 ## Blockers
 

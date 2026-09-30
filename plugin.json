@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "engineering-project-os",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.",
   "author": {
     "name": "Pavel Bochkov Rastopchin",

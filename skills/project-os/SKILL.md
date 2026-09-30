@@ -15,7 +15,7 @@ Installing the plugin makes the skill available in Codex and exposes its compani
 
 Use this skill only for Project OS requests. The host may expose it automatically when the installed plugin is selected or the request clearly matches, but do not apply it to unrelated coding work.
 
-Before inspecting or changing a repository, identify the available project input. In Codex, use the repository workspace selected for the current task and accept an explicit path to another schema 4 repository as a read-only knowledge source. In ChatGPT, setup advice and a new starter package may begin from the user's project description, selected project files or an archive provided in the current chat. Ask only for the missing details required to choose a safe setup and mark conclusions that are not backed by files as unverified. Reviewing, validating, repairing, adopting or upgrading an existing Project OS setup requires the relevant repository files, normally `AGENTS.md` and `.agents/`; ask for them when they are missing. Knowledge import requires an approved reusable bundle plus the destination Project OS context. Knowledge export requires the source reusable registry. Never inspect an empty host workspace or claim that the plugin is unavailable. Installation alone does not attach or connect a repository on either surface.
+Before inspecting or changing a repository, identify the available project input. In Codex, use the repository workspace selected for the current task and accept an explicit path to another schema 5 repository as a read-only knowledge source. In ChatGPT, setup advice and a new starter package may begin from the user's project description, selected project files or an archive provided in the current chat. Ask only for the missing details required to choose a safe setup and mark conclusions that are not backed by files as unverified. Reviewing, validating, repairing, adopting or upgrading an existing Project OS setup requires the relevant repository files, normally `AGENTS.md` and `.agents/`; ask for them when they are missing. Knowledge import requires an approved reusable bundle plus the destination Project OS context. Knowledge export requires the source reusable registry. Never inspect an empty host workspace or claim that the plugin is unavailable. Installation alone does not attach or connect a repository on either surface.
 
 ## Interpret short requests
 
@@ -34,7 +34,8 @@ Treat the following as canonical, memorable prompts rather than parser tokens:
 - `program close completed`: require complete exit evidence.
 - `program close stopped: <reason>`: require a reason.
 - `plan open: <outcome>`: require one observable outcome.
-- `plan checkpoint`, `plan complete`: require an active plan.
+- `plan checkpoint`, `plan complete`: require an active plan. Completion uses the guarded helper.
+- `plan status[: <plan-id>]`: read-only gate and request report; require an ID when no single active plan exists.
 - `plan resume[: <plan-id>]`: continue the active plan or reactivate a selected blocked plan after verifying its blocker is resolved. Require a plan ID when the selection is ambiguous.
 - `plan block: <reason>`, `plan supersede: <reason>`: require a reason.
 - `finding add: <observation>`: require a concrete observation.
@@ -73,7 +74,7 @@ When upgrading a closed legacy Program, require its actual closure date in canon
 ## Route to focused instructions
 
 - For `inspect`, `bootstrap` or `adopt`, read [bootstrap.md](references/bootstrap.md).
-- For `check`, `repair`, `upgrade`, Program lifecycle or plan lifecycle, read [maintenance.md](references/maintenance.md).
+- For `check`, `repair`, `upgrade`, Program lifecycle, request intake or plan lifecycle, read [maintenance.md](references/maintenance.md).
 - For findings or failure knowledge, read [knowledge.md](references/knowledge.md).
 - `overview` and `help` are fully specified above and do not require loading every reference.
 
@@ -94,6 +95,7 @@ For reasoned plan, finding or knowledge edits without a dedicated helper subcomm
 - Existing user and repository instructions take precedence.
 - Never overwrite `AGENTS.md`, context, state, a Program, plan, finding, evidence or knowledge blindly.
 - Keep application code, production configuration, credentials, personal data and runtime artifacts outside Project OS operations unless the user's request independently authorizes them.
+- Follow the connected repository WORKFLOW for immediate durable user-request intake, contract revisions and compaction recovery. Authorized clarifications require no separate permission to record or integrate.
 - Record only verified repository facts. Mark unresolved claims as unverified.
 - Keep project incidents separate from portable lessons. Approve only confirmed, sanitized mechanisms and never require a Project OS release to transfer user knowledge.
 - Do not imply a daemon, watcher, hook, MCP server, hidden database, automatic upload or automatic cross-repository synchronization.

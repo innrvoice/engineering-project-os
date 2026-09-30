@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from test_project_os import PROJECT_OS, file_hashes, run_cli
+from test_project_os import PROJECT_OS, file_hashes, run_cli, strip_schema5_records
 
 
 def lesson(
@@ -78,7 +78,7 @@ class ReusableKnowledgeCommandTest(unittest.TestCase):
             path = self.init(root)
             self.assertEqual(json.loads(path.read_text()), {"schema_version": 1, "entries": []})
             system = json.loads((root / ".agents/SYSTEM.json").read_text())
-            self.assertEqual(system["schema_version"], 4)
+            self.assertEqual(system["schema_version"], 5)
             self.assertEqual(system["paths"]["reusable_knowledge"], ".agents/knowledge/reusable/failures.json")
             self.assertNotIn("shared_knowledge", system["paths"])
             self.assertNotIn("managed_knowledge", system)
@@ -1354,6 +1354,7 @@ class SchemaThreeKnowledgeMigrationTest(unittest.TestCase):
 
         system_path = root / ".agents/SYSTEM.json"
         system = json.loads(system_path.read_text())
+        strip_schema5_records(root, system)
         system["schema_version"] = 3
         system["project_os_version"] = "2.0.5"
         system["managed_knowledge"] = {
@@ -1842,7 +1843,7 @@ class SchemaThreeKnowledgeMigrationTest(unittest.TestCase):
             ).read_text())
             self.assertEqual(reusable, {"schema_version": 1, "entries": []})
             system = json.loads((root / ".agents/SYSTEM.json").read_text())
-            self.assertEqual(system["schema_version"], 4)
+            self.assertEqual(system["schema_version"], 5)
             self.assertNotIn("managed_knowledge", system)
             self.assertNotIn("shared_knowledge", system["paths"])
             self.assertEqual(run_cli("check", "--target", str(root)).returncode, 0)

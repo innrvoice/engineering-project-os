@@ -62,7 +62,7 @@ Run this in Terminal with the installed helper path resolved:
 python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory --dry-run
 ~~~
 
-Apply only when the preview reports `safe_to_adopt: true`, every mapping is correct and no project-owned destination is listed for modification:
+Apply only when the preview reports `safe_to_adopt: true`, every mapping is correct and the proposed plan-format and AGENTS routing changes preserve existing content. Review every listed modification before applying:
 
 ~~~shell
 python3 /absolute/path/to/project-os/scripts/project_os.py adopt --target /path/to/repository --inventory
@@ -84,7 +84,7 @@ Do not infer an active Program merely because `PROGRAM.md` exists. Adoption fail
    python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
    ~~~
 
-6. Report created or adopted files, checker result and unverified boundaries.
+6. Report created or adopted files, reviewed format or workflow-routing changes, checker result and unverified boundaries. Verify WORKFLOW routing and the empty requests registry. Legacy unfinished plans require a reviewed contract before resume or closure.
 7. Recommend a new Codex task so new startup instructions enter the instruction chain.
 
 Do not copy another project's state, plans, findings, history, paths, evidence or product rules. Transfer only approved reusable lessons through the explicit knowledge import workflow.

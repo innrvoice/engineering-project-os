@@ -139,6 +139,29 @@ class DistributionTests(unittest.TestCase):
                 elif not case["name"].startswith("bootstrap-"):
                     self.assertEqual(file_hashes(target), before)
 
+    def test_extracted_continuity_fixtures_have_real_source_checks_and_open_remote_gate(self):
+        cases = json.loads((self.skill / "evals/continuity.json").read_text())["cases"]
+        self.assertEqual(len(cases), 5)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                target = self.base / case["name"]
+                prepared = self.command(self.skill / "evals/prepare_fixture.py", "--case", case["name"], "--target", str(target))
+                self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+                checked = self.command(self.skill / "scripts/project_os.py", "check", "--target", str(target))
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                baseline = subprocess.run([sys.executable, "-B", "-m", "unittest", "-v", "test_retry.py"], cwd=target, capture_output=True, text=True)
+                self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+                report = self.command(self.skill / "scripts/project_os.py", "plan", "status", "--target", str(target), "--json")
+                self.assertEqual(report.returncode, 0, report.stderr)
+                value = json.loads(report.stdout)
+                self.assertFalse(value["can_complete"])
+                self.assertEqual(value["gates"][1]["id"], "remote-migration")
+                self.assertEqual(value["gates"][1]["status"], "pending")
+                if case["name"] == "continuity-remote-prerequisite":
+                    self.assertEqual(value["gates"][0]["status"], "verified")
+                self.assertTrue(case["restart_prompt"])
+                self.assertTrue(case["host_evidence"])
+
     def test_checker_accepts_documented_block_and_resume_registry_transitions(self):
         target = self.base / "plan-transition"
         prepared = self.command(self.skill / "evals/prepare_fixture.py", "--case",

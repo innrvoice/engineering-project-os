@@ -8,7 +8,7 @@ Resume engineering work with durable state and reusable failure knowledge.
 
 [Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 
-The source-tree release is 2.1.1. The Directory page shows the version currently available for installation.
+The source-tree candidate is 2.2.0 and is not published by this checkout. The Directory page shows the version currently available for installation.
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
@@ -20,7 +20,8 @@ Engineering Project OS keeps that working truth in visible repository files. Cod
 
 - **Resumable work:** return in a new Codex task and continue from an exact checkpoint instead of retelling the project.
 - **Visible plans and decisions:** keep the current route, constraints and next action beside the code that depends on them.
-- **Evidence-backed completion:** distinguish a passing source check from a deployed result, a physical-device check or another acceptance gate.
+- **Guarded completion:** required gates and proof are checked before a plan can close, including remote prerequisites when the outcome needs them.
+- **Durable additions:** corrections and new requirements are recorded during work, routed into the current or a following slice and recovered after context compaction.
 - **Reusable failure knowledge:** turn a confirmed mechanism into a reviewed lesson that you can carry into another repository you own.
 
 Project OS is useful when work spans sessions, has several acceptance boundaries or produces lessons worth preserving. It is not a generic project manager, an automatic global knowledge service or a requirement for an ordinary one-session code fix.
@@ -114,8 +115,10 @@ An overview needs no files. Advice about an existing setup requires the relevant
 
 The Universal Plugin Directory is the primary installation route. If you need a standalone Codex-only installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
 
+After the candidate is published with its versioned tag, the standalone installation request is:
+
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.1.1/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.0/skills/project-os
 ~~~
 
 Start a new Codex task after installation. The versioned URL does not follow `main` automatically.
