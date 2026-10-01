@@ -56,7 +56,7 @@ In ChatGPT, the user downloads the returned bundle artifact and later uploads it
 
 ## Import into another project
 
-Import is always explicit and never mutates the source. First ensure the destination repository is connected to Project OS 2.1.1, then preview the source:
+Import is always explicit and never mutates the source. First ensure the destination repository is connected to the current Project OS schema, then preview the source:
 
 ~~~shell
 python3 /absolute/path/to/project-os/scripts/project_os.py knowledge import --target /path/to/destination --source /path/to/source-repository --dry-run

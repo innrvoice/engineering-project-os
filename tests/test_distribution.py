@@ -59,6 +59,40 @@ class DistributionTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             PACKAGE.build_zip(ROOT, second)
 
+    def test_release_guard_rejects_pending_hosts_and_narrow_scope_then_accepts_verified_hosts(self):
+        target = self.base / "release-guard"
+        helper = self.skill / "scripts/project_os.py"
+        prepared = self.command(self.skill / "evals/prepare_fixture.py", "--case", "continuity-premature-release", "--target", str(target))
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        before = file_hashes(target)
+        with self.assertRaisesRegex(ValueError, "NOT_READY"):
+            PACKAGE.validate_release_acceptance(ROOT, self.archive, target, "001")
+        self.assertEqual(file_hashes(target), before)
+        contract_path = target / ".agents/plans/001-retry.json"
+        contract = json.loads(contract_path.read_text())
+        contract['gates'] = contract['gates'][:1]
+        contract_path.write_text(json.dumps(contract, indent=2) + "\n")
+        with self.assertRaisesRegex(ValueError, "narrower source plan"):
+            PACKAGE.validate_release_acceptance(ROOT, self.archive, target, "001")
+        for product in ('Codex', 'ChatGPT'):
+            gate = dict(contract['gates'][0], id=product.lower(), evidence_class='host', target='fresh ' + product)
+            gate['evidence'] = [dict(gate['evidence'][0], target=gate['target'])]
+            contract['gates'].append(gate)
+        contract_path.write_text(json.dumps(contract, indent=2) + "\n")
+        self.assertEqual(self.command(helper, 'check', '--target', str(target)).returncode, 0)
+        before = file_hashes(target)
+        report = PACKAGE.validate_release_acceptance(ROOT, self.archive, target, '001')
+        self.assertEqual(report['readiness'], 'READY')
+        self.assertEqual(file_hashes(target), before)
+        changed = self.base / 'changed-candidate.zip'
+        with zipfile.ZipFile(self.archive) as source, zipfile.ZipFile(changed, 'w') as output:
+            for member in source.infolist():
+                content = source.read(member.filename)
+                if member.filename == 'README.md': content += b'\nChanged candidate.\n'
+                output.writestr(member, content)
+        with self.assertRaisesRegex(ValueError, 'differs from the candidate'):
+            PACKAGE.validate_release_acceptance(ROOT, changed, target, '001')
+
     def test_packaged_document_link_check_detects_missing_guide(self):
         broken = self.base / "missing-guide.zip"
         with zipfile.ZipFile(self.archive) as source, zipfile.ZipFile(broken, "w") as output:
@@ -138,6 +172,29 @@ class DistributionTests(unittest.TestCase):
                     self.assertEqual(file_hashes(target), before)
                 elif not case["name"].startswith("bootstrap-"):
                     self.assertEqual(file_hashes(target), before)
+
+    def test_extracted_continuity_fixtures_have_real_source_checks_and_open_remote_gate(self):
+        cases = json.loads((self.skill / "evals/continuity.json").read_text())["cases"]
+        self.assertEqual(len(cases), 6)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                target = self.base / case["name"]
+                prepared = self.command(self.skill / "evals/prepare_fixture.py", "--case", case["name"], "--target", str(target))
+                self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+                checked = self.command(self.skill / "scripts/project_os.py", "check", "--target", str(target))
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                baseline = subprocess.run([sys.executable, "-B", "-m", "unittest", "-v", "test_retry.py"], cwd=target, capture_output=True, text=True)
+                self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+                report = self.command(self.skill / "scripts/project_os.py", "plan", "status", "--target", str(target), "--json")
+                self.assertEqual(report.returncode, 0, report.stderr)
+                value = json.loads(report.stdout)
+                self.assertFalse(value["can_complete"])
+                self.assertEqual(value["gates"][1]["id"], "codex" if case["name"] == "continuity-premature-release" else "remote-migration")
+                self.assertEqual(value["gates"][1]["status"], "pending")
+                if case["name"] == "continuity-remote-prerequisite":
+                    self.assertEqual(value["gates"][0]["status"], "verified")
+                self.assertTrue(case["restart_prompt"])
+                self.assertTrue(case["host_evidence"])
 
     def test_checker_accepts_documented_block_and_resume_registry_transitions(self):
         target = self.base / "plan-transition"

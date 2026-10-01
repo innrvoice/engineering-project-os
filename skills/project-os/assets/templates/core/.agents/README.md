@@ -3,9 +3,11 @@
 This directory stores repository-local working state for resumable engineering tasks. `AGENTS.md` routes Codex to the relevant records; it does not load every file for every request.
 
 - `SYSTEM.json`: schema, Project OS release, mode, path mappings, capability packs, overlays and managed-guidance baselines.
+- `WORKFLOW.md`: managed rules for intake, recovery and guarded closure.
+- `requests.json`: user additions, routing and explicit resolutions.
 - `CONTEXT.md`: durable project facts and verified commands.
 - `STATE.md`: current checkpoint and next action.
-- `plans/`: canonical execution registry and one-outcome plans.
+- `plans/`: canonical execution registry, one-outcome Markdown plans and JSON acceptance contracts.
 - `findings/`: concrete project defects and candidates.
 - `evidence/`: sanitized linked verification.
 - `knowledge/project/`: confirmed project-specific lessons.

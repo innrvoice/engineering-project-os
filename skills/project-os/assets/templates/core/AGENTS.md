@@ -4,13 +4,15 @@
 
 - Current user instructions take precedence over this repository workflow.
 - `.agents/CONTEXT.md` records durable current facts, authority, architecture and verified commands.
+- `.agents/WORKFLOW.md` owns durable request intake, recovery and guarded completion.
+- `.agents/requests.json` owns user additions and their routing.
 - `.agents/STATE.md` owns the current checkpoint and exact next action.
 - `.agents/plans/index.json` owns execution state and plan statuses.
 - `.agents/findings/findings.json` owns concrete project findings.
 - `.agents/knowledge/` contains confirmed lessons, not product authority.
 - Chat history, generated summaries and archived evidence are context, not current verification.
 
-Before non-trivial work, inspect Git HEAD and status, then read CONTEXT, STATE, the active plan if one exists, applicable capability guidance, relevant knowledge entries and the code and callers being changed. Do not load complete history or unrelated evidence at startup.
+Before non-trivial work, inspect Git HEAD and status, then read `.agents/WORKFLOW.md`, CONTEXT, STATE, unresolved requests, the active plan and its JSON contract if one exists, applicable capability guidance, relevant knowledge entries and the code and callers being changed. Do not load complete history or unrelated evidence at startup.
 
 Capability guidance lives under `.agents/packs/`. Read only selected packs and overlays relevant to the requested change. Detected languages and frameworks are evidence, not behavioral profiles or permission to infer commands.
 
@@ -32,7 +34,7 @@ Ask a targeted question only when missing information would materially change be
 - Multi-session work uses one active plan for one observable outcome.
 - While `execution_state` is `running`, exactly one plan is `active`. If the optional `active_plan` field exists, it matches that record.
 - `STATE` is a compact handoff, not a diary. Durable facts belong in `CONTEXT`; detailed results belong in linked evidence.
-- A plan is not `done` until its stated acceptance evidence exists. Preserve missing manual, hosted, artifact, production or physical checks as unverified.
+- Close a plan only through the helper `plan complete` after all contract gates and scoped requests are satisfied. Preserve missing manual, hosted, artifact, production or physical checks as unverified.
 
 ## Findings and knowledge
 

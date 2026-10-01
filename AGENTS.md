@@ -30,3 +30,5 @@ Keep this repository's plans, checkpoints, findings, evidence and knowledge out 
 Commit, push, tag, GitHub Release, installed-skill replacement and directory submission require owner authorization. A tagged standalone installation and public directory availability are separate outcomes. Never infer publication from passing local tests.
 
 State what changed, what was verified and what remains unverified. Do not publish credentials, private data or internal working history in code, documentation, commit messages or release notes.
+
+Read `.agents/WORKFLOW.md` before non-trivial work and after context compaction. It owns durable request intake and guarded plan completion; current user and repository instructions take precedence.

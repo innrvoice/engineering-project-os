@@ -49,6 +49,31 @@ def file_hashes(root: Path) -> dict[str, str]:
     }
 
 
+
+def write_test_contract(root: Path, plan_id: str = "001") -> str:
+    relative = f".agents/plans/{plan_id}.json"
+    (root / relative).write_text(json.dumps({"schema_version": 1, "plan_id": plan_id, "revision": 1, "gates": [{
+        "id": "sample", "condition": "Verify the sample outcome.", "evidence_class": "source", "target": "local",
+        "status": "pending", "evidence": [], "next_action": "Validate sample contents.", "reason": "",
+    }]}, indent=2) + "\n")
+    return relative
+
+
+def strip_schema5_records(root: Path, system: dict) -> None:
+    system["paths"].pop("requests", None)
+    system["managed_guidance"].pop(".agents/WORKFLOW.md", None)
+    for name in ("requests.json", "WORKFLOW.md"):
+        path = root / ".agents" / name
+        if path.exists():
+            path.unlink()
+    index_path = root / system["paths"]["plans"]
+    index = json.loads(index_path.read_text())
+    index["schema_version"] = 1
+    index.pop("legacy_closed", None)
+    index.pop("legacy_uncontracted", None)
+    index_path.write_text(json.dumps(index, indent=2) + "\n")
+
+
 def write_program_definition(root: Path) -> Path:
     path = root / "program-definition.json"
     path.write_text(
@@ -162,8 +187,8 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.1.1")
-        self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 4)
+        self.assertEqual(PROJECT_OS.VERSION, "2.2.1")
+        self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 5)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
         self.assertEqual(portable["name"], compatibility["name"])
@@ -321,10 +346,10 @@ class KnowledgeAssetTest(unittest.TestCase):
                 (ROOT / "docs" / "SETUP.md").read_text(encoding="utf-8"),
             )
         )
-        self.assertEqual(setup_versions, {"2.1.0", PROJECT_OS.VERSION})
+        self.assertEqual(setup_versions, {"2.1.1", PROJECT_OS.VERSION})
         packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
-        self.assertIn(f"Project OS {PROJECT_OS.VERSION} is the source-tree candidate", packaging)
-        self.assertIn("Project OS 2.1.0 is the current public baseline", packaging)
+        self.assertIn(f"Project OS {PROJECT_OS.VERSION} is the corrective source-tree candidate", packaging)
+        self.assertIn(f"Project OS {PROJECT_OS.VERSION} is available in the Directory", packaging)
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn("## [2.1.1] - 2026-09-15", changelog)
         self.assertIn("## [2.1.0] - 2026-09-15", changelog)
@@ -449,7 +474,7 @@ class InitializationTest(unittest.TestCase):
                 (target / ".agents" / "knowledge" / "reusable" / "failures.json").read_text()
             )
             self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
-            self.assertEqual(system["schema_version"], 4)
+            self.assertEqual(system["schema_version"], 5)
             self.assertEqual(system["mode"], "standard")
             self.assertIsNone(system["active_program"])
             self.assertFalse((target / ".agents" / "PROGRAM.md").exists())
@@ -500,7 +525,7 @@ class InitializationTest(unittest.TestCase):
             target = Path(temporary)
             agents = target / "AGENTS.md"
             original = (
-                "# Existing\n\nRead `.agents/CONTEXT.md` and `.agents/STATE.md` first.\n"
+                "# Existing\n\nRead `.agents/WORKFLOW.md`, `.agents/CONTEXT.md` and `.agents/STATE.md` first.\n"
             )
             agents.write_text(original, encoding="utf-8")
             result = run_cli(
@@ -687,7 +712,7 @@ class AdoptionTest(unittest.TestCase):
             report = json.loads(adopted.stdout.split("\ndry-run:", 1)[0])
             self.assertTrue(report["safe_to_adopt"])
             self.assertEqual(report["legacy_knowledge_count"], 1)
-            self.assertEqual(report["existing_files_modified"], [])
+            self.assertEqual(report["existing_files_modified"], [".agents/plans/index.json", "AGENTS.md"])
             self.assertEqual(file_hashes(target), before)
 
     def test_adopt_preserves_existing_records_and_passes_check(self) -> None:
@@ -698,7 +723,9 @@ class AdoptionTest(unittest.TestCase):
             self.assertEqual(adopted.returncode, 0, adopted.stdout + adopted.stderr)
             after = file_hashes(target)
             for relative, digest in before.items():
-                self.assertEqual(after[relative], digest, relative)
+                if relative not in {"AGENTS.md", ".agents/plans/index.json"}:
+                    self.assertEqual(after[relative], digest, relative)
+            self.assertTrue((target / "AGENTS.md").read_text().startswith((FIXTURES / "mature-mobile/AGENTS.md").read_text().rstrip()))
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
             self.assertEqual(system["packs"], ["service", "mobile", "data", "delivery"])
             self.assertEqual(system["overlays"], ["react-native-expo"])
@@ -911,7 +938,7 @@ class ValidationAndSyncTest(unittest.TestCase):
             index = json.loads(index_path.read_text())
             index["execution_state"] = "running"
             index["plans"] = [
-                {"id": "001", "status": "active", "path": ".agents/plans/001.md", "outcome": "x"}
+                {"id": "001", "status": "active", "path": ".agents/plans/001.md", "outcome": "x", "contract_path": write_test_contract(target)}
             ]
             index_path.write_text(json.dumps(index, indent=2) + "\n", encoding="utf-8")
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)
@@ -1196,6 +1223,7 @@ class ProgramLifecycleTest(unittest.TestCase):
                 {
                     "id": "001",
                     "status": "active",
+                    "contract_path": write_test_contract(target),
                     "path": ".agents/plans/001.md",
                     "outcome": "Finish active work.",
                 }
@@ -1411,6 +1439,7 @@ class UpgradeTest(unittest.TestCase):
         })
         knowledge_path.parent.mkdir(parents=True, exist_ok=True)
         knowledge_path.write_text(json.dumps(knowledge, indent=2) + "\n", encoding="utf-8")
+        strip_schema5_records(target, system)
         system["schema_version"] = 2
         system["project_os_version"] = "1.0.1"
         system["mode"] = mode
@@ -1433,7 +1462,7 @@ class UpgradeTest(unittest.TestCase):
             applied = run_cli("upgrade", "--target", str(target))
             self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
             system = json.loads((target / ".agents" / "SYSTEM.json").read_text())
-            self.assertEqual(system["schema_version"], 4)
+            self.assertEqual(system["schema_version"], 5)
             self.assertEqual(system["mode"], "standard")
             self.assertEqual(system["project_os_version"], PROJECT_OS.VERSION)
             self.assertEqual(run_cli("check", "--target", str(target)).returncode, 0)

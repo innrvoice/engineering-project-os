@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import copy
+import contextlib
+import io
 import hashlib
 import json
 import os
@@ -17,8 +19,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.1.1"
-SCHEMA_VERSION = 4
+VERSION = "2.2.1"
+SCHEMA_VERSION = 5
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
 OVERLAY_NAMES = ("react-native-expo",)
@@ -106,6 +108,7 @@ DEFAULT_PATHS: dict[str, Any] = {
     "context": ".agents/CONTEXT.md",
     "state": ".agents/STATE.md",
     "plans": ".agents/plans/index.json",
+    "requests": ".agents/requests.json",
     "findings": ".agents/findings/findings.json",
     "evidence": ".agents/evidence",
     "program": None,
@@ -935,6 +938,8 @@ def default_system(
     active_program: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     managed_guidance: dict[str, str] = {
+        ".agents/WORKFLOW.md": "sha256:"
+        + hashlib.sha256((CORE_TEMPLATE / ".agents/WORKFLOW.md").read_bytes()).hexdigest(),
         ".agents/packs/README.md": "sha256:"
         + hashlib.sha256((PACK_TEMPLATE / "README.md").read_bytes()).hexdigest()
     }
@@ -1003,6 +1008,7 @@ def guidance_operations(
 
 def guidance_content_map(packs: Sequence[str], overlays: Sequence[str]) -> dict[str, str]:
     contents = {
+        ".agents/WORKFLOW.md": (CORE_TEMPLATE / ".agents/WORKFLOW.md").read_text(encoding="utf-8"),
         ".agents/packs/README.md": (PACK_TEMPLATE / "README.md").read_text(encoding="utf-8")
     }
     for name in packs:
@@ -1162,6 +1168,12 @@ def execute_sync_transaction(
                 after_write()
             fs.verify()
             check_preconditions(after=True)
+            # Final validation may invoke code that races with published destinations.
+            # Check written bytes and identities too, not only read-only dependencies.
+            for path, directory_fd, identity, digest in created:
+                require_identity(directory_fd, path.name, identity, digest)
+            for path, directory_fd, _, _, identity, digest in replaced:
+                require_identity(directory_fd, path.name, identity, digest)
         except BaseException as error:
             failures: list[str] = []
             for path, directory_fd, tombstone, digest in reversed(deleted):
@@ -1232,6 +1244,8 @@ def init_project(
         raise ProjectOSError("Existing .agents must be a real directory")
     owned_names = {
         "SYSTEM.json",
+        "WORKFLOW.md",
+        "requests.json",
         "README.md",
         "CONTEXT.md",
         "STATE.md",
@@ -1295,7 +1309,21 @@ def init_project(
     system = default_system(root, "standard", "initialized", packs, overlays, paths)
     operations.extend(guidance_operations(root, packs, overlays))
     operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
-    execute_operations(root, operations, dry_run)
+    if agents_exists:
+        original, _ = read_regular_at_path(agents_path)
+        agents_draft = original.decode("utf-8")
+        replacements_for_init = []
+        if ".agents/WORKFLOW.md" not in agents_draft:
+            agents_draft = agents_draft.rstrip() + "\n\nRead `.agents/WORKFLOW.md` before non-trivial work and after context compaction. Current user and repository instructions take precedence.\n"
+            replacements_for_init.append((agents_path, agents_draft, hashlib.sha256(original).hexdigest()))
+        creates_for_init = [(path, content or "") for action, path, content in operations if action == "create"]
+        print_transaction_preview(root, creates_for_init, replacements_for_init)
+        if not dry_run:
+            execute_sync_transaction(root, creates_for_init, replacements_for_init,
+                                     after_write=lambda: require_passing_check(root, "Initialization"),
+                                     preconditions={agents_path: hashlib.sha256(original).hexdigest()})
+    else:
+        execute_operations(root, operations, dry_run)
 
     if agents_exists:
         print("existing AGENTS.md preserved")
@@ -1616,6 +1644,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         "context": relative_string(root, context),
         "state": relative_string(root, state),
         "plans": relative_string(root, plans),
+        "requests": DEFAULT_PATHS["requests"],
         "findings": relative_string(root, findings),
         "evidence": relative_string(root, evidence),
         "program": None,
@@ -1686,6 +1715,8 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         warnings.append("legacy knowledge duplicate ids are resolved only by source fingerprint")
 
     managed_destinations = [
+        ".agents/WORKFLOW.md",
+        ".agents/requests.json",
         ".agents/packs/README.md",
         ".agents/knowledge/reusable/failures.json",
         *(f".agents/packs/{name}.md" for name in packs),
@@ -1700,7 +1731,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         except ProjectOSError as error:
             errors.append(str(error))
 
-    planned_creates = [".agents/SYSTEM.json"]
+    planned_creates = [".agents/SYSTEM.json", ".agents/WORKFLOW.md", ".agents/requests.json"]
     planned_creates.extend(f".agents/packs/{name}.md" for name in packs)
     planned_creates.extend(f".agents/packs/overlays/{name}.md" for name in overlays)
     planned_creates.extend((".agents/packs/README.md", ".agents/knowledge/reusable/failures.json"))
@@ -1713,13 +1744,33 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         except ProjectOSError as error:
             errors.append(str(error))
 
+    if not errors and plans is not None:
+        try:
+            validate_plan_records(root, system, errors,
+                                  index_value=migrate_plan_index(load_json(plans)),
+                                  requests_value={"schema_version": 1, "next_id": 1, "requests": []})
+        except ProjectOSError as error:
+            errors.append(str(error))
+    modified = []
+    if not errors and plans is not None:
+        original_plans = load_json(plans)
+        if migrate_plan_index(original_plans) != original_plans:
+            modified.append(paths["plans"])
+    if ".agents/WORKFLOW.md" not in agents_text:
+        modified.append("AGENTS.md")
     report: dict[str, Any] = {
         "target": str(root),
         "safe_to_adopt": not errors,
         "errors": errors,
         "warnings": warnings,
         "planned_creates": sorted(set(planned_creates)),
-        "existing_files_modified": [],
+        "existing_files_modified": modified,
+        "proposed_record_changes": ({
+            paths["plans"]: migrate_plan_index(load_json(plans)),
+            "AGENTS.md": agents_text if ".agents/WORKFLOW.md" in agents_text else agents_text.rstrip() + "\n\nRead `.agents/WORKFLOW.md` before non-trivial work and after context compaction. It owns durable request intake and guarded plan completion; current user and repository instructions take precedence.\n",
+            ".agents/WORKFLOW.md": (CORE_TEMPLATE / ".agents/WORKFLOW.md").read_text(encoding="utf-8"),
+            paths["requests"]: {"schema_version": 1, "next_id": 1, "requests": []},
+        } if not errors and plans is not None else {}),
         "legacy_knowledge_count": len(inventory),
         "legacy_duplicate_ids": duplicates,
         "proposed_system": system,
@@ -1745,28 +1796,33 @@ def adopt_project(root: Path, dry_run: bool, include_inventory: bool) -> int:
         return 0
 
     system = report["proposed_system"]
-    operations = [
-        ("create", root / raw_path, content)
-        for raw_path, content in guidance_content_map(
-            system["packs"], system["overlays"]
-        ).items()
-    ]
-    reusable_destination = root / system["paths"]["reusable_knowledge"]
-    operations.append(
-        (
-            "create",
-            reusable_destination,
-            json.dumps(empty_reusable_knowledge(), indent=2, ensure_ascii=False) + "\n",
-        )
-    )
-    operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
-    execute_operations(
-        root,
-        operations,
-        dry_run=False,
-        before_write=lambda: verify_adoption_preconditions(root, report),
-    )
-    print("adopted: existing files were preserved")
+    snapshots = {root / raw_path: digest.removeprefix("sha256:")
+                 for category in ("files", "history_archives", "legacy_markdown")
+                 for raw_path, digest in report["preconditions"][category].items()}
+    creates = [(root / raw_path, content) for raw_path, content in guidance_content_map(
+        system["packs"], system["overlays"]
+    ).items()]
+    creates.extend([
+        (root / system["paths"]["requests"], canonical_json({"schema_version": 1, "next_id": 1, "requests": []})),
+        (root / system["paths"]["reusable_knowledge"], canonical_json(empty_reusable_knowledge())),
+        (system_path, json.dumps(system, indent=2, ensure_ascii=False) + "\n"),
+    ])
+    for raw_path in report["planned_creates"]:
+        if (root / raw_path).exists():
+            raise ProjectOSError(f"Refusing to overwrite adoption destination: {raw_path}")
+    verify_adoption_preconditions(root, report)
+    legacy_system = copy.deepcopy(system)
+    legacy_system["schema_version"] = 4
+    legacy_system["paths"].pop("requests")
+    # Use the same reviewed format/routing migration as upgrade.
+    next_system = copy.deepcopy(legacy_system)
+    extra_creates, replacements = plan_continuity_migration(root, legacy_system, next_system, snapshots)
+    # The requests create above already belongs to the full adoption preview.
+    assert len(extra_creates) == 1
+    print_transaction_preview(root, creates, replacements)
+    execute_sync_transaction(root, creates, replacements,
+                             after_write=lambda: require_passing_check(root, "Adoption"), preconditions=snapshots)
+    print("adopted: project content preserved; plan format and workflow routing migrated")
     return 0
 
 
@@ -2170,6 +2226,7 @@ def validate_system_owner_paths(
         "context",
         "state",
         "plans",
+        "requests",
         "findings",
         "program",
         "history_index",
@@ -2378,7 +2435,8 @@ def validate_adoption_records(root: Path, paths: dict[str, Any], errors: list[st
             if not isinstance(value, dict):
                 errors.append("plans index must contain an object")
             else:
-                validate_registry_schema(value, "plans index", errors)
+                if value.get("schema_version") != 2:
+                    validate_registry_schema(value, "plans index", errors)
                 plans = value.get("plans", [])
                 check_unique_ids(plans, "plans", errors, ("id", "status", "path", "outcome"))
                 active_ids: list[str] = []
@@ -2784,6 +2842,583 @@ def validate_active_program(
         except ProjectOSError as error:
             errors.append(str(error))
 
+GATE_STATUSES = {"pending", "verified", "not_applicable"}
+REQUEST_STATUSES = {"captured", "needs_clarification", "integrated", "implemented", "withdrawn"}
+REQUEST_RELATIONS = {"same_outcome", "prerequisite", "independent"}
+
+
+def positive_integer(value: Any) -> bool:
+    return type(value) is int and value > 0
+
+
+def record_hash(value: Any) -> str:
+    return "sha256:" + hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def retain_snapshot(snapshots: dict[Path, str] | None, path: Path, digest: str) -> None:
+    if snapshots is not None:
+        if path in snapshots and snapshots[path] != digest:
+            raise ProjectOSError(f"File changed during validation: {path}")
+        snapshots[path] = digest
+
+
+def read_plan_input(
+    root: Path, raw_path: Any, label: str, errors: list[str],
+    snapshots: dict[Path, str] | None = None,
+) -> tuple[Any, Path | None]:
+    path = safe_relative(root, raw_path)
+    if path is None:
+        errors.append(f"{label} has an unsafe repository-relative path: {raw_path!r}")
+        return None, None
+    try:
+        reject_symlink_path(root, path)
+        value, digest = load_json_snapshot(path)
+        retain_snapshot(snapshots, path, digest)
+        return value, path
+    except ProjectOSError as error:
+        errors.append(f"{label}: {error}")
+        return None, path
+
+
+def validate_contract(
+    root: Path, plan: dict[str, Any], errors: list[str],
+    snapshots: dict[Path, str] | None = None,
+) -> dict[str, Any] | None:
+    label = f"plan {plan.get('id')!r} contract"
+    contract, path = read_plan_input(root, plan.get("contract_path"), label, errors, snapshots)
+    if not isinstance(contract, dict):
+        errors.append(f"{label} must contain an object")
+        return None
+    if contract.get("schema_version") != 1 or type(contract.get("schema_version")) is not int:
+        errors.append(f"{label} schema_version must be 1")
+    if contract.get("plan_id") != plan.get("id"):
+        errors.append(f"{label} plan_id must match the registry")
+    revision = contract.get("revision")
+    if not positive_integer(revision):
+        errors.append(f"{label} revision must be a positive integer")
+    gates = contract.get("gates")
+    if not isinstance(gates, list) or not gates:
+        errors.append(f"{label} gates must be a non-empty array")
+        return contract
+    check_unique_ids(gates, label + " gates", errors,
+                     ("id", "condition", "evidence_class", "target", "status", "evidence", "next_action", "reason"), GATE_STATUSES)
+    for gate in gates:
+        if not isinstance(gate, dict):
+            continue
+        gate_label = f"{label} gate {gate.get('id')!r}"
+        for key in ("condition", "evidence_class", "target"):
+            if not isinstance(gate.get(key), str) or not gate[key].strip():
+                errors.append(f"{gate_label} {key} must be non-empty text")
+        for key in ("next_action", "reason"):
+            if not isinstance(gate.get(key), str):
+                errors.append(f"{gate_label} {key} must be text")
+        status = gate.get("status")
+        if status == "pending" and not str(gate.get("next_action") or "").strip():
+            errors.append(f"{gate_label} pending requires next_action")
+        if status == "not_applicable" and not str(gate.get("reason") or "").strip():
+            errors.append(f"{gate_label} not_applicable requires a scope-grounded reason")
+        evidence = gate.get("evidence")
+        if not isinstance(evidence, list):
+            errors.append(f"{gate_label} evidence must be an array")
+            continue
+        if status == "verified" and not evidence:
+            errors.append(f"{gate_label} verified requires evidence")
+        seen: set[str] = set()
+        for proof in evidence:
+            if not isinstance(proof, dict):
+                errors.append(f"{gate_label} evidence must contain objects")
+                continue
+            raw_path = proof.get("path")
+            if isinstance(raw_path, str):
+                if raw_path in seen:
+                    errors.append(f"{gate_label} duplicate evidence path {raw_path!r}")
+                seen.add(raw_path)
+            proof_path = safe_relative(root, raw_path)
+            if proof_path is None:
+                errors.append(f"{gate_label} unsafe evidence path: {raw_path!r}")
+                continue
+            try:
+                reject_symlink_path(root, proof_path)
+                content, _ = read_regular_at_path(proof_path)
+                digest = hashlib.sha256(content).hexdigest()
+                retain_snapshot(snapshots, proof_path, digest)
+                if proof.get("sha256") != "sha256:" + digest:
+                    errors.append(f"{gate_label} evidence hash mismatch: {raw_path}")
+            except (OSError, ProjectOSError) as error:
+                errors.append(f"{gate_label} evidence missing or unsafe: {raw_path}: {error}")
+            try:
+                canonical_date(proof.get("checked_on"), f"{gate_label} evidence checked_on")
+            except ProjectOSError as error:
+                errors.append(str(error))
+            if proof.get("target") != gate.get("target"):
+                errors.append(f"{gate_label} evidence target mismatch")
+            if type(proof.get("revision")) is not int or proof.get("revision") != revision:
+                errors.append(f"{gate_label} evidence revision is stale")
+    return contract
+
+
+def read_regular_at_path(path: Path) -> tuple[bytes, os.stat_result]:
+    # Reject final symlinks and non-regular files even during read-only status checks.
+    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        return read_regular_at(directory_fd, path.name)
+    finally:
+        os.close(directory_fd)
+
+
+def contract_gate_map(contract: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    if not isinstance(contract, dict) or not isinstance(contract.get("gates"), list):
+        return {}
+    return {gate["id"]: gate for gate in contract["gates"]
+            if isinstance(gate, dict) and isinstance(gate.get("id"), str)}
+
+
+def closure_requests(plan_id: str, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # A successor's later progress must not invalidate its predecessor's receipt.
+    return [request for request in requests if request.get("target_plan") == plan_id or (
+        request.get("origin_plan") == plan_id and not (
+            request.get("relation") == "independent"
+            and request.get("target_plan") not in (None, plan_id)
+            and request.get("status") in ("integrated", "implemented")
+        )
+    )]
+
+
+def completion_record(
+    root: Path, plan: dict[str, Any], contract: dict[str, Any],
+    requests: list[dict[str, Any]], closed_on: str,
+) -> dict[str, Any]:
+    contract_path = safe_relative(root, plan["contract_path"])
+    assert contract_path is not None
+    proofs = {(proof["path"], proof["sha256"]) for gate in contract["gates"]
+              for proof in gate["evidence"]}
+    return {
+        "closed_on": closed_on,
+        "revision": contract["revision"],
+        "contract_sha256": "sha256:" + hashlib.sha256(contract_path.read_bytes()).hexdigest(),
+        "evidence": [{"path": path, "sha256": digest} for path, digest in sorted(proofs)],
+        "requests": [{"id": request["id"], "sha256": record_hash(request)}
+                     for request in sorted(closure_requests(plan["id"], requests), key=lambda item: item["id"])],
+    }
+
+
+def plan_blockers(
+    plan: dict[str, Any], contract: dict[str, Any] | None, requests: list[dict[str, Any]],
+) -> list[str]:
+    blockers: list[str] = []
+    if contract is None:
+        blockers.append("A reviewed acceptance contract is required before resume or completion.")
+    else:
+        for gate in contract_gate_map(contract).values():
+            if gate.get("status") == "pending":
+                blockers.append(f"Gate {gate['id']}: {gate.get('condition')}; next: {gate.get('next_action')}")
+    for request in closure_requests(plan["id"], requests):
+        if request.get("status") not in ("implemented", "withdrawn"):
+            blockers.append(f"Request {request['id']} remains {request.get('status')}: {request.get('interpretation')}")
+    return blockers
+
+
+def validate_plan_records(
+    root: Path, system: dict[str, Any], errors: list[str],
+    snapshots: dict[Path, str] | None = None,
+    index_value: dict[str, Any] | None = None,
+    requests_value: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    paths = system.get("paths", {})
+    if index_value is None:
+        index, _ = read_plan_input(root, paths.get("plans"), "plans index", errors, snapshots)
+    else:
+        index = index_value
+    if not isinstance(index, dict):
+        errors.append("plans index must contain an object")
+        return {}, {}, []
+    if type(index.get("schema_version")) is not int or index.get("schema_version") != 2:
+        errors.append("plans index schema_version must be 2; run upgrade")
+    if "version" in index and index["version"] != 2:
+        errors.append("plans index version must match schema_version 2")
+    plans = index.get("plans")
+    check_unique_ids(plans, "plans", errors, ("id", "status", "path", "outcome"), PLAN_STATUSES)
+    if not isinstance(plans, list):
+        return index, {}, []
+    plans = [plan for plan in plans if isinstance(plan, dict) and isinstance(plan.get("id"), str)]
+    by_id = {plan["id"]: plan for plan in plans}
+    legacy_closed = index.get("legacy_closed", {})
+    legacy_open = index.get("legacy_uncontracted", [])
+    if not isinstance(legacy_closed, dict) or any(
+        not isinstance(key, str) or not isinstance(value, str) or value not in {"done", "superseded"}
+        for key, value in (legacy_closed.items() if isinstance(legacy_closed, dict) else ())
+    ):
+        errors.append("plans legacy_closed must map IDs to original done or superseded statuses")
+        legacy_closed = {}
+    if not isinstance(legacy_open, list) or any(not isinstance(item, str) for item in legacy_open):
+        errors.append("plans legacy_uncontracted must be an array of IDs")
+        legacy_open = []
+    if len(legacy_open) != len(set(legacy_open)):
+        errors.append("plans legacy_uncontracted contains duplicate IDs")
+    if set(legacy_closed).intersection(legacy_open):
+        errors.append("legacy_closed and legacy_uncontracted must be disjoint")
+    for plan_id, status in legacy_closed.items():
+        if plan_id not in by_id or by_id[plan_id].get("status") != status:
+            errors.append(f"legacy_closed plan {plan_id!r} must retain its original status {status!r}")
+    for plan_id in legacy_open:
+        if plan_id not in by_id or by_id[plan_id].get("status") not in ("active", "blocked", "planned"):
+            errors.append(f"legacy_uncontracted plan {plan_id!r} must remain non-terminal")
+        elif by_id[plan_id].get("contract_path") is not None:
+            errors.append(f"legacy_uncontracted plan {plan_id!r} has a contract; remove its migration mark after review")
+    active = [plan["id"] for plan in plans if plan.get("status") == "active"]
+    if index.get("execution_state") == "running":
+        if len(active) != 1:
+            errors.append("running execution requires exactly one active plan")
+        if "active_plan" in index and index["active_plan"] != (active[0] if len(active) == 1 else None):
+            errors.append("active_plan must match the single active plan when present")
+    elif index.get("execution_state") == "idle":
+        if active:
+            errors.append("idle execution requires no active plan")
+        if "active_plan" in index and index["active_plan"] is not None:
+            errors.append("idle execution requires active_plan null when present")
+    else:
+        errors.append("execution_state must be idle or running")
+    contracts: dict[str, dict[str, Any]] = {}
+    owners: dict[str, str] = {"AGENTS.md": "AGENTS.md", ".agents/SYSTEM.json": "SYSTEM"}
+    for key in ("context", "state", "plans", "requests", "findings", "program", "history_index", "reusable_knowledge", "knowledge_coverage"):
+        if isinstance(paths.get(key), str):
+            owners[paths[key].casefold()] = key
+    for raw_path in system.get("managed_guidance", {}):
+        owners[raw_path.casefold()] = "managed guidance"
+    for raw_path in paths.get("project_knowledge", []):
+        if isinstance(raw_path, str):
+            owners[raw_path.casefold()] = "project knowledge"
+    identities: dict[tuple[int, int], str] = {}
+    for raw_path, owner in owners.items():
+        path = safe_relative(root, raw_path)
+        if path is not None and path.is_file():
+            details = path.stat()
+            identities[(details.st_dev, details.st_ino)] = owner
+    for plan in plans:
+        if not isinstance(plan.get("outcome"), str) or not plan["outcome"].strip():
+            errors.append(f"plan {plan['id']!r} outcome must be non-empty text")
+        for key in ("path", "contract_path"):
+            raw_path = plan.get(key)
+            if key == "contract_path" and raw_path is None:
+                if plan["id"] not in legacy_closed and plan["id"] not in legacy_open:
+                    errors.append(f"plan {plan['id']!r} requires contract_path")
+                continue
+            path = safe_relative(root, raw_path)
+            if path is None:
+                errors.append(f"plan {plan['id']!r} has invalid {key}")
+                continue
+            normalized = path.relative_to(root).as_posix().casefold()
+            if normalized in owners:
+                errors.append(f"plan {plan['id']!r} {key} owner collision with {owners[normalized]}")
+            owners[normalized] = f"plan {plan['id']} {key}"
+            try:
+                reject_symlink_path(root, path)
+                data, details = read_regular_at_path(path)
+                identity = (details.st_dev, details.st_ino)
+                if identity in identities:
+                    errors.append(f"plan {plan['id']!r} {key} aliases {identities[identity]}")
+                identities[identity] = owners[normalized]
+                retain_snapshot(snapshots, path, hashlib.sha256(data).hexdigest())
+                if key == "path" and len(data.decode('utf-8').splitlines()) > 200:
+                    errors.append(f"plan {plan['id']!r} exceeds 200 lines")
+            except (OSError, UnicodeError, ProjectOSError) as error:
+                errors.append(f"plan {plan['id']!r} {key} missing or unsafe: {error}")
+        if plan.get("contract_path") is not None:
+            contract = validate_contract(root, plan, errors, snapshots)
+            if contract is not None:
+                contracts[plan["id"]] = contract
+    if requests_value is None:
+        registry, _ = read_plan_input(root, paths.get("requests"), "requests registry", errors, snapshots)
+    else:
+        registry = requests_value
+    requests: list[dict[str, Any]] = []
+    if not isinstance(registry, dict):
+        errors.append("requests registry must contain an object")
+    else:
+        if type(registry.get("schema_version")) is not int or registry.get("schema_version") != 1:
+            errors.append("requests registry schema_version must be 1")
+        if not positive_integer(registry.get("next_id")):
+            errors.append("requests registry next_id must be a positive integer")
+        raw_requests = registry.get("requests")
+        check_unique_ids(raw_requests, "requests", errors,
+                         ("id", "recorded_on", "source_text", "interpretation", "origin_plan", "target_plan", "relation", "status", "gate_ids", "decision"), REQUEST_STATUSES)
+        if isinstance(raw_requests, list):
+            requests = [item for item in raw_requests if isinstance(item, dict) and isinstance(item.get("id"), str)]
+    for request in requests:
+        label = f"request {request['id']!r}"
+        if not re.fullmatch(r"R-[0-9]{3,}", request["id"]):
+            errors.append(f"{label} ID must have R-NNN form")
+        elif positive_integer(registry.get("next_id")) and int(request["id"][2:]) >= registry["next_id"]:
+            errors.append(f"{label} next_id must exceed assigned IDs")
+        for key in ("source_text", "interpretation"):
+            if not isinstance(request.get(key), str) or not request[key].strip():
+                errors.append(f"{label} {key} must be non-empty text")
+        if not isinstance(request.get("decision"), str):
+            errors.append(f"{label} decision must be text")
+        try:
+            canonical_date(request.get("recorded_on"), f"{label} recorded_on")
+        except ProjectOSError as error:
+            errors.append(str(error))
+        relation = request.get("relation")
+        if not isinstance(relation, str) or relation not in REQUEST_RELATIONS:
+            errors.append(f"{label} invalid relation")
+        for key in ("origin_plan", "target_plan"):
+            value = request.get(key)
+            if value is not None and (not isinstance(value, str) or value not in by_id):
+                errors.append(f"{label} unknown {key}")
+        gate_ids = request.get("gate_ids")
+        if not isinstance(gate_ids, list) or any(not isinstance(item, str) for item in gate_ids):
+            errors.append(f"{label} gate_ids must be an array of IDs")
+            continue
+        if len(gate_ids) != len(set(gate_ids)):
+            errors.append(f"{label} duplicate gate_ids")
+        status = request.get("status")
+        if not isinstance(status, str):
+            continue
+        if status in {"integrated", "implemented"}:
+            target = request.get("target_plan")
+            if not isinstance(target, str) or target not in by_id or not gate_ids:
+                errors.append(f"{label} routed requests require target_plan and gate_ids")
+            if relation in ("same_outcome", "prerequisite") and (
+                request.get("origin_plan") is None or target != request.get("origin_plan")
+            ):
+                errors.append(f"{label} required dependency must remain in its origin plan")
+            if relation == "independent" and target != request.get("origin_plan") and not str(request.get("decision") or "").strip():
+                errors.append(f"{label} independent routing requires a decision explaining the separate outcome and sequence")
+            gates = contract_gate_map(contracts.get(target)) if isinstance(target, str) else {}
+            for gate_id in gate_ids:
+                if gate_id not in gates:
+                    errors.append(f"{label} missing linked gate {gate_id!r}")
+                elif status == "implemented" and gates[gate_id].get("status") != "verified":
+                    errors.append(f"{label} implemented requires verified linked gates")
+        if status == "withdrawn" and not str(request.get("decision") or "").strip():
+            errors.append(f"{label} withdrawal requires the user's explicit cancellation or replacement in decision")
+    for plan in plans:
+        if plan.get("status") != "done" or plan["id"] in legacy_closed:
+            continue
+        receipt = plan.get("completion")
+        contract = contracts.get(plan["id"])
+        if not isinstance(receipt, dict):
+            errors.append(f"plan {plan['id']!r} done requires a completion receipt; use plan complete")
+            continue
+        try:
+            canonical_date(receipt.get("closed_on"), f"plan {plan['id']} completion closed_on")
+        except ProjectOSError as error:
+            errors.append(str(error))
+        errors.extend(f"plan {plan['id']} done: {blocker}" for blocker in plan_blockers(plan, contract, requests))
+        if contract is not None:
+            try:
+                if receipt != completion_record(root, plan, contract, requests, receipt.get("closed_on")):
+                    errors.append(f"plan {plan['id']!r} completion receipt no longer matches its contract, evidence or scoped requests")
+            except (KeyError, TypeError, OSError):
+                errors.append(f"plan {plan['id']!r} completion receipt cannot be verified")
+    return index, contracts, requests
+
+
+def plan_status_report(root: Path, plan_id: str | None, snapshots: dict[Path, str] | None = None) -> dict[str, Any]:
+    system = require_current_system(root, snapshots)
+    errors: list[str] = []
+    structural_output = io.StringIO()
+    with contextlib.redirect_stdout(structural_output):
+        structural_status = check_project(root)
+    if structural_status:
+        errors.extend(line.removeprefix("error: ") for line in structural_output.getvalue().splitlines()
+                      if line.startswith("error: "))
+    index, contracts, requests = validate_plan_records(root, system, errors, snapshots)
+    errors = list(dict.fromkeys(errors))
+    raw_plans = index.get("plans", [])
+    plans = [item for item in raw_plans if isinstance(item, dict)] if isinstance(raw_plans, list) else []
+    if plan_id is None:
+        active = [plan for plan in plans if plan.get("status") == "active"]
+        if len(active) != 1:
+            raise ProjectOSError("plan status requires --id unless exactly one plan is active")
+        plan = active[0]
+    else:
+        matches = [plan for plan in plans if plan.get("id") == plan_id]
+        if len(matches) != 1:
+            raise ProjectOSError(f"Unknown or ambiguous plan ID: {plan_id}")
+        plan = matches[0]
+    contract = contracts.get(plan["id"])
+    blockers = plan_blockers(plan, contract, requests)
+    readiness_blockers = [*errors, *blockers]
+    if plan.get("status") not in ("active", "done"):
+        readiness_blockers.append("Readiness requires an active plan or a validated completed plan.")
+    ready = not readiness_blockers
+    if plan.get("status") != "active":
+        blockers.insert(0, "Only an active plan can be completed.")
+    return {"plan_id": plan["id"], "outcome": plan["outcome"], "status": plan["status"],
+            "ready": ready, "readiness": "READY" if ready else "NOT_READY",
+            "readiness_blockers": readiness_blockers,
+            "can_complete": not errors and not blockers, "errors": errors, "blockers": blockers,
+            "gates": list(contract_gate_map(contract).values()),
+            "requests": [request for request in requests if plan["id"] in (request.get("origin_plan"), request.get("target_plan"))],
+            "following_slices": [item for item in plans if item.get("status") == "planned"]}
+
+
+def plan_status(root: Path, plan_id: str | None, as_json: bool, require_ready: bool = False) -> int:
+    report = plan_status_report(root.resolve(), plan_id)
+    if as_json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(f"Readiness: {report['readiness']} - {report['outcome']}")
+        print(f"Plan {report['plan_id']}: {report['status']} - {report['outcome']}")
+        for gate in report["gates"]:
+            print(f"{gate.get('id')}: {gate.get('status')} [{gate.get('evidence_class')}; {gate.get('target')}] {gate.get('condition')}")
+        for blocker in [*report["errors"], *report["blockers"]]:
+            print(f"remaining: {blocker}")
+        for request in report["requests"]:
+            print(f"request {request.get('id')}: {request.get('status')} -> {request.get('target_plan')}")
+        for plan in report["following_slices"]:
+            print(f"planned: {plan['id']} - {plan['outcome']}")
+        print("Recorded closure eligible: " + ("yes" if report["can_complete"] else "no"))
+    return 1 if report["errors"] or require_ready and not report["ready"] else 0
+
+
+def complete_plan(root: Path, plan_id: str, checkpoint: Path, dry_run: bool) -> int:
+    root = root.resolve()
+    if check_project(root) != 0:
+        raise ProjectOSError("Plan complete requires a clean structural check")
+    snapshots: dict[Path, str] = {}
+    report = plan_status_report(root, plan_id, snapshots)
+    if not report["can_complete"]:
+        raise ProjectOSError("Plan cannot close: " + "; ".join([*report["errors"], *report["blockers"]]))
+    system = require_current_system(root, snapshots)
+    errors: list[str] = []
+    index, contracts, requests = validate_plan_records(root, system, errors, snapshots)
+    if errors:
+        raise ProjectOSError("Plan inputs changed or are invalid: " + "; ".join(errors))
+    plan = next(item for item in index["plans"] if item["id"] == plan_id)
+    if plan["status"] != "active" or plan_blockers(plan, contracts.get(plan_id), requests):
+        raise ProjectOSError("Plan closure inputs changed during validation")
+    checkpoint = checkpoint.absolute()
+    if checkpoint.is_relative_to(root):
+        reject_symlink_path(root, checkpoint)
+    if checkpoint.is_symlink() or not checkpoint.is_file():
+        raise ProjectOSError("Checkpoint draft must be a regular file")
+    # Select the external parent once, as for a user-selected repository root.
+    checkpoint = checkpoint.parent.resolve() / checkpoint.name
+    reject_symlink_path(Path(checkpoint.anchor), checkpoint)
+    content, draft_details = read_regular_at_path(checkpoint)
+    draft_digest = hashlib.sha256(content).hexdigest()
+    try:
+        draft = content.decode("utf-8")
+    except UnicodeError as error:
+        raise ProjectOSError("Checkpoint must be UTF-8") from error
+    if not draft.strip() or len(draft.splitlines()) > 80:
+        raise ProjectOSError("Checkpoint must contain non-empty text of at most 80 lines")
+    if not re.search(r"^Execution state: idle\.?$", draft, re.MULTILINE) or not re.search(
+        r"^Active plan: none\.?$", draft, re.MULTILINE
+    ):
+        raise ProjectOSError("Checkpoint must declare Execution state: idle and Active plan: none on separate lines")
+    reserved = [token for token in RESERVED_TEMPLATE_TOKENS if token in draft]
+    if reserved:
+        raise ProjectOSError("Checkpoint contains unresolved template tokens")
+    state_path = safe_relative(root, system["paths"]["state"])
+    index_path = safe_relative(root, system["paths"]["plans"])
+    assert state_path is not None and index_path is not None
+    state_bytes, _ = read_regular_at_path(state_path)
+    state_digest = hashlib.sha256(state_bytes).hexdigest()
+    snapshots[state_path] = state_digest
+    draft_identity = (draft_details.st_dev, draft_details.st_ino)
+    if checkpoint == state_path or checkpoint == index_path or checkpoint in snapshots or any(
+        (path.stat().st_dev, path.stat().st_ino) == draft_identity for path in snapshots
+    ):
+        raise ProjectOSError("Checkpoint draft must be separate from Project OS record owners")
+    plan["completion"] = completion_record(root, plan, contracts[plan_id], requests, date.today().isoformat())
+    plan["status"] = "done"
+    index["execution_state"] = "idle"
+    if "active_plan" in index:
+        index["active_plan"] = None
+    replacements = [(index_path, canonical_json(index), snapshots[index_path]), (state_path, draft, state_digest)]
+    print(json.dumps({"transition": {"plan_id": plan_id, "from": "active", "to": "done", "execution_state": "idle"},
+                      "completion": plan["completion"], "checkpoint": draft}, indent=2, ensure_ascii=False))
+    print_transaction_preview(root, [], replacements)
+    if dry_run:
+        print("dry-run: no files written")
+        return 0
+
+    def verify_checkpoint() -> None:
+        reject_symlink_path(Path(checkpoint.anchor), checkpoint)
+        current, details = read_regular_at_path(checkpoint)
+        if hashlib.sha256(current).hexdigest() != draft_digest or (
+            details.st_dev, details.st_ino
+        ) != draft_identity:
+            raise ProjectOSError("Checkpoint draft changed during operation")
+
+    def validate_completion() -> None:
+        require_passing_check(root, "Plan completion")
+        verify_checkpoint()
+
+    verify_checkpoint()
+    execute_sync_transaction(root, [], replacements,
+                             after_write=validate_completion, preconditions=snapshots)
+    return 0
+
+
+def migrate_plan_index(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ProjectOSError("Plans index must contain an object")
+    if value.get("schema_version") == 2:
+        return copy.deepcopy(value)
+    errors: list[str] = []
+    validate_registry_schema(value, "legacy plans index", errors)
+    check_unique_ids(value.get("plans"), "legacy plans", errors, ("id", "status", "path", "outcome"), PLAN_STATUSES)
+    if errors:
+        raise ProjectOSError("Invalid legacy plans index: " + "; ".join(errors))
+    migrated = copy.deepcopy(value)
+    if "legacy_closed" in migrated or "legacy_uncontracted" in migrated:
+        raise ProjectOSError("Legacy plans index collides with new migration fields")
+    migrated["schema_version"] = 2
+    if "version" in migrated:
+        migrated["version"] = 2
+    migrated["legacy_closed"] = {}
+    migrated["legacy_uncontracted"] = []
+    for plan in migrated["plans"]:
+        if plan["status"] in {"done", "superseded"}:
+            migrated["legacy_closed"][plan["id"]] = plan["status"]
+        elif not plan.get("contract_path"):
+            migrated["legacy_uncontracted"].append(plan["id"])
+    return migrated
+
+
+def plan_continuity_migration(
+    root: Path, original_system: dict[str, Any], next_system: dict[str, Any],
+    snapshots: dict[Path, str],
+) -> tuple[list[tuple[Path, str | bytes]], list[tuple[Path, str, str]]]:
+    creates: list[tuple[Path, str | bytes]] = []
+    replacements: list[tuple[Path, str, str]] = []
+    paths = next_system["paths"]
+    if original_system.get("schema_version") == SCHEMA_VERSION:
+        return creates, replacements
+    if "requests" in paths:
+        raise ProjectOSError("Legacy SYSTEM requests owner collides with schema-5 migration")
+    paths["requests"] = DEFAULT_PATHS["requests"]
+    request_path = root / paths["requests"]
+    reject_symlink_path(root, request_path)
+    if request_path.exists():
+        raise ProjectOSError("Requests destination already exists; resolve ownership before upgrade")
+    creates.append((request_path, canonical_json({"schema_version": 1, "next_id": 1, "requests": []})))
+    index_path = safe_relative(root, paths.get("plans"))
+    if index_path is None:
+        raise ProjectOSError("Plans owner is unsafe")
+    reject_symlink_path(root, index_path)
+    value, digest = load_json_snapshot(index_path)
+    snapshots[index_path] = digest
+    migrated = migrate_plan_index(value)
+    if migrated != value:
+        replacements.append((index_path, canonical_json(migrated), digest))
+    agents_path = root / "AGENTS.md"
+    reject_symlink_path(root, agents_path)
+    data, _ = read_regular_at_path(agents_path)
+    digest = hashlib.sha256(data).hexdigest()
+    snapshots[agents_path] = digest
+    text = data.decode("utf-8")
+    if ".agents/WORKFLOW.md" not in text:
+        text = text.rstrip() + "\n\nRead `.agents/WORKFLOW.md` before non-trivial work and after context compaction. It owns durable request intake and guarded plan completion; current user and repository instructions take precedence.\n"
+        replacements.append((agents_path, text, digest))
+    return creates, replacements
+
+
 def check_project(root: Path, config: Path | None = None) -> int:
     root = root.resolve()
     errors: list[str] = []
@@ -2851,6 +3486,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
 
     managed_guidance = system.get("managed_guidance")
     expected_managed_paths = [
+        ".agents/WORKFLOW.md",
         ".agents/packs/README.md",
         *expected_pack_paths,
         *expected_overlay_paths,
@@ -2955,7 +3591,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
     check_no_symlink_path(root, agents_path, "AGENTS.md", errors)
     if agents_path.is_file():
         agents_text = agents_path.read_text(encoding="utf-8", errors="ignore")
-        for routed_path in (context_path, state_path):
+        for routed_path in (context_path, state_path, root / ".agents/WORKFLOW.md"):
             if routed_path is None:
                 continue
             relative = routed_path.relative_to(root).as_posix()
@@ -2968,59 +3604,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
             if lines > maximum:
                 errors.append(f"{path.relative_to(root)} has {lines} lines; maximum is {maximum}")
 
-    if plans_path is not None and plans_path.is_file():
-        try:
-            plans_value = load_json(plans_path)
-        except ProjectOSError as error:
-            errors.append(str(error))
-        else:
-            if not isinstance(plans_value, dict):
-                errors.append("plans index must contain an object")
-            else:
-                validate_registry_schema(plans_value, "plans index", errors)
-                plans = plans_value.get("plans", [])
-                check_unique_ids(plans, "plans", errors, ("id", "status", "path", "outcome"))
-                active_ids: list[str] = []
-                if isinstance(plans, list):
-                    for plan in plans:
-                        if not isinstance(plan, dict):
-                            continue
-                        if plan.get("status") == "active" and isinstance(plan.get("id"), str):
-                            active_ids.append(plan["id"])
-                        plan_status = plan.get("status")
-                        if not isinstance(plan_status, str) or plan_status not in PLAN_STATUSES:
-                            errors.append(
-                                f"plan {plan.get('id')!r} has invalid status {plan.get('status')!r}"
-                            )
-                        path = safe_relative(root, plan.get("path"))
-                        if path is None:
-                            errors.append(f"plan {plan.get('id')!r} has invalid path")
-                        elif not path.is_file():
-                            errors.append(
-                                f"plan {plan.get('id')!r} path does not exist: {plan.get('path')}"
-                            )
-                        else:
-                            lines = len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
-                            if lines > 200:
-                                errors.append(
-                                    f"plan {plan.get('id')!r} has {lines} lines; maximum is 200"
-                                )
-                execution_state = plans_value.get("execution_state")
-                explicit_active = plans_value.get("active_plan")
-                if execution_state == "running":
-                    if len(active_ids) != 1:
-                        errors.append("running execution requires exactly one active plan")
-                    if "active_plan" in plans_value and explicit_active != (
-                        active_ids[0] if len(active_ids) == 1 else None
-                    ):
-                        errors.append("active_plan must match the single active plan when present")
-                elif execution_state == "idle":
-                    if active_ids:
-                        errors.append("idle execution requires no active plan")
-                    if "active_plan" in plans_value and explicit_active is not None:
-                        errors.append("idle execution requires active_plan null when present")
-                else:
-                    errors.append("execution_state must be idle or running")
+    validate_plan_records(root, system, errors)
 
     if findings_path is not None and findings_path.is_file():
         try:
@@ -3180,8 +3764,7 @@ def read_selected_system(
     system_path = root / ".agents" / "SYSTEM.json"
     reject_symlink_path(root, system_path)
     system, digest = load_json_snapshot(system_path)
-    if snapshots is not None:
-        snapshots[system_path] = digest
+    retain_snapshot(snapshots, system_path, digest)
     if not isinstance(system, dict):
         raise ProjectOSError("SYSTEM configuration must contain an object")
     if system.get("schema_version") != SCHEMA_VERSION:
@@ -4447,9 +5030,10 @@ def plan_managed_release_update(
     )
     recorded_guidance = original_system.get("managed_guidance")
     expected_guidance = expected["managed_guidance"]
-    if not isinstance(recorded_guidance, dict) or list(recorded_guidance) != list(
-        expected_guidance
-    ):
+    baseline_paths = list(expected_guidance)
+    if original_system.get("schema_version") != SCHEMA_VERSION:
+        baseline_paths.remove(".agents/WORKFLOW.md")
+    if not isinstance(recorded_guidance, dict) or list(recorded_guidance) != baseline_paths:
         raise ProjectOSError("SYSTEM managed_guidance is missing or inconsistent")
     if any(not isinstance(value, str) for value in recorded_guidance.values()):
         raise ProjectOSError("SYSTEM managed_guidance contains an invalid baseline")
@@ -4458,6 +5042,12 @@ def plan_managed_release_update(
     deletions: list[tuple[Path, str]] = []
     conflicts: list[str] = []
     guidance_contents = guidance_content_map(packs, overlays)
+    if original_system.get("schema_version") != SCHEMA_VERSION:
+        workflow_path = root / ".agents/WORKFLOW.md"
+        reject_symlink_path(root, workflow_path)
+        if workflow_path.exists():
+            raise ProjectOSError("Workflow destination already exists; resolve ownership before upgrade")
+        creates.append((workflow_path, guidance_contents[".agents/WORKFLOW.md"]))
     for raw_path, recorded_hash in recorded_guidance.items():
         path = safe_relative(root, raw_path)
         if path is None:
@@ -4799,9 +5389,9 @@ def upgrade_project(
         )
     snapshots = {system_path: original_digest}
     schema = original_system.get("schema_version")
-    if not isinstance(schema, int) or schema not in {2, 3, SCHEMA_VERSION}:
+    if not isinstance(schema, int) or schema not in {2, 3, 4, SCHEMA_VERSION}:
         raise ProjectOSError(
-            f"Upgrade supports SYSTEM schema 2, 3 or {SCHEMA_VERSION}, got {schema!r}"
+            f"Upgrade supports SYSTEM schema 2, 3, 4 or {SCHEMA_VERSION}, got {schema!r}"
         )
     if not isinstance(original_system.get("installation"), str) or original_system.get(
         "installation"
@@ -4821,7 +5411,7 @@ def upgrade_project(
     replacements: list[tuple[Path, str, str]] = []
     deletions: list[tuple[Path, str]] = []
 
-    if schema == SCHEMA_VERSION:
+    if schema in {4, SCHEMA_VERSION}:
         if any(
             value is not None
             for value in (legacy_program_state, disposition, closed_on, reason)
@@ -4831,9 +5421,9 @@ def upgrade_project(
             "standard",
             "program",
         }:
-            raise ProjectOSError("Schema 4 SYSTEM mode must be standard or program")
+            raise ProjectOSError("Current SYSTEM mode must be standard or program")
         if "active_program" not in next_system:
-            raise ProjectOSError("Schema 4 SYSTEM must declare active_program")
+            raise ProjectOSError("Current SYSTEM must declare active_program")
         require_safe_system_owners(root, next_system)
     elif schema == 3:
         if any(
@@ -4958,12 +5548,31 @@ def upgrade_project(
                 next_system["active_program"] = None
                 next_paths["program"] = None
 
+    continuity_creates, continuity_replacements = plan_continuity_migration(
+        root, original_system, next_system, snapshots
+    )
+    creates.extend(continuity_creates)
+    replacements.extend(continuity_replacements)
+
     managed_creates, managed_replacements, managed_deletions = plan_managed_release_update(
         root, original_system, next_system, snapshots
     )
     creates.extend(managed_creates)
     replacements.extend(managed_replacements)
     deletions.extend(managed_deletions)
+    require_safe_system_owners(root, next_system)
+    prospective_errors: list[str] = []
+    if schema != SCHEMA_VERSION:
+        prospective_index_path = safe_relative(root, next_paths.get("plans"))
+        assert prospective_index_path is not None
+        prospective_index = migrate_plan_index(load_json(prospective_index_path))
+        validate_plan_records(root, next_system, prospective_errors, snapshots,
+                              index_value=prospective_index,
+                              requests_value={"schema_version": 1, "next_id": 1, "requests": []})
+    else:
+        validate_plan_records(root, next_system, prospective_errors, snapshots)
+    if prospective_errors:
+        raise ProjectOSError("Upgrade record conflicts: " + "; ".join(prospective_errors))
     serialized_system = json.dumps(next_system, indent=2, ensure_ascii=False) + "\n"
     if hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != original_digest:
         replacements.append((system_path, serialized_system, original_digest))
@@ -4971,6 +5580,10 @@ def upgrade_project(
     print(f"upgrade schema: {schema} -> {SCHEMA_VERSION}")
     print(f"upgrade mode: {original_system.get('mode')} -> {next_system.get('mode')}")
     print_transaction_preview(root, creates, replacements, deletions)
+    if schema != SCHEMA_VERSION:
+        for path, content, *_ in [*creates, *replacements]:
+            if path.name in {"AGENTS.md", "WORKFLOW.md", "requests.json"} or path == safe_relative(root, next_paths.get("plans")):
+                print(f"preview: {path.relative_to(root)}\n{content}")
     if dry_run:
         print("dry-run: no files written")
         return 0
@@ -4988,6 +5601,19 @@ def upgrade_project(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    plan_parser = subparsers.add_parser("plan", help="Inspect or transactionally complete a plan")
+    plan_commands = plan_parser.add_subparsers(dest="plan_command", required=True)
+    plan_status_parser = plan_commands.add_parser("status", help="Report recorded gates and remaining obligations")
+    plan_status_parser.add_argument("--target", required=True, type=Path)
+    plan_status_parser.add_argument("--id")
+    plan_status_parser.add_argument("--json", action="store_true")
+    plan_status_parser.add_argument("--require-ready", action="store_true", help="Exit nonzero until all recorded outcome acceptance passes")
+    plan_complete_parser = plan_commands.add_parser("complete", help="Close only after required evidence exists")
+    plan_complete_parser.add_argument("--target", required=True, type=Path)
+    plan_complete_parser.add_argument("--id", required=True)
+    plan_complete_parser.add_argument("--checkpoint", required=True, type=Path)
+    plan_complete_parser.add_argument("--dry-run", action="store_true")
 
     detect_parser = subparsers.add_parser("detect", help="Inspect toolchain and capability signals")
     detect_parser.add_argument("--target", required=True, type=Path)
@@ -5133,6 +5759,10 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if args.command == "plan":
+            if args.plan_command == "status":
+                return plan_status(args.target, args.id, args.json, args.require_ready)
+            return complete_plan(args.target, args.id, args.checkpoint, args.dry_run)
         if args.command == "detect":
             print(json.dumps(detect_repository(args.target), indent=2, ensure_ascii=False))
             return 0

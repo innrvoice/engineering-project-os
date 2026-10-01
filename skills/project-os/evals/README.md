@@ -10,6 +10,14 @@ Run every case in `discovery.json` on its named surface with the exact candidate
 
 If routing needs adjustment, change one discovery field at a time, reinstall the candidate and replay the complete set. A frontmatter description change affects selection. A skill-body change affects behavior after selection. Public listing copy and starter prompts affect user expectations but do not replace behavioral testing.
 
+## Replay continuity across sessions
+
+continuity.json supplies five multi-message cases: compatible intake without a save command, conflict, independent successor, explicit withdrawal and required remote acceptance. prepare_fixture.py creates their isolated connected repositories with a real focused Python check and a pending synthetic remote gate. It supplies no external access.
+
+Load the exact candidate on the named host and send each message in order. Inspect the actual requests registry, contract, index and checkpoint after each message; do not infer behavior from response wording. End that session. Start a fresh session over the same files and send only restart_prompt, without the previous chat. Verify recovered requirements, destinations, blockers and the exact next action. For ChatGPT, supply the resulting synthetic records as files in the new chat.
+
+Record the package SHA-256, surface, each observation and file snapshots in local evidence. Fixture generation and deterministic helper checks prove fixture validity only. They do not execute host reasoning, prove plugin selection or close the fresh-session acceptance gate.
+
 ## Prepare one case
 
 Extract the submission ZIP. Resolve `<plugin-root>` to its absolute extraction directory. Select a case name from `submission.json` and a new target directory whose parent already exists:
@@ -46,3 +54,7 @@ python3 -B <plugin-root>/skills/project-os/scripts/project_os.py check --target 
 ## Evidence boundary
 
 The source test suite builds a ZIP and executes its fixtures, bootstrap, checker and upgrade paths. Those deterministic checks do not execute Codex or ChatGPT reasoning workflows and do not prove plugin discovery. Record fresh Codex and ChatGPT plugin-loader results separately, including the exact ZIP hash and host. Portal ingestion, review approval and publication also remain separate checks.
+
+## Premature readiness regression
+
+Replay continuity-premature-release before publication: local tests and a prepared ZIP are already reported, but both host gates are pending. Inspect the actual failing readiness command, NOT_READY leading report, no publication recommendation and fresh file-only recovery. Plain addition/cancellation scenarios must validate JSON after every turn; matching a phrase in skill instructions is insufficient.

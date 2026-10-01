@@ -63,6 +63,9 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - Do not open a plan as a side effect of starting a Program.
 - Refuse Program closure while any plan is active.
 - Require exit evidence for `completed` and a reason for `stopped`.
+- Close plans only through the guarded helper with contracts, scoped requests and completion receipts.
+- Preserve legacy dispositions without inventing proof; review uncontracted work on resume.
+- Deliver managed workflow changes to existing repositories through a previewed routing and format migration.
 - Archive exact contract bytes and record their SHA-256 digest.
 - Check every indexed archive path and digest.
 - Describe the archive as tamper-evident, not technically immutable, signed or remotely protected.
@@ -101,7 +104,7 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - portable bundle metadata;
 - CI assertions, fixtures, documentation and release notes.
 
-Project OS 2.1.1 uses `SYSTEM.schema_version: 4`. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Candidate 2.2.1 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 

@@ -68,9 +68,9 @@ A successful setup requires the helper check to pass and the Git diff to contain
 
 Ordinary engineering work now uses ordinary requests. Use `$project-os` when the request concerns Project OS maintenance, durable plan state, findings, evidence, knowledge or Program lifecycle.
 
-## Upgrade from 2.1.0 to 2.1.1
+## Upgrade from 2.1.1 to 2.2.1
 
-Project OS 2.1.1 keeps schema 4, command interfaces and knowledge transfer formats unchanged. The repository upgrade updates the recorded Project OS release and managed guidance. It must not modify application code or project-owned knowledge.
+Project OS 2.2.1 introduces SYSTEM schema 5, plans schema 2, JSON acceptance contracts, durable request intake and guarded plan completion. Knowledge transfer formats remain unchanged. Update the Directory plugin to use the published helper. The tagged standalone route requires the separate GitHub tag and Release.
 
 First update the installed Directory plugin, then start a new Codex task in the repository and type:
 
@@ -78,7 +78,7 @@ First update the installed Directory plugin, then start a new Codex task in the 
 $project-os upgrade
 ~~~
 
-Codex must use the installed 2.1.1 helper transaction:
+Codex must use the installed 2.2.1 helper transaction:
 
 ~~~text
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
@@ -87,7 +87,7 @@ python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/
 git diff --check
 ~~~
 
-Review the dry-run before applying it. After the check, inspect the exact changed paths. Application code, project plans, findings, evidence and project-owned knowledge must remain unchanged unless a separate user request explicitly authorizes such work.
+Review the dry-run before applying it. After the check, inspect the exact changed paths. The reviewed transaction adds managed WORKFLOW, an empty requests registry, minimal AGENTS routing and plan-index migration metadata. Existing Markdown plans, context, state, findings, evidence and application code remain unchanged. Historical closed plans retain their dispositions without new proof. Before resuming a legacy unfinished plan, review its contract and remove its migration mark. Existing legacy knowledge migration rules remain applicable.
 
 Updating the installed plugin alone does not upgrade a connected repository. Each repository keeps its recorded release until this explicit transaction succeeds.
 
@@ -110,10 +110,10 @@ ChatGPT works against the supplied copies. It cannot connect to a live local che
 Use this route only when a standalone Codex-only installation is required. Send the following message in Codex chat, not Terminal:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.1.1/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.1/skills/project-os
 ~~~
 
-Start a new Codex task after installation. The URL is pinned to release 2.1.1 and does not follow `main` automatically.
+Start a new Codex task after installation. Use this candidate URL only after the versioned tag is published. It does not follow `main` automatically.
 
 Avoid keeping an older standalone skill active beside the Directory plugin. Remove the obsolete user-level `project-os` skill before relying on the Directory version so `$project-os` resolves to one intended installation.
 

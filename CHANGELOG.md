@@ -4,6 +4,34 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - Directory publication reported 2026-10-01
+
+Directory publication is separate from the corresponding GitHub source update, tag and Release.
+
+### Fixed
+
+- Delivered canonical request and proof examples in managed WORKFLOW for ordinary engineering turns, explicit cancellation and fresh file-only recovery.
+- Required immediate record validation after intake and withdrawal and structural validation on recovery.
+- Added explicit READY/NOT_READY outcome reports and a failing --require-ready mode for pending acceptance.
+- Added a read-only exact-package acceptance guard before publication recommendations; package consistency alone does not imply readiness.
+- Preserved schema 5, plans schema 2 and request/contract schema 1. Fresh host acceptance remains mandatory and publication is separate.
+
+## [2.2.0] - Directory publication reported 2026-09-30
+
+### Added
+
+- Added durable user-request intake, conflict resolution and following-slice routing that survives context compaction through repository records.
+- Added JSON acceptance contracts, explicit evidence targets and completion receipts for new plans.
+- Added read-only plan status and transactional plan complete operations that reject open prerequisites, unresolved scoped requests and invalid proof.
+- Added managed workflow guidance and schema 5 migration from schemas 2, 3 and 4 with historical closed dispositions and review-on-resume handling of legacy unfinished plans.
+- Added synthetic continuity, closure, migration and extracted-package regressions. Fresh host behavior and publication remain separate acceptance gates.
+
+### Changed
+
+- Plan index format is schema 2; contracts and request registries use schema 1. Existing knowledge-transfer formats remain unchanged.
+- Bootstrap, adoption and upgrade deliver workflow routing and request owners while preserving project content.
+- Transactions verify written destinations after final validation and preserve divergent concurrent writes during rollback.
+
 ## [2.1.1] - 2026-09-15
 
 ### Changed

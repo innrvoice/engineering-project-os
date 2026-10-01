@@ -12,6 +12,7 @@ After a repository is connected, ordinary product work does not need a Project O
 | Inspect repository state | `$project-os inspect` | No |
 | Create or adopt the control plane | `$project-os bootstrap` or `$project-os adopt` | After a clean preview |
 | Validate the control plane | `$project-os check` | No |
+| Read remaining work | `$project-os plan status[: <plan-id>]` | No |
 | Resume or manage durable work | `$project-os plan open: <outcome>`, `plan checkpoint`, `plan resume`, `plan complete`, `plan block: <reason>` or `plan supersede: <reason>` | Record changes after review |
 | Coordinate a multi-phase initiative | `$project-os program start: <initiative>`, `program status` or `program close <disposition>` | Start and close after a clean preview; status is read-only |
 | Record and reuse failures | `$project-os finding add: <observation>` or `$project-os knowledge <operation>` | Capture, approval, lifecycle and import operations may write |
@@ -27,7 +28,7 @@ Open the repository and ask Codex to continue the actual engineering job. Applic
 Continue the offline retry work from the current repository state. Verify the recorded blocker before changing code.
 ~~~
 
-Codex should inspect the active plan, `STATE.md`, relevant findings and referenced evidence. It should distinguish facts that remain current from acceptance gates that still need verification, then continue from the recorded next action.
+Codex should inspect WORKFLOW, unresolved requests, the active plan with its contract, STATE, relevant findings and referenced evidence. It should distinguish facts that remain current from acceptance gates that still need verification, then continue from the recorded next action.
 
 Use `$project-os plan resume` only when the Project OS plan transition itself is required, such as reactivating a blocked plan after its blocker is proven resolved. A new task does not require a ceremonial resume command when an active plan already routes the work.
 
@@ -39,7 +40,7 @@ Open a plan when an outcome is likely to outlive the current task or needs expli
 $project-os plan open: make password reset idempotent across API retries and worker redelivery
 ~~~
 
-Codex inspects current authority, checks that no other plan is active and prepares one outcome-sized plan. The plan records scope, exclusions, acceptance conditions, verification and the first executable action. It does not implement the feature merely because the plan was opened.
+Codex inspects current authority, checks that no other plan is active and prepares one outcome-sized plan. The Markdown plan records scope, exclusions, implementation and decisions. Its adjacent JSON contract owns acceptance conditions, required proof and next actions; the index owns status. It does not implement the feature merely because the plan was opened.
 
 Checkpoint after repository truth changes materially or before a handoff:
 
@@ -55,7 +56,35 @@ Complete only when the plan's required evidence exists:
 $project-os plan complete
 ~~~
 
-Source checks, deployment, public availability and physical acceptance remain separate gates. A passing CI job cannot satisfy a device-specific acceptance condition unless the plan explicitly defines that equivalence.
+The request invokes the helper plan complete with a checkpoint draft and reviewed dry run. It cannot close a plan with a pending prerequisite, invalid proof or unresolved scoped request. Following slices remain planned. Source checks, deployment, public availability and physical acceptance remain separate gates. A passing CI job cannot satisfy a device-specific acceptance condition unless the plan explicitly defines that equivalence.
+
+## Add a requirement during work
+
+Send an ordinary instruction, without a Project OS prefix or a separate save command:
+
+~~~text
+Also handle reconnecting after the app has been offline. Keep the existing retry behavior.
+~~~
+
+Codex captures the requirement immediately and integrates it into the same outcome's contract. A material outcome change raises contract revision and requires reassessing proof. Captured means saved; integrated means assigned; implemented requires verified linked gates.
+
+For an independent request such as a new diagnostics screen, Codex creates a planned slice with a contract and recorded sequence. It keeps one active plan. If the addition conflicts with an earlier rule, Codex records needs_clarification, asks for the required decision and continues independent authorized work. An explicit cancellation is recorded as withdrawn with the user's decision; nothing is silently dropped.
+
+After context compaction or in a fresh task, unresolved requests are read from repository files, even when no plan is active. The next task can recover the requirement, destination and next action without the previous chat.
+
+## See what prevents closure
+
+~~~text
+$project-os plan status
+~~~
+
+The agent runs plan status --require-ready before reporting readiness or suggesting publication. A blocked report starts with "NOT_READY: the outcome is not ready" and the missing acceptance, even when source tests and package checks passed.
+
+A useful response states what was implemented, what was verified and in which target, what remains for closure, which decisions or permissions are needed and where additions were routed. For example: source tests passed; the plan remains open because the remote migration and post-migration scenario are pending; the next step is inspecting the target schema. It must not call the whole feature complete.
+
+A deliberately source-only preparation plan may close without deployment when that was the agreed outcome. A required production migration cannot be relabelled as a following independent slice. A structural PASS does not prove live behavior.
+
+For example, a release ZIP is built and unit tests pass, but fresh-session addition/cancellation recovery has not been checked. The release remains NOT_READY. Run those checks on the isolated candidate before publication; publication is never a prerequisite for discovering whether the promised behavior works.
 
 ## Run a Program for a multi-phase initiative
 
@@ -162,7 +191,7 @@ Updating the installed plugin does not update repository-local records. In each 
 $project-os upgrade
 ~~~
 
-Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.1.1 upgrade, application code and project-owned knowledge must not change.
+Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.1 upgrade, application code and project-owned knowledge must not change.
 
 If a managed file has diverged from its recorded baseline, the helper reports a conflict instead of overwriting it. Resolve ownership deliberately and repeat the dry-run. Do not hand-edit `SYSTEM.release` or schema fields to simulate an upgrade.
 
