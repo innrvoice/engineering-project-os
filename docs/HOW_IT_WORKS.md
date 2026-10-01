@@ -108,7 +108,7 @@ The Python helper performs deterministic operations such as `detect`, `init`, `a
 
 The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
 
-Project OS 2.2.0 introduces schema 5 while preserving the existing knowledge bundle formats. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
+Project OS 2.2.1 introduces schema 5 while preserving the existing knowledge bundle formats. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
 
 ## ChatGPT is the companion surface
 
@@ -123,3 +123,7 @@ Project OS narrows where engineering state lives. It does not broaden what Codex
 Application edits, deletion, dependency installation, Git operations, deployment, publication and external communication still require user authority and must follow repository instructions.
 
 For exact request syntax, record schemas and helper commands, continue with [Reference](REFERENCE.md). For installation and upgrades, use [Setup](SETUP.md). For job-based examples, use [Usage](USAGE.md).
+
+## Readiness before delivery
+
+The agent checks recorded outcome readiness before each final checkpoint or publication recommendation. plan status --require-ready returns NOT_READY and a failing exit status until required gates and requests are resolved. A valid record layout, passing source tests or a ZIP cannot substitute for host acceptance. Ordinary intake and cancellation use canonical examples delivered in managed WORKFLOW and are checked immediately, so fresh sessions can detect invalid records rather than trust only their narrative.

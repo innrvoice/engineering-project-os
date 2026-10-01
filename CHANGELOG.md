@@ -4,7 +4,19 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.0] - Unreleased candidate
+## [2.2.1] - Directory publication reported 2026-10-01
+
+Directory publication is separate from the corresponding GitHub source update, tag and Release.
+
+### Fixed
+
+- Delivered canonical request and proof examples in managed WORKFLOW for ordinary engineering turns, explicit cancellation and fresh file-only recovery.
+- Required immediate record validation after intake and withdrawal and structural validation on recovery.
+- Added explicit READY/NOT_READY outcome reports and a failing --require-ready mode for pending acceptance.
+- Added a read-only exact-package acceptance guard before publication recommendations; package consistency alone does not imply readiness.
+- Preserved schema 5, plans schema 2 and request/contract schema 1. Fresh host acceptance remains mandatory and publication is separate.
+
+## [2.2.0] - Directory publication reported 2026-09-30
 
 ### Added
 

@@ -1,6 +1,6 @@
 # Reference
 
-This is the technical contract for Project OS 2.2.0. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.2.1. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
@@ -154,16 +154,18 @@ The requests registry has schema_version 1, positive next_id and requests. Every
 
 Request statuses are captured, needs_clarification, integrated, implemented and withdrawn. Relations are same_outcome, prerequisite and independent. Routed entries require target_plan and linked gates. same_outcome and prerequisite remain in their origin plan; moving either to a successor fails validation. Implemented requires verified linked gates and their valid proof. Withdrawn requires a non-empty record of the user's explicit cancellation or replacement. An unresolved scoped request prevents closure even when the source checks pass. A routed independent successor does not block or later invalidate its predecessor's completion receipt.
 
+The managed WORKFLOW includes canonical request and evidence examples for ordinary turns without loading the skill. The agent validates and repairs records immediately after every intake, routing, cancellation or contract revision and checks recovered files before trusting their meaning.
+
 The agent records material instructions immediately without a separate save command, resolves compatible additions into the active outcome and keeps conflicts visible for the required decision. It must read unresolved entries after compaction or in a fresh task. Alternatives discussed during brainstorming are not automatically work orders. The files do not capture chat in the background.
 
 ### Plan status
 
 ~~~shell
 python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --json
-python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --id 001
+python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --id 001 --require-ready
 ~~~
 
-Without --id, exactly one active plan must exist. JSON reports plan_id, outcome, status, can_complete, errors, blockers, gates, related requests and following_slices. It is read-only. Invalid records return a failure status; ordinary pending work is a valid report with can_complete false. The prose report lists targets, pending actions and routed additions. Agents add their evidence-based implementation summary rather than treating this structural report as live product verification.
+Without --id, exactly one active plan must exist. JSON reports plan_id, outcome, status, ready, readiness, readiness_blockers, can_complete, errors, blockers, gates, related requests and following_slices. readiness is READY only for an active or valid completed contracted plan with no remaining obligations; otherwise NOT_READY. --require-ready returns nonzero for NOT_READY, including valid pending work. Closed legacy plans have no renewed readiness. It is read-only. Invalid records return a failure status; ordinary pending work is a valid report with can_complete false. The prose report lists targets, pending actions and routed additions. Agents add their evidence-based implementation summary rather than treating this structural report as live product verification.
 
 ### Plan complete
 
@@ -211,7 +213,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.2.0",
+  "created_with": "2.2.1",
   "entries": []
 }
 ~~~
@@ -500,8 +502,8 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.2.0 identifies the installed skill, helper, package metadata and connected `project_os_version`.
-- `SYSTEM.schema_version` is 4.
+- Release 2.2.1 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- `SYSTEM.schema_version` is 5.
 - Knowledge registries retain their own `schema_version: 1`.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.
 - The version in the external `$schema` URL inside `plugin.json` belongs to that external schema, not to the Project OS release.

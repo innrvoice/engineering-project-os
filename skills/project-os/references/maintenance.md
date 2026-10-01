@@ -45,19 +45,19 @@ Run the checker after every plan transition.
 
 Apply the managed WORKFLOW on ordinary engineering turns without requiring a Project OS prefix. Immediately save material corrections, clarifications and new instructions in the requests registry before long work or ending the response. Preserve a short source formulation and interpretation. Route compatible same-outcome and prerequisite additions into the origin plan's contract; route independent outcomes into planned slices with their own contracts and explicit sequence. A conflict stays needs_clarification until the necessary decision arrives. Alternatives discussed during brainstorming are not automatically implementation instructions.
 
-The index owns status and contract_path. Plan Markdown describes implementation and decisions, not a second acceptance register. The adjacent JSON contract owns gates. Requests own intake and routing. STATE links the current checkpoint. Follow the precise field definitions in the bundled plans README and public Reference. Increment contract revision on material outcome changes, record the reason and controlling request in Markdown and reassess evidence before attaching it to the new revision.
+The index owns status and contract_path. Plan Markdown describes implementation and decisions, not a second acceptance register. The adjacent JSON contract owns gates. Requests own intake and routing. STATE links the current checkpoint. Read the connected WORKFLOW canonical intake and proof examples and the plans README contract template. Use literal request keys origin_plan, target_plan, relation, source_text, recorded_on, status, gate_ids and decision. Validate and repair records immediately after intake, routing, withdrawal and revision before continuing application work. Increment contract revision on material outcome changes, record the reason and controlling request in Markdown and reassess evidence before attaching it to the new revision.
 
 Before resuming any legacy_uncontracted plan, including an already active one, review a contract from current instructions and repository evidence, preview the attachment and remove its migration mark. An old closed disposition stays legacy_closed and is not newly verified. Preserve the old plan and its unverified obligations on supersession.
 
 ### Read status and complete
 
-Run the read-only status helper before claiming that the outcome is complete:
+Run the read-only status helper before each final checkpoint, readiness claim, publication recommendation or release permission request:
 
 ~~~shell
-python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --json
+python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target /path/to/repository --require-ready --json
 ~~~
 
-Use --id when no single active plan exists. Status reports gates, proof errors, scoped requests, blockers and following planned slices. It cannot independently inspect production or judge the meaning of evidence.
+Use --id when no single active plan exists. Status reports READY or NOT_READY for the named outcome, gates, proof errors, scoped requests, blockers and following planned slices. --require-ready fails while any mandatory acceptance or request remains open. Lead with NOT_READY and the blockers before local successes; do not call the candidate verified or ask to publish it. Run required host scenarios on an exact isolated candidate before publication, preserving stable. A code-only scope cannot be used to imply release readiness. It cannot independently inspect production or judge the meaning of evidence.
 
 Prepare a UTF-8 checkpoint draft in a temporary file outside repository record owners. Preserve relevant verified state and report the finished outcome, its evidence and remaining independent work. The draft must declare Execution state: idle and Active plan: none on separate lines and fit the 80-line checkpoint limit. Preview closure:
 

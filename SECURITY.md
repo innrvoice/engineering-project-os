@@ -2,7 +2,7 @@
 
 ## Supported version
 
-This source tree develops candidate Project OS 2.2.0. It does not establish that the candidate is published. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
+This source tree develops candidate Project OS 2.2.1. It does not establish that the candidate is published. Install the Directory plugin or standalone Codex skill first, then upgrade each connected repository explicitly. Updating the plugin or skill does not update repositories by itself.
 
 ## Report a vulnerability
 
@@ -20,7 +20,7 @@ Include:
 
 ## Runtime boundary
 
-The 2.2.0 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal`, `--checkpoint` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
+The 2.2.1 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal`, `--checkpoint` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Directory installation and standalone skill installation from GitHub are separate network operations performed by the host.
 
 Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database, central failure database or automatic cross-project synchronization. The helper runs only when a person or Codex invokes it locally. ChatGPT can work only with material supplied in its conversation.
 

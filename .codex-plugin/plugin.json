@@ -1,6 +1,6 @@
 {
   "name": "engineering-project-os",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.",
   "author": {
     "name": "Pavel Bochkov Rastopchin",

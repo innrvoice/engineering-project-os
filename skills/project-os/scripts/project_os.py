@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 SCHEMA_VERSION = 5
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
@@ -3240,31 +3240,38 @@ def plan_status_report(root: Path, plan_id: str | None, snapshots: dict[Path, st
         plan = matches[0]
     contract = contracts.get(plan["id"])
     blockers = plan_blockers(plan, contract, requests)
+    readiness_blockers = [*errors, *blockers]
+    if plan.get("status") not in ("active", "done"):
+        readiness_blockers.append("Readiness requires an active plan or a validated completed plan.")
+    ready = not readiness_blockers
     if plan.get("status") != "active":
         blockers.insert(0, "Only an active plan can be completed.")
     return {"plan_id": plan["id"], "outcome": plan["outcome"], "status": plan["status"],
+            "ready": ready, "readiness": "READY" if ready else "NOT_READY",
+            "readiness_blockers": readiness_blockers,
             "can_complete": not errors and not blockers, "errors": errors, "blockers": blockers,
             "gates": list(contract_gate_map(contract).values()),
             "requests": [request for request in requests if plan["id"] in (request.get("origin_plan"), request.get("target_plan"))],
             "following_slices": [item for item in plans if item.get("status") == "planned"]}
 
 
-def plan_status(root: Path, plan_id: str | None, as_json: bool) -> int:
+def plan_status(root: Path, plan_id: str | None, as_json: bool, require_ready: bool = False) -> int:
     report = plan_status_report(root.resolve(), plan_id)
     if as_json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
+        print(f"Readiness: {report['readiness']} - {report['outcome']}")
         print(f"Plan {report['plan_id']}: {report['status']} - {report['outcome']}")
         for gate in report["gates"]:
             print(f"{gate.get('id')}: {gate.get('status')} [{gate.get('evidence_class')}; {gate.get('target')}] {gate.get('condition')}")
         for blocker in [*report["errors"], *report["blockers"]]:
             print(f"remaining: {blocker}")
         for request in report["requests"]:
-            print(f"request {request['id']}: {request['status']} -> {request['target_plan']}")
+            print(f"request {request.get('id')}: {request.get('status')} -> {request.get('target_plan')}")
         for plan in report["following_slices"]:
             print(f"planned: {plan['id']} - {plan['outcome']}")
         print("Recorded closure eligible: " + ("yes" if report["can_complete"] else "no"))
-    return 1 if report["errors"] else 0
+    return 1 if report["errors"] or require_ready and not report["ready"] else 0
 
 
 def complete_plan(root: Path, plan_id: str, checkpoint: Path, dry_run: bool) -> int:
@@ -5601,6 +5608,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan_status_parser.add_argument("--target", required=True, type=Path)
     plan_status_parser.add_argument("--id")
     plan_status_parser.add_argument("--json", action="store_true")
+    plan_status_parser.add_argument("--require-ready", action="store_true", help="Exit nonzero until all recorded outcome acceptance passes")
     plan_complete_parser = plan_commands.add_parser("complete", help="Close only after required evidence exists")
     plan_complete_parser.add_argument("--target", required=True, type=Path)
     plan_complete_parser.add_argument("--id", required=True)
@@ -5753,7 +5761,7 @@ def main() -> int:
     try:
         if args.command == "plan":
             if args.plan_command == "status":
-                return plan_status(args.target, args.id, args.json)
+                return plan_status(args.target, args.id, args.json, args.require_ready)
             return complete_plan(args.target, args.id, args.checkpoint, args.dry_run)
         if args.command == "detect":
             print(json.dumps(detect_repository(args.target), indent=2, ensure_ascii=False))

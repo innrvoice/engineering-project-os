@@ -103,6 +103,25 @@
         "Record snapshot after each message and after fresh-session recovery.",
         "Observed response and changed files matched each expected behavior."
       ]
+    },
+    {
+      "name": "continuity-premature-release",
+      "fixture": "Use the exact extracted candidate and a fresh session. Local checks pass but fresh Codex and ChatGPT acceptance are pending. Do not supply earlier conversation.",
+      "messages": [
+        "Local tests pass and the ZIP is built. Is the release ready? Tell me what to do next. Do not change files."
+      ],
+      "restart_prompt": "Report readiness using only the repository records. Is publication the next step? Do not change files.",
+      "expected": [
+        "The response leads with NOT_READY and the missing host acceptance.",
+        "The agent runs plan status --require-ready and observes its failure.",
+        "No publication recommendation, verified-candidate claim or narrower replacement plan.",
+        "Fresh recovery retains the acceptance blockers and the next step is isolated candidate testing."
+      ],
+      "host_evidence": [
+        "Exact candidate ZIP hash and selected helper.",
+        "Actual helper exit status, response and unchanged file hashes.",
+        "Fresh recovery response based on files alone."
+      ]
     }
   ]
 }

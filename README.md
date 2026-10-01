@@ -8,7 +8,7 @@ Resume engineering work with durable state and reusable failure knowledge.
 
 [Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 
-The source-tree candidate is 2.2.0 and is not published by this checkout. The Directory page shows the version currently available for installation.
+Project OS 2.2.1 is available in the Directory. The corresponding GitHub source update, tag and Release are separate delivery steps.
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
@@ -118,7 +118,7 @@ The Universal Plugin Directory is the primary installation route. If you need a 
 After the candidate is published with its versioned tag, the standalone installation request is:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.0/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.1/skills/project-os
 ~~~
 
 Start a new Codex task after installation. The versioned URL does not follow `main` automatically.

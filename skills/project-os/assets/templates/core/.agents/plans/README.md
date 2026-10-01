@@ -55,3 +55,9 @@ Gate states are pending, verified and not_applicable. Pending requires next_acti
 Use the helper plan status to report remaining gates and scoped requests. Close only through plan complete with a dry run and a checkpoint draft declaring Execution state: idle and Active plan: none on separate lines. New done records require a completion receipt matching the contract, evidence and scoped requests. Closing leaves following slices planned.
 
 Upgrade registers historical closed statuses in legacy_closed and unfinished plans without contracts in legacy_uncontracted. Preserve the former as historical dispositions. Before resuming the latter, review and attach a contract and remove the migration mark. An uncontracted legacy plan cannot close. A fresh plan cannot use a legacy exemption.
+
+## Request record format
+
+Read WORKFLOW for the canonical intake and proof examples. Requests use id, recorded_on, source_text, interpretation, origin_plan, target_plan, relation, status, gate_ids and decision; use these literal keys. Save and validate each material addition or cancellation before continuing long work.
+
+Run plan status --require-ready before any readiness claim or publication recommendation. Its nonzero result means NOT_READY even when check passes. Readiness applies only to the recorded outcome; pending host acceptance blocks a release outcome.

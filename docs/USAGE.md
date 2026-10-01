@@ -78,9 +78,13 @@ After context compaction or in a fresh task, unresolved requests are read from r
 $project-os plan status
 ~~~
 
+The agent runs plan status --require-ready before reporting readiness or suggesting publication. A blocked report starts with "NOT_READY: the outcome is not ready" and the missing acceptance, even when source tests and package checks passed.
+
 A useful response states what was implemented, what was verified and in which target, what remains for closure, which decisions or permissions are needed and where additions were routed. For example: source tests passed; the plan remains open because the remote migration and post-migration scenario are pending; the next step is inspecting the target schema. It must not call the whole feature complete.
 
 A deliberately source-only preparation plan may close without deployment when that was the agreed outcome. A required production migration cannot be relabelled as a following independent slice. A structural PASS does not prove live behavior.
+
+For example, a release ZIP is built and unit tests pass, but fresh-session addition/cancellation recovery has not been checked. The release remains NOT_READY. Run those checks on the isolated candidate before publication; publication is never a prerequisite for discovering whether the promised behavior works.
 
 ## Run a Program for a multi-phase initiative
 
@@ -187,7 +191,7 @@ Updating the installed plugin does not update repository-local records. In each 
 $project-os upgrade
 ~~~
 
-Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.0 upgrade, application code and project-owned knowledge must not change.
+Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.1 upgrade, application code and project-owned knowledge must not change.
 
 If a managed file has diverged from its recorded baseline, the helper reports a conflict instead of overwriting it. Resolve ownership deliberately and repeat the dry-run. Do not hand-edit `SYSTEM.release` or schema fields to simulate an upgrade.
 

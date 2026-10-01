@@ -95,7 +95,8 @@ For reasoned plan, finding or knowledge edits without a dedicated helper subcomm
 - Existing user and repository instructions take precedence.
 - Never overwrite `AGENTS.md`, context, state, a Program, plan, finding, evidence or knowledge blindly.
 - Keep application code, production configuration, credentials, personal data and runtime artifacts outside Project OS operations unless the user's request independently authorizes them.
-- Follow the connected repository WORKFLOW for immediate durable user-request intake, contract revisions and compaction recovery. Authorized clarifications require no separate permission to record or integrate.
+- Follow the connected repository WORKFLOW for immediate durable user-request intake, canonical JSON, validation after each intake or cancellation, contract revisions and compaction recovery. Authorized clarifications require no separate permission to record or integrate.
+- Before final checkpoints, readiness claims or publication recommendations, run plan status --require-ready. Lead with NOT_READY when required acceptance is open; never present source checks or a ZIP as a verified release candidate.
 - Record only verified repository facts. Mark unresolved claims as unverified.
 - Keep project incidents separate from portable lessons. Approve only confirmed, sanitized mechanisms and never require a Project OS release to transfer user knowledge.
 - Do not imply a daemon, watcher, hook, MCP server, hidden database, automatic upload or automatic cross-repository synchronization.

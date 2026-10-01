@@ -68,9 +68,9 @@ A successful setup requires the helper check to pass and the Git diff to contain
 
 Ordinary engineering work now uses ordinary requests. Use `$project-os` when the request concerns Project OS maintenance, durable plan state, findings, evidence, knowledge or Program lifecycle.
 
-## Upgrade from 2.1.1 to candidate 2.2.0
+## Upgrade from 2.1.1 to 2.2.1
 
-Candidate 2.2.0 introduces SYSTEM schema 5, plans schema 2, JSON acceptance contracts, durable request intake and guarded plan completion. Knowledge transfer formats remain unchanged. The candidate is not published by this source checkout; use the versioned installed helper after publication or explicitly test the candidate helper in an isolated fixture.
+Project OS 2.2.1 introduces SYSTEM schema 5, plans schema 2, JSON acceptance contracts, durable request intake and guarded plan completion. Knowledge transfer formats remain unchanged. Update the Directory plugin to use the published helper. The tagged standalone route requires the separate GitHub tag and Release.
 
 First update the installed Directory plugin, then start a new Codex task in the repository and type:
 
@@ -78,7 +78,7 @@ First update the installed Directory plugin, then start a new Codex task in the 
 $project-os upgrade
 ~~~
 
-Codex must use the installed 2.2.0 helper transaction:
+Codex must use the installed 2.2.1 helper transaction:
 
 ~~~text
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
@@ -110,7 +110,7 @@ ChatGPT works against the supplied copies. It cannot connect to a live local che
 Use this route only when a standalone Codex-only installation is required. Send the following message in Codex chat, not Terminal:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.0/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.1/skills/project-os
 ~~~
 
 Start a new Codex task after installation. Use this candidate URL only after the versioned tag is published. It does not follow `main` automatically.

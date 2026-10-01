@@ -166,7 +166,7 @@ def prepare(case: str, target: Path) -> None:
     if creates or replacements:
         project_os.execute_sync_transaction(target, creates, replacements,
             after_write=lambda: project_os.require_passing_check(target, "Reviewer fixture"))
-    if case == "continuity-remote-prerequisite":
+    if case in {"continuity-remote-prerequisite", "continuity-premature-release"}:
         checked = subprocess.run([sys.executable, "-B", "-m", "unittest", "-v", "test_retry.py"], cwd=target,
                                  capture_output=True, text=True, check=False)
         if checked.returncode:
@@ -178,6 +178,17 @@ def prepare(case: str, target: Path) -> None:
             "path": ".agents/evidence/source-baseline.md", "sha256": "sha256:" + hashlib.sha256(proof.encode()).hexdigest(),
             "checked_on": date.today().isoformat(), "target": "local", "revision": 1,
         }])
+        if case == "continuity-premature-release":
+            contract["gates"] = contract["gates"][:1]
+            for product in ("Codex", "ChatGPT"):
+                contract["gates"].append({"id": product.lower(), "condition": f"Fresh {product} intake, cancellation and file-only recovery pass.",
+                    "evidence_class": "host", "target": f"fresh {product} candidate session", "status": "pending", "evidence": [],
+                    "next_action": f"Run exact isolated candidate acceptance in {product} before publication.", "reason": "No host behavior proof is supplied."})
+            plan = index["plans"][0]
+            plan["outcome"] = "Prepare a release candidate with verified fresh Codex and ChatGPT behavior."
+            (target / ".agents/plans/index.json").write_text(json.dumps(index, indent=2) + "\n")
+            (target / plan["path"]).write_text("# Plan 001: Verified release candidate\n\nLocal tests passed. The ZIP is prepared. Fresh Codex and ChatGPT intake, cancellation and file-only recovery are mandatory acceptance before publication. The adjacent contract owns all gates.\n")
+            (target / ".agents/STATE.md").write_text("# Checkpoint\n\nExecution state: running.\nActive plan: 001.\n\nLocal tests passed and candidate ZIP is built. Mandatory fresh Codex and ChatGPT acceptance are pending. Next: test the isolated candidate before publication.\n")
         project_os.execute_sync_transaction(target, [(target / ".agents/evidence/source-baseline.md", proof)],
             [(contract_path, json.dumps(contract, indent=2) + "\n", hashlib.sha256(contract_path.read_bytes()).hexdigest())],
             after_write=lambda: project_os.require_passing_check(target, "Synthetic source baseline"))

@@ -80,6 +80,46 @@ class PlanCompletionTest(unittest.TestCase):
         self.assertIn('migration', result.stderr)
         self.assertEqual(file_hashes(self.root), before)
 
+    def test_require_ready_fails_with_pending_host_even_when_structural_check_passes(self):
+        contract = json.loads(self.contract_path.read_text())
+        contract['gates'].append({'id': 'host', 'condition': 'Fresh session recovery works.', 'evidence_class': 'host',
+                                  'target': 'fresh Codex', 'status': 'pending', 'evidence': [],
+                                  'next_action': 'Run fresh-session recovery before publication.', 'reason': 'No host acceptance yet.'})
+        write_json(self.contract_path, contract)
+        before = file_hashes(self.root)
+        self.assertEqual(self.check().returncode, 0)
+        result = run_cli('plan', 'status', '--target', str(self.root), '--require-ready', '--json')
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report['readiness'], 'NOT_READY')
+        self.assertFalse(report['ready'])
+        self.assertIn('Fresh session', ' '.join(report['readiness_blockers']))
+        self.assertEqual(file_hashes(self.root), before)
+
+    def test_ready_applies_to_named_active_and_valid_completed_outcome(self):
+        result = run_cli('plan', 'status', '--target', str(self.root), '--require-ready', '--json')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)['ready'])
+        self.assertEqual(self.complete().returncode, 0)
+        result = run_cli('plan', 'status', '--target', str(self.root), '--id', '001', '--require-ready', '--json')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)['ready'])
+        self.assertFalse(json.loads(result.stdout)['can_complete'])
+        (self.root / '.agents/evidence/001.md').write_text('Changed proof.\n')
+        result = run_cli('plan', 'status', '--target', str(self.root), '--id', '001', '--require-ready', '--json')
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(json.loads(result.stdout)['ready'])
+
+    def test_unresolved_request_and_planned_status_are_not_ready(self):
+        self.request('needs_clarification')
+        result = run_cli('plan', 'status', '--target', str(self.root), '--require-ready', '--json')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('R-001', ' '.join(json.loads(result.stdout)['readiness_blockers']))
+        self.add_plan('002', 'planned', verified=True)
+        result = run_cli('plan', 'status', '--target', str(self.root), '--id', '002', '--require-ready', '--json')
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(json.loads(result.stdout)['ready'])
+
     def test_dry_run_then_close_records_proof_and_does_not_activate_successor(self):
         self.add_plan('002', 'planned')
         self.request('implemented', target='001', gates=['sample'])

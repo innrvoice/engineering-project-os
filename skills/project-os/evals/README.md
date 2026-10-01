@@ -54,3 +54,7 @@ python3 -B <plugin-root>/skills/project-os/scripts/project_os.py check --target 
 ## Evidence boundary
 
 The source test suite builds a ZIP and executes its fixtures, bootstrap, checker and upgrade paths. Those deterministic checks do not execute Codex or ChatGPT reasoning workflows and do not prove plugin discovery. Record fresh Codex and ChatGPT plugin-loader results separately, including the exact ZIP hash and host. Portal ingestion, review approval and publication also remain separate checks.
+
+## Premature readiness regression
+
+Replay continuity-premature-release before publication: local tests and a prepared ZIP are already reported, but both host gates are pending. Inspect the actual failing readiness command, NOT_READY leading report, no publication recommendation and fresh file-only recovery. Plain addition/cancellation scenarios must validate JSON after every turn; matching a phrase in skill instructions is insufficient.

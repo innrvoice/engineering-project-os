@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
+import io
+import contextlib
 import json
 import re
 import stat
@@ -182,14 +185,57 @@ def build_zip(root: Path, output: Path) -> dict[str, object]:
     return validate_zip(output)
 
 
+def validate_release_acceptance(root: Path, archive_path: Path, target: Path, plan_id: str) -> dict[str, object]:
+    """Read-only guard for the exact candidate, separate from ZIP consistency."""
+    sources = source_files(root)
+    with zipfile.ZipFile(archive_path) as archive:
+        expected = {path.relative_to(root).as_posix(): path.read_bytes() for path in sources}
+        if set(archive.namelist()) != set(expected) or any(
+            archive.read(name) != content for name, content in expected.items()
+        ):
+            raise ValueError("NOT_READY: ZIP differs from the candidate checkout; rebuild and repeat affected acceptance")
+    spec = importlib.util.spec_from_file_location("project_os_release_guard", root / "skills/project-os/scripts/project_os.py")
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    snapshots = {}
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            report = helper.plan_status_report(target.resolve(), plan_id, snapshots)
+        if not report["ready"]:
+            raise ValueError("NOT_READY: " + "; ".join(report["readiness_blockers"]))
+        for product in ("codex", "chatgpt"):
+            if not any(gate.get("evidence_class") == "host" and product in gate.get("target", "").lower()
+                       and gate.get("status") == "verified" for gate in report["gates"]):
+                raise ValueError(f"NOT_READY: release acceptance requires verified {product} host evidence; a narrower source plan is insufficient")
+        for path, digest in snapshots.items():
+            helper.reject_symlink_path(target.resolve(), path)
+            content, _ = helper.read_regular_at_path(path)
+            if hashlib.sha256(content).hexdigest() != digest:
+                raise ValueError("NOT_READY: acceptance inputs changed during validation")
+        current = {path.relative_to(root).as_posix(): path.read_bytes() for path in source_files(root)}
+        if current != expected:
+            raise ValueError("NOT_READY: candidate source changed during acceptance validation")
+    except helper.ProjectOSError as error:
+        raise ValueError("NOT_READY: " + str(error)) from error
+    return {"readiness": "READY", "plan_id": report["plan_id"], "outcome": report["outcome"]}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--output", type=Path, help="New ZIP path; existing files are never overwritten")
     group.add_argument("--check", type=Path, help="Validate an existing ZIP without writes")
+    parser.add_argument("--acceptance-target", type=Path, help="Connected repository owning candidate acceptance; requires --check and --plan-id")
+    parser.add_argument("--plan-id", help="Candidate acceptance plan; requires --acceptance-target")
     arguments = parser.parse_args()
+    if bool(arguments.acceptance_target) != bool(arguments.plan_id) or arguments.acceptance_target and not arguments.check:
+        parser.error("Release acceptance requires --check, --acceptance-target and --plan-id together")
     try:
         result = validate_zip(arguments.check) if arguments.check else build_zip(ROOT, arguments.output)
+        if arguments.acceptance_target:
+            result["acceptance"] = validate_release_acceptance(ROOT, arguments.check, arguments.acceptance_target, arguments.plan_id)
+        else:
+            result["acceptance"] = "NOT_EVALUATED: package consistency only; not release readiness"
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
         parser.exit(2, f"Package validation failed: {error}\n")
     print(json.dumps(result, indent=2))
