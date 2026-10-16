@@ -1,12 +1,12 @@
 # GitHub distribution and release packaging
 
-Project OS 2.2.3 adds deterministic finding capture, compact checkpoint writes, atomic completion with a current checkpoint and a read-only freshness guard. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built. GitHub distribution is the primary release path; Directory submission remains a separate channel.
+Project OS 2.2.4 corrects finding proof refresh and legacy ownership, retaining compact checkpoints and atomic completion. Completed final-commit Codex Review is a separate mandatory release gate. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built. GitHub distribution is the primary release path; Directory submission remains a separate channel.
 
 Retain the exact reviewed ZIP for the GitHub Release and verify its SHA-256 after download. Public documentation is part of that ZIP, so changing packaged copy before publication requires a new reproducible build and artifact checks. All selected skill files must match the behaviorally tested copy exactly. Preserve existing published artifacts unchanged.
 
 Ordinary repairs must save actual findings and companion transfers must save their current checkpoint before returning project files. Verify the actual exported bytes by reconstructing the returned snapshot and running structural and checkpoint checks there. Passing runtime tests or a successful knowledge import does not establish that result. Preserve failed observations when revising and retesting the candidate.
 
-The primary installation route registers the GitHub marketplace from `main` and installs `engineering-project-os@engineering-project-os` from its pinned `v2.2.3` source. The tagged standalone Codex skill is the secondary route. [Setup](SETUP.md) contains the exact Terminal commands and skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
+The primary installation route registers the GitHub marketplace from `main` and installs `engineering-project-os@engineering-project-os` from its pinned `v2.2.4` source. The tagged standalone Codex skill is the secondary route. [Setup](SETUP.md) contains the exact Terminal commands and skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
 
 ## Verify before building the release package
 
@@ -16,8 +16,8 @@ Only after those behavioral checks pass, run the complete suite including extrac
 
 ~~~shell
 python3 -B -m unittest discover -s tests -v
-python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.3-plugin.zip
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.3-plugin.zip
+python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.4-plugin.zip
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.4-plugin.zip
 ~~~
 
 The output path must not exist. The builder reads the current working tree, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python and zlib environment. Record the SHA-256, entry count, compressed bytes and extracted bytes for the exact reviewed ZIP.
@@ -30,7 +30,7 @@ The package must not contain a release-managed failure knowledge database. Capab
 
 ## Version and schema contract
 
-Release version must be `2.2.3` in the helper, both plugin manifests, marketplace plugin-source ref, knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while its plugin source pins `v2.2.3`. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1. A dated legacy-channel status may name its own older version only inside an explicit Legacy Directory section.
+Release version must be `2.2.4` in the helper, both plugin manifests, marketplace plugin-source ref, knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while its plugin source pins `v2.2.4`. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1. A dated legacy-channel status may name its own older version only inside an explicit Legacy Directory section.
 
 The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata without rewriting Markdown plans, context, state, findings, evidence or application code. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
@@ -71,7 +71,7 @@ Replay the multi-message cases in `skills/project-os/evals/continuity.json` and 
 Run the fresh-host persistence and files-only recovery scenarios against a frozen local skill copy before building the release ZIP. Package consistency alone reports NOT_EVALUATED and never proves release readiness. Before recommending publication or asking for release authorization, run the read-only guard against the exact tested ZIP and the connected repository that owns its acceptance:
 
 ~~~shell
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.3-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.4-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
 ~~~
 
 This guard rejects a ZIP differing from the candidate checkout and fails with NOT_READY when the selected plan has invalid records, stale proof, open requirements or pending acceptance. A successful result includes the exact ZIP SHA-256 and the named recorded outcome. It checks recorded proof consistency, not the semantic truth of evidence. The agent must verify that this is the release-preparation outcome and that it covers actual fresh Codex and ChatGPT behavior, not a narrower source-only plan. Acceptance files remain private and are never packaged.
@@ -86,16 +86,31 @@ The listing copy leads with Codex developer workflows, then states when to use t
 
 Test all three public starter prompts in a fresh ChatGPT chat. The overview must describe Project OS as built for Codex and ChatGPT as the companion. Existing-repository requests without supplied files must ask for them rather than inspecting an empty host workspace.
 
+## Required final-commit Codex Review
+
+CI completion and Codex Review completion are separate prerequisites. Before merge or publication, verify both Codex code and security review have completed for the exact final source commit and every remark has a recorded disposition. Missing, running, unknown or wrong-commit review is NOT_READY. A later source commit invalidates the previous review. Local reviews and passing tests do not replace the configured GitHub review.
+
+Run the read-only repository guard against a clean checkout of the reviewed PR head:
+
+~~~shell
+python3 -B scripts/check_codex_review.py --repo innrvoice/engineering-project-os --pr <number> --head <full-final-commit-sha> --target /path/to/clean/reviewed-checkout --dispositions /path/to/private/dispositions.json --json
+~~~
+
+The guard requires the canonical bot's completed final-head code/security status, no unresolved findings or review threads and a disposition for every marked bot finding across the PR history. With no findings, the disposition file is optional. It fails closed on missing API access, timeout, incomplete pagination, changed source, changed proof or concurrent review state. It does not merge, resolve threads or publish. Run it immediately before merge and again before publication using the retained reviewed checkout; verify the squash-merged tree matches that reviewed source.
+
+Dispositions stay private and bind the repository, PR, reviewed head, exact comment body and local verification evidence. Each finding uses its real comment URL, `decision: fixed` or `decision: rejected`, a reason, `comment_sha256: sha256:<actual-comment-body-digest>` and `evidence: [{path: <repository-relative-proof>, sha256: sha256:<actual-file-digest>}]`. The top-level fields are `schema_version: 1`, `repository`, `pr`, `reviewed_head` and `findings`. An accepted-risk declaration or a resolved thread alone is insufficient. Refresh review after fixes, address every remark and preserve the actual guard result as the separate acceptance evidence.
+
 ## Release sequence
 
 1. Finish runtime/source checks and review the complete diff. Freeze exact candidate skill files for isolated installation; keep existing published artifacts unchanged.
 2. Run ordinary repair/discovery, knowledge review/approval, discovery and continuity scenarios in fresh Codex and ChatGPT sessions. Inspect actual findings, requests and current checkpoints; repeat recovery in separate sessions from files alone.
 3. After all mandatory behavioral acceptance passes, run the full suite including extracted-package checks, build the release ZIP, verify reproducibility and compare every packaged file to the tested candidate.
 4. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit. Test the three starter prompts and supplied-material companion boundaries.
-5. Pass the pre-publication acceptance guard above with all mandatory host results recorded against the exact final ZIP. Only then recommend publication or request explicit owner authorization for commit, push, pull request, merge, tag and GitHub Release.
-6. Complete the authorized source pull request, wait for required checks and merge. Verify the merged source, create tag `v2.2.3` on the accepted commit and attach the exact reviewed ZIP to the GitHub Release.
-7. Verify the remote tag, Release metadata and downloaded asset SHA-256. Test the documented GitHub marketplace and tagged standalone routes in isolated profiles, then inspect the selected installation in a fresh Codex task. Check the installed version, exact skill bytes, bootstrap or upgrade, actual finding/checkpoint persistence and files-only recovery.
-8. Report GitHub source, Release, artifact and installation results with their evidence. Report the legacy Directory status separately; a GitHub release does not require a new Portal submission or establish ChatGPT availability.
+5. After the candidate changes and available checks are concrete and reviewable, obtain scoped owner authorization for commit, push and a source pull request. Report every pending acceptance gate. Creating the PR enables review and does not authorize merge or publication; do not require an already completed PR review before creating that PR.
+6. Complete the authorized source pull request and wait separately for CI and completed Codex code/security reviews of the final commit. Record every finding disposition, resolve its thread and pass the final-head guard above. A new source commit requires a matching new review and affected acceptance checks.
+7. With all mandatory host results and final-commit review recorded, pass the pre-publication acceptance guard against the exact final ZIP. Only then recommend publication or request scoped owner authorization for merge, tag and GitHub Release. After authorization, merge and verify the merged tree, create tag `v2.2.4` on the accepted commit and attach the exact reviewed ZIP to the GitHub Release.
+8. Verify the remote tag, Release metadata and downloaded asset SHA-256. Test the documented GitHub marketplace and tagged standalone routes in isolated profiles, then inspect the selected installation in a fresh Codex task. Check the installed version, exact skill bytes, bootstrap or upgrade, actual finding/checkpoint persistence and files-only recovery.
+9. Report GitHub source, Release, artifact and installation results with their evidence. Report the legacy Directory status separately; a GitHub release does not require a new Portal submission or establish ChatGPT availability.
 
 Do not replace package contents under an existing version. Any content change after publication requires another version.
 
@@ -103,7 +118,7 @@ Do not replace package contents under an existing version. Any content change af
 
 Use these release notes after the release gates pass:
 
-`2.2.3 brings durable findings, verified checkpoints and atomic plan completion to Codex developer workflows. Reviewed knowledge transfers preserve source privacy, filter for destination applicability and retain approval decisions. The GitHub marketplace is the primary installation route with a version-pinned plugin source; the tagged standalone skill remains available. Fresh-session persistence and files-only recovery checks precede release packaging. Schema compatibility is preserved.`
+`2.2.4 rejects implicit refresh of changed finding proof, separates helper-owned proof data from legacy project fields and adds reviewed proof migration. Final-commit Codex Review and disposition of every remark are mandatory before merge or publication, independently of CI. GitHub marketplace installation remains primary with a tagged standalone skill alternative. Existing checkpoints, Standard, Program and schema compatibility remain supported.`
 
 ## Legacy Directory
 

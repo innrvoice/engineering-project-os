@@ -187,7 +187,7 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.2.3")
+        self.assertEqual(PROJECT_OS.VERSION, "2.2.4")
         self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 5)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)
@@ -332,6 +332,8 @@ class KnowledgeAssetTest(unittest.TestCase):
         ]
         legacy_paths = {ROOT / "README.md", ROOT / "docs/SETUP.md", ROOT / "docs/PACKAGING.md"}
         legacy_section = re.compile(r"^## Legacy Directory\n.*?(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+        proof_legacy_paths = {ROOT / "docs/SETUP.md", ROOT / "docs/REFERENCE.md"}
+        proof_legacy_section = re.compile(r"^## Legacy finding proof ownership\n.*?(?=^## |\Z)", re.MULTILINE | re.DOTALL)
         active_release_versions: set[str] = set()
         for path in markdown_paths:
             text = path.read_text(encoding="utf-8")
@@ -343,12 +345,19 @@ class KnowledgeAssetTest(unittest.TestCase):
                 self.assertIn("skills-only", sections[0], path)
                 self.assertIn("the maintainer reported", sections[0], path)
                 self.assertIn("This observation concerns this plugin's submission", sections[0], path)
-            current_versions = set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", legacy_section.sub("", text)))
+            proof_sections = proof_legacy_section.findall(text)
+            self.assertEqual(len(proof_sections), 1 if path in proof_legacy_paths else 0, path)
+            for proof_section in proof_sections:
+                self.assertEqual(set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", proof_section)), {"2.2.3"}, path)
+                self.assertIn("ownership", proof_section)
+                self.assertIn("--finding-proof-review", proof_section)
+            active_text = proof_legacy_section.sub("", legacy_section.sub("", text))
+            current_versions = set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", active_text))
             self.assertLessEqual(current_versions, {PROJECT_OS.VERSION}, path)
             active_release_versions.update(current_versions)
         self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
         packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
-        self.assertIn(f"Project OS {PROJECT_OS.VERSION} adds deterministic finding capture", packaging)
+        self.assertIn(f"Project OS {PROJECT_OS.VERSION} corrects finding proof refresh and legacy ownership", packaging)
         self.assertIn("Retain the exact reviewed ZIP for the GitHub Release", packaging)
         self.assertIn("GitHub distribution is the primary release path; Directory submission remains a separate channel.", packaging)
         self.assertIn("Preserve existing published artifacts unchanged.", packaging)

@@ -4,6 +4,20 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] - Unreleased
+
+### Fixed
+
+- Reject implicit finding recapture when evidence bytes or managed input changed; require a reviewed explicit ID update and preserve true no-op repeats.
+- Separate helper-owned proof metadata from project-owned finding extensions and migrate earlier helper captures through an explicit hash-bound ownership review without refreshing changed evidence.
+- Preserve legacy fields on validation, upgrade and explicit finding updates; reject namespace collisions and concurrent proof/review changes without overwriting data.
+
+### Changed
+
+- Require completed Codex code/security review of the final source commit and disposition of every remark before merge or publication, separately from CI.
+- Add a read-only final-head review guard with exact comment/evidence hashes, source checks and fail-closed handling of missing, running, stale or unresolved reviews.
+- Keep SYSTEM schema 5, plans schema 2 and findings, contracts, requests and new proof format version 1.
+
 ## [2.2.3] - 2026-10-16
 
 ### Changed

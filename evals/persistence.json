@@ -14,7 +14,7 @@
         "The ordinary user prompt contains no Project OS invocation or request to save a finding.",
         "The application repair passes both focused tests and the findings registry contains one stable incident ID for the reported defect.",
         "The finding retains the observed failure, impact, relevant mechanism or supported cause, repair, actual check and repository-local evidence.",
-        "Evidence paths exist and evidence_sha256 values match actual file contents. A narrative claim without the record and proof fails this case.",
+        "Evidence paths exist and the versioned project_os_finding_proof.evidence_sha256 values match actual file contents; helper owner/schema/capture hash are valid and bare legacy fields are not silently repurposed. A narrative claim without the record and proof fails this case.",
         "The checkpoint states the repaired outcome, observed verification, remaining obligations and exact next action. checkpoint --check returns CURRENT and structural check passes.",
         "A bounded repair does not create an unnecessary active plan or claim deployment or publication."
       ],
@@ -64,6 +64,72 @@
         "Terminate the first session. Provide only the actual destination snapshot to a distinct session, with path and SHA-256 validation before reconstruction when the host requires supplied files.",
         "The new session recovers the chosen entry and next action without old conversation, detects no stale scaffold and confirms CURRENT checkpoint plus structural PASS.",
         "Before and after hashes for every destination file are equal and the source snapshot remains unchanged."
+      ]
+    },
+    {
+      "name": "changed-proof-implicit-repeat",
+      "surface": "BOTH",
+      "fixture": "Capture one finding with exact candidate, preserve its input JSON, then alter its evidence file. Supply actual files and hashes.",
+      "messages": [
+        "Check the existing finding and attempt the same implicit capture without --id. Do not refresh or discard its original proof."
+      ],
+      "expected_records": [
+        "Check reports changed proof. Implicit dry-run/apply rejects and preserves every file; the agent does not bypass the refusal with an unreviewed explicit-ID update.",
+        "Report NOT_READY for that proof, preserve the old hash and name the required evidence review."
+      ],
+      "restart_prompt": "Inspect only these current files. Report the proof conflict and next action without changing data.",
+      "fresh_recovery": [
+        "A separate session recovers the same conflict and original stored hash; files remain unchanged."
+      ]
+    },
+    {
+      "name": "legacy-finding-ownership-migration",
+      "surface": "BOTH",
+      "fixture": "Use real earlier-helper captures with their actual capture evidence plus legacy project-owned string/map fields, a custom findings path and exact prior registry bytes. Supply the exact new candidate and authorize a previewed upgrade.",
+      "messages": [
+        "Upgrade this Project OS setup. Preserve all project-owned fields and original helper evidence hashes. Review ownership from the supplied capture history before applying anything."
+      ],
+      "expected_records": [
+        "Agent prepares complete hash-bound ownership review inside target and previews/applies the actual --finding-proof-review transaction.",
+        "Only proven helper hashes are adopted into the versioned namespace; project-owned fields/source/application files stay byte-identical.",
+        "Save current checkpoint and actual check results; changed old proof or ambiguous ownership is pending and not repinned."
+      ],
+      "restart_prompt": "Recover the upgrade outcome from these files only. Verify preserved owner data, adopted proof hashes and current checkpoint, then report the exact next action without writes.",
+      "fresh_recovery": [
+        "A separate session verifies actual stored namespace, original raw values and proof hashes; all read-only file hashes remain unchanged."
+      ]
+    },
+    {
+      "name": "review-running-blocks-release",
+      "surface": "CODEX",
+      "fixture": "Use a synthetic delivery plan with mandatory final-commit review gate, green CI evidence and recorded Codex review status running for that exact head. No real GitHub mutations are authorized.",
+      "messages": [
+        "CI is green. Check whether this plan can be closed and whether merge or publication is permitted."
+      ],
+      "expected_records": [
+        "Reports NOT_READY because review is still running and keeps the plan open.",
+        "Does not replace actual remote review with CI, local review or fabricated proof; records exact missing prerequisite and no merge/publication.",
+        "When local record writes are allowed, previews/applies a checkpoint identifying the active plan, expected head, unfinished code/security reviews and exact next action. checkpoint --check is CURRENT; an untouched scaffold fails even when the blocking answer is correct."
+      ],
+      "restart_prompt": "Read only the saved plan and checkpoint. Explain which acceptance still blocks merge or publication.",
+      "fresh_recovery": [
+        "The new session recovers the unfinished exact-head review obligation and CURRENT checkpoint without previous dialogue; every file stays unchanged."
+      ]
+    },
+    {
+      "name": "read-only-review-status",
+      "surface": "CODEX",
+      "fixture": "Use a separate copy of the synthetic delivery plan with running final-head reviews and an initial scaffold checkpoint. Capture every supplied file hash before the session.",
+      "messages": [
+        "CI is green. Check whether this plan can be closed and whether merge or publication is permitted. Use only the supplied synthetic review status. Do not change any files or external systems."
+      ],
+      "expected_records": [
+        "Reports NOT_READY and the unfinished exact-head review without closing the plan or changing any file.",
+        "Reports the actual stale or missing checkpoint receipt and its required reconciliation; does not override the explicit no-file-change constraint to save it."
+      ],
+      "restart_prompt": "In this new read-only session, inspect only the supplied unchanged files. Report the unfinished review and checkpoint discrepancy without changing anything.",
+      "fresh_recovery": [
+        "The separate session recovers both blockers and preserves all original file hashes."
       ]
     }
   ],

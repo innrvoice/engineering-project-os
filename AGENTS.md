@@ -27,6 +27,8 @@ Keep this repository's plans, checkpoints, findings, evidence and knowledge out 
 
 ## Publication and communication
 
+Before any merge or publication, wait for completed Codex code and security reviews of the exact final source commit, address every remark and resolve its thread. CI success does not prove review completion. A new commit invalidates previous review evidence. Run `scripts/check_codex_review.py` against a clean checkout of that final PR head with private comment/evidence-bound dispositions; require READY immediately before merge and publication. Missing, running, stale or unresolved review blocks both actions. Keep an explicit review gate in the local release contract. Owner permission alone does not satisfy this gate.
+
 Commit, push, tag, GitHub Release, installed-skill replacement and directory submission require owner authorization. A tagged standalone installation and public directory availability are separate outcomes. Never infer publication from passing local tests.
 
 State what changed, what was verified and what remains unverified. Do not publish credentials, private data or internal working history in code, documentation, commit messages or release notes.

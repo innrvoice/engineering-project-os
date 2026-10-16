@@ -8,7 +8,7 @@ Resume engineering work with durable state and reusable failure knowledge.
 
 [Install in Codex from GitHub](docs/SETUP.md#1-install-in-codex-from-github)
 
-Project OS 2.2.3 adds deterministic finding capture and verifiable checkpoints. GitHub is the primary distribution channel for this Codex developer tool. See the [changelog](CHANGELOG.md) for release history.
+Project OS 2.2.4 protects finding proof updates and preserves legacy field ownership. GitHub is the primary distribution channel for this Codex developer tool. See the [changelog](CHANGELOG.md) for release history.
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
@@ -130,14 +130,14 @@ codex plugin marketplace add innrvoice/engineering-project-os --ref main
 codex plugin add engineering-project-os@engineering-project-os
 ~~~
 
-The marketplace catalog follows `main`; its plugin source is pinned to `v2.2.3`. Open the target repository in Codex and start a new task after installation. See [Setup](docs/SETUP.md) for verification, upgrades and resolving duplicate installations.
+The marketplace catalog follows `main`; its plugin source is pinned to `v2.2.4`. Open the target repository in Codex and start a new task after installation. See [Setup](docs/SETUP.md) for verification, upgrades and resolving duplicate installations.
 
 ## Standalone Codex skill
 
 For a standalone Codex installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.3/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.4/skills/project-os
 ~~~
 
 Start a new Codex task after installation. The versioned URL does not follow `main` automatically. Keep one intended Project OS installation active.

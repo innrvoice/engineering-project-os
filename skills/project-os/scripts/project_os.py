@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.2.3"
+VERSION = "2.2.4"
 SCHEMA_VERSION = 5
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
@@ -3858,7 +3858,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
                 for finding in findings:
                     if not isinstance(finding, dict):
                         continue
-                    validate_finding_proofs(root, finding, errors)
+                    validate_finding_proofs(root, finding, errors, system.get("project_os_version"))
                     evidence = finding.get("evidence", [])
                     if not isinstance(evidence, list):
                         errors.append(f"finding {finding.get('id')!r} evidence must be an array")
@@ -5607,6 +5607,7 @@ def upgrade_project(
     closed_on: str | None,
     reason: str | None,
     dry_run: bool,
+    finding_proof_review: Path | None = None,
 ) -> int:
     root = root.resolve()
     system_path = root / ".agents" / "SYSTEM.json"
@@ -5781,6 +5782,10 @@ def upgrade_project(
                 next_system["active_program"] = None
                 next_paths["program"] = None
 
+    replacements.extend(plan_finding_proof_migration(
+        root, original_system, snapshots, finding_proof_review
+    ))
+
     continuity_creates, continuity_replacements = plan_continuity_migration(
         root, original_system, next_system, snapshots
     )
@@ -5814,7 +5819,7 @@ def upgrade_project(
     print(f"upgrade mode: {original_system.get('mode')} -> {next_system.get('mode')}")
     print_transaction_preview(root, creates, replacements, deletions)
     for path, content, *_ in [*creates, *replacements]:
-        if path.name == "AGENTS.md" or schema != SCHEMA_VERSION and (
+        if path.name == "AGENTS.md" or path == safe_relative(root, next_paths.get("findings")) or schema != SCHEMA_VERSION and (
             path.name in {"WORKFLOW.md", "requests.json"} or path == safe_relative(root, next_paths.get("plans"))
         ):
             print(f"preview: {path.relative_to(root)}\n{content}")
@@ -5836,14 +5841,31 @@ FINDING_INPUT_FIELDS = {
     "title", "status", "impact", "evidence", "required_check",
     "observation", "cause", "resolution", "priority",
 }
+FINDING_PROOF_KEY = "project_os_finding_proof"
+FINDING_PROOF_OWNER = "engineering-project-os"
 
 
-def validate_finding_proofs(root: Path, finding: dict[str, Any], errors: list[str]) -> None:
-    """Legacy findings retain path evidence; new captures additionally pin its bytes."""
-    if "evidence_sha256" not in finding:
-        return
-    label = f"finding {finding.get('id')!r}"
-    proofs = finding["evidence_sha256"]
+def owned_finding_proof(finding: dict[str, Any], errors: list[str]) -> dict[str, Any] | None:
+    """Only the versioned namespace is helper-owned; legacy extension keys are opaque."""
+    if FINDING_PROOF_KEY not in finding:
+        return None
+    label = f"finding {finding.get('id')!r} {FINDING_PROOF_KEY}"
+    proof = finding[FINDING_PROOF_KEY]
+    if (
+        not isinstance(proof, dict)
+        or type(proof.get("schema_version")) is not int or proof["schema_version"] != 1
+        or proof.get("owner") != FINDING_PROOF_OWNER
+    ):
+        return None
+    if (
+        set(proof) != {"schema_version", "owner", "capture_input_sha256", "evidence_sha256"}
+    ):
+        errors.append(f"{label} namespace collision or unsupported ownership/schema; preserve the existing data and review its owner")
+        return None
+    capture_hash = proof.get("capture_input_sha256")
+    if not isinstance(capture_hash, str) or FULL_SHA256_PATTERN.fullmatch(capture_hash) is None:
+        errors.append(f"{label} capture_input_sha256 must be a SHA-256 digest")
+    proofs = proof.get("evidence_sha256")
     evidence = finding.get("evidence")
     if (
         not isinstance(proofs, dict) or not isinstance(evidence, list)
@@ -5851,8 +5873,30 @@ def validate_finding_proofs(root: Path, finding: dict[str, Any], errors: list[st
         or set(proofs) != set(evidence)
     ):
         errors.append(f"{label} evidence_sha256 must cover exactly its evidence paths")
+    return proof
+
+
+def validate_finding_proofs(
+    root: Path,
+    finding: dict[str, Any],
+    errors: list[str],
+    source_release: str | None = None,
+) -> None:
+    """Validate helper-owned proof without reinterpreting project-owned legacy fields."""
+    if (
+        isinstance(source_release, str) and re.match(r"^2\.2\.3(?:$|[-+])", source_release)
+        and ("evidence_sha256" in finding or "capture_input_sha256" in finding)
+    ):
+        errors.append(
+            f"finding {finding.get('id')!r} legacy proof ownership is ambiguous for 2.2.3; "
+            "use the reviewed upgrade --finding-proof-review before trusting its proof"
+        )
+    previous_errors = len(errors)
+    proof = owned_finding_proof(finding, errors)
+    if proof is None or len(errors) != previous_errors:
         return
-    for raw_path, expected in proofs.items():
+    label = f"finding {finding.get('id')!r}"
+    for raw_path, expected in proof["evidence_sha256"].items():
         path = safe_relative(root, raw_path)
         if path is None or not isinstance(expected, str) or FULL_SHA256_PATTERN.fullmatch(expected) is None:
             errors.append(f"{label} has invalid evidence_sha256 proof: {raw_path!r}")
@@ -5864,6 +5908,121 @@ def validate_finding_proofs(root: Path, finding: dict[str, Any], errors: list[st
                 errors.append(f"{label} evidence changed: {raw_path}")
         except (ProjectOSError, OSError) as error:
             errors.append(f"{label} evidence is unavailable: {raw_path}: {error}")
+
+
+def plan_finding_proof_migration(
+    root: Path,
+    original_system: dict[str, Any],
+    snapshots: dict[Path, str],
+    review_path: Path | None,
+) -> list[tuple[Path, str, str]]:
+    """Classify unattributed 2.2.3 fields explicitly; never refresh their old hashes."""
+    registry_path = safe_relative(root, original_system["paths"].get("findings"))
+    if registry_path is None:
+        raise ProjectOSError("Finding proof migration requires a safe findings registry path")
+    reject_symlink_path(root, registry_path)
+    registry, digest = load_json_snapshot(registry_path)
+    if not isinstance(registry, dict):
+        raise ProjectOSError("Findings registry must contain an object")
+    errors: list[str] = []
+    validate_registry_schema(registry, "findings registry", errors)
+    findings = registry.get("findings")
+    check_unique_ids(findings, "findings", errors,
+                     ("id", "status", "impact", "evidence", "required_check"), FINDING_STATUSES)
+    if errors:
+        raise ProjectOSError("Invalid findings registry: " + "; ".join(errors))
+    retain_snapshot(snapshots, registry_path, digest)
+    for finding in findings:
+        validate_finding_proofs(root, finding, errors)
+        proof = owned_finding_proof(finding, [])
+        if proof is not None and not errors:
+            for raw_path, expected in proof["evidence_sha256"].items():
+                path = safe_relative(root, raw_path)
+                if path is None or path == registry_path:
+                    raise ProjectOSError("Finding proof cannot own its findings registry")
+                retain_snapshot(snapshots, path, expected.removeprefix("sha256:"))
+    if errors:
+        raise ProjectOSError("Finding proof conflicts: " + "; ".join(errors))
+    if release_order(original_system.get("project_os_version")) >= release_order("2.2.4"):
+        # Repeating the reviewed upgrade is a no-op; old review digests are historical.
+        return []
+    source_223 = release_order(original_system.get("project_os_version"))[:3] == (2, 2, 3)
+    ambiguous = {
+        finding["id"]: finding for finding in findings
+        if source_223 and ("evidence_sha256" in finding or "capture_input_sha256" in finding)
+    }
+    if ambiguous and review_path is None:
+        raise ProjectOSError(
+            "Finding proof ownership is ambiguous for 2.2.3 records: "
+            + ", ".join(sorted(ambiguous))
+            + ". Preserve their raw fields and supply --finding-proof-review with an exact-registry "
+            "ownership decision for every listed ID (project_owned or helper_2_2_3)."
+        )
+    if review_path is None:
+        return []
+    review_path = review_path if review_path.is_absolute() else root / review_path
+    if not review_path.is_relative_to(root) or ".." in review_path.parts or review_path == registry_path:
+        raise ProjectOSError("Finding proof review must be a separate file inside the target repository")
+    reject_symlink_path(root, review_path)
+
+    def unique_review_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ProjectOSError(f"Finding proof review has duplicate JSON key {key!r}; supply one explicit decision per key")
+            value[key] = item
+        return value
+
+    try:
+        review_bytes, _ = read_regular_at_path(review_path)
+        review = json.loads(review_bytes.decode("utf-8"), object_pairs_hook=unique_review_keys)
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ProjectOSError(f"Could not read finding proof review: {error}") from error
+    if (
+        not isinstance(review, dict)
+        or set(review) != {"schema_version", "registry_sha256", "ownership"}
+        or type(review.get("schema_version")) is not int or review["schema_version"] != 1
+        or review.get("registry_sha256") != "sha256:" + digest
+        or not isinstance(review.get("ownership"), dict)
+        or set(review["ownership"]) != set(ambiguous)
+        or any(not isinstance(value, str) or value not in {"project_owned", "helper_2_2_3"}
+               for value in review["ownership"].values())
+    ):
+        raise ProjectOSError(
+            "Finding proof review must use schema_version 1, the exact registry_sha256 and "
+            "complete ownership decisions (project_owned or helper_2_2_3) for the ambiguous IDs"
+        )
+    retain_snapshot(snapshots, review_path, hashlib.sha256(review_bytes).hexdigest())
+    next_registry = copy.deepcopy(registry)
+    for finding in next_registry["findings"]:
+        if review["ownership"].get(finding["id"]) != "helper_2_2_3":
+            continue
+        if FINDING_PROOF_KEY in finding:
+            raise ProjectOSError(
+                f"finding {finding['id']!r} {FINDING_PROOF_KEY} namespace collision; "
+                "migration will preserve the existing owner value"
+            )
+        finding[FINDING_PROOF_KEY] = {
+            "schema_version": 1,
+            "owner": FINDING_PROOF_OWNER,
+            "capture_input_sha256": copy.deepcopy(finding.get("capture_input_sha256")),
+            "evidence_sha256": copy.deepcopy(finding.get("evidence_sha256")),
+        }
+        proof_errors: list[str] = []
+        validate_finding_proofs(root, finding, proof_errors)
+        if proof_errors:
+            raise ProjectOSError(
+                "Legacy finding proof adoption cannot refresh or discard invalid proof: "
+                + "; ".join(proof_errors)
+            )
+        for raw_path, expected in finding[FINDING_PROOF_KEY]["evidence_sha256"].items():
+            path = safe_relative(root, raw_path)
+            if path is None or path == registry_path or path == review_path:
+                raise ProjectOSError("Legacy finding proof cannot own the findings registry or review input")
+            retain_snapshot(snapshots, path, expected.removeprefix("sha256:"))
+    if next_registry == registry:
+        return []
+    return [(registry_path, canonical_json(next_registry), digest)]
 
 
 def record_finding(root: Path, input_path: Path, identifier: str | None, dry_run: bool) -> int:
@@ -5889,6 +6048,10 @@ def _record_finding(root: Path, input_path: Path, identifier: str | None, dry_ru
     findings = registry.get("findings")
     check_unique_ids(findings, "findings", errors,
                      ("id", "status", "impact", "evidence", "required_check"), FINDING_STATUSES)
+    if isinstance(findings, list):
+        for finding in findings:
+            if isinstance(finding, dict):
+                owned_finding_proof(finding, errors)
     if not positive_integer(registry.get("next_id")):
         errors.append("findings registry next_id must be a positive integer")
     if errors:
@@ -5937,6 +6100,7 @@ def _record_finding(root: Path, input_path: Path, identifier: str | None, dry_ru
         proofs[raw_path] = "sha256:" + digest
 
     by_id = {finding["id"]: finding for finding in findings}
+    explicit_identifier = identifier is not None
     if identifier is not None:
         if identifier not in by_id:
             raise ProjectOSError(f"Unknown finding ID: {identifier}; omit --id to allocate a new ID")
@@ -5944,7 +6108,7 @@ def _record_finding(root: Path, input_path: Path, identifier: str | None, dry_ru
     else:
         # Only an identical capture is idempotent. Similar titles are not proof of one incident.
         matches = [finding for finding in findings if (
-            finding.get("capture_input_sha256") == record_hash(definition)
+            (owned_finding_proof(finding, []) or {}).get("capture_input_sha256") == record_hash(definition)
             or {key: finding[key] for key in FINDING_INPUT_FIELDS if key in finding} == definition
         )]
         if len(matches) > 1:
@@ -5952,6 +6116,25 @@ def _record_finding(root: Path, input_path: Path, identifier: str | None, dry_ru
         existing = matches[0] if matches else None
         if existing is not None:
             identifier = existing["id"]
+    if existing is not None and FINDING_PROOF_KEY in existing and owned_finding_proof(existing, []) is None:
+        raise ProjectOSError(
+            f"finding {identifier!r} {FINDING_PROOF_KEY} namespace collision; "
+            "the existing owner value will not be overwritten"
+        )
+    managed_proof = {
+        "schema_version": 1,
+        "owner": FINDING_PROOF_OWNER,
+        "capture_input_sha256": record_hash(definition),
+        "evidence_sha256": proofs,
+    }
+    if existing is not None and not explicit_identifier and (
+        existing.get(FINDING_PROOF_KEY) != managed_proof
+        or any(existing.get(key) != value for key, value in definition.items())
+    ):
+        raise ProjectOSError(
+            f"Finding {identifier} implicit reuse requires identical input and owned evidence proof; "
+            "review changed or legacy evidence and use explicit --id for a deliberate update"
+        )
     next_registry = copy.deepcopy(registry)
     if identifier is None:
         numeric_ids = [re.fullmatch(r"([A-Z][A-Z0-9-]*)-([0-9]+)", value) for value in by_id]
@@ -5966,8 +6149,7 @@ def _record_finding(root: Path, input_path: Path, identifier: str | None, dry_ru
         next_registry["next_id"] = sequence + 1
     entry = copy.deepcopy(existing) if existing is not None else {"id": identifier}
     entry.update(definition)
-    entry["evidence_sha256"] = proofs
-    entry["capture_input_sha256"] = record_hash(definition)
+    entry[FINDING_PROOF_KEY] = managed_proof
     if existing is None:
         next_registry["findings"].append(entry)
     else:
@@ -6141,6 +6323,10 @@ def build_parser() -> argparse.ArgumentParser:
     upgrade_parser.add_argument("--closed-on")
     upgrade_parser.add_argument("--reason")
     upgrade_parser.add_argument("--dry-run", action="store_true")
+    upgrade_parser.add_argument(
+        "--finding-proof-review", type=Path,
+        help="inside-target JSON ownership review for unattributed 2.2.3 finding proof fields",
+    )
 
     program_parser = subparsers.add_parser("program", help="Manage a multi-phase Program")
     program_subparsers = program_parser.add_subparsers(
@@ -6234,6 +6420,7 @@ def main() -> int:
                 args.closed_on,
                 args.reason,
                 args.dry_run,
+                args.finding_proof_review,
             )
         if args.command == "program":
             if args.program_command == "start":

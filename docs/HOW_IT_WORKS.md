@@ -110,7 +110,7 @@ The Python helper performs deterministic operations such as `detect`, `init`, `a
 
 The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
 
-Project OS 2.2.3 retains schema 5 and the existing knowledge bundle formats. It adds transactional finding capture, verifiable checkpoint writes and atomic completion with a current idle checkpoint. Updating the selected plugin or standalone skill does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
+Project OS 2.2.4 retains schema 5 and the existing knowledge bundle formats. It retains transactional finding capture, verifiable checkpoint writes and atomic completion with a current idle checkpoint. Finding proof uses an explicit versioned namespace; unchanged repeated input also requires unchanged proof. Legacy project fields survive validation and updates, while earlier unnamespaced helper proofs require reviewed ownership migration. Updating the selected plugin or standalone skill does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
 
 ## ChatGPT is the companion surface
 

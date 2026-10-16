@@ -216,7 +216,7 @@ First update the selected GitHub plugin or standalone Codex skill using [Setup](
 $project-os upgrade
 ~~~
 
-Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.3 upgrade, application code and project-owned knowledge must not change.
+Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.4 upgrade, application code and project-owned knowledge must not change.
 
 If a managed file has diverged from its recorded baseline, the helper reports a conflict instead of overwriting it. Resolve ownership deliberately and repeat the dry-run. Do not hand-edit `SYSTEM.release` or schema fields to simulate an upgrade.
 

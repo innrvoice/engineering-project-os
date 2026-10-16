@@ -104,13 +104,15 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - portable bundle metadata;
 - CI assertions, fixtures, documentation and release notes.
 
-Project OS 2.2.3 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Project OS 2.2.4 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 
 Build and validate the exact working-tree ZIP using [GitHub distribution and release packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh Codex and supplied-material ChatGPT evaluation, native marketplace installation, tagged installation, hosted URL verification or publication authorization. Directory submission is a separate channel with its own availability and review requirements.
 
 ## Pull requests
+
+Wait separately for CI and completed Codex code/security review of the final commit. Address every remark with evidence, resolve its thread and pass the read-only [final-head review guard](docs/PACKAGING.md#required-final-commit-codex-review) before merge or publication. A source change requires another matching review. Do not infer completion from green check runs, lack of review comments or a locally completed review.
 
 Describe the concrete problem, smallest implemented change, checks run and remaining unverified boundaries. Do not claim deployment, production behavior or physical acceptance from source inspection or unit tests.
 

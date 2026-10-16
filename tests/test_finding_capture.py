@@ -88,7 +88,7 @@ class FindingCaptureTest(unittest.TestCase):
         entry = self.registry()["findings"][0]
         self.assertEqual(entry["id"], identifier)
         self.assertEqual(entry["status"], "verified")
-        self.assertEqual(entry["evidence_sha256"][self.definition["evidence"][0]],
+        self.assertEqual(entry[P.FINDING_PROOF_KEY]["evidence_sha256"][self.definition["evidence"][0]],
                          "sha256:" + hashlib.sha256(self.evidence_path.read_bytes()).hexdigest())
         self.assertEqual(self.registry()["next_id"], 2)
 
@@ -225,6 +225,93 @@ class FindingCaptureTest(unittest.TestCase):
         self.assertIn("evidence changed", output.getvalue())
         self.assertEqual(self.registry_path.read_bytes(), original)
 
+    def test_implicit_repeat_never_repins_changed_verified_evidence(self) -> None:
+        self.definition.update(status="verified", resolution="Observed verification in the original evidence.")
+        self.write_input()
+        self.record()
+        original = self.registry_path.read_bytes()
+        self.evidence_path.write_text("Changed evidence was not reviewed or reverified.\n")
+        before = self.snapshot()
+        for dry_run in (True, False):
+            with self.subTest(dry_run=dry_run):
+                with self.assertRaisesRegex(P.ProjectOSError, "explicit --id"):
+                    self.record(dry_run=dry_run)
+                self.assertEqual(self.snapshot(), before)
+                self.assertEqual(self.registry_path.read_bytes(), original)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(P.check_project(self.root), 1)
+
+    def test_same_input_hash_cannot_revert_an_owner_field_edit(self) -> None:
+        self.record()
+        value = self.registry()
+        value["findings"][0]["impact"] = "An owner clarified this field after the capture."
+        self.registry_path.write_text(P.canonical_json(value))
+        before = self.snapshot()
+        with self.assertRaisesRegex(P.ProjectOSError, "identical input"):
+            self.record()
+        self.assertEqual(self.snapshot(), before)
+
+    def test_explicit_update_preserves_bare_legacy_owner_fields(self) -> None:
+        legacy = dict(self.definition, id="F-001", evidence_sha256="Owner-defined report reference",
+                      capture_input_sha256={"owner": "unrelated local metadata"})
+        self.registry_path.write_text(P.canonical_json({"schema_version": 1, "next_id": 2, "findings": [legacy]}))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(P.check_project(self.root), 0)
+        with self.assertRaisesRegex(P.ProjectOSError, "explicit --id"):
+            self.record()
+        self.record("F-001")
+        saved = self.registry()["findings"][0]
+        self.assertEqual(saved["evidence_sha256"], legacy["evidence_sha256"])
+        self.assertEqual(saved["capture_input_sha256"], legacy["capture_input_sha256"])
+        self.assertEqual(saved[P.FINDING_PROOF_KEY]["owner"], "engineering-project-os")
+
+    def test_unmarked_namespace_remains_owner_data_and_blocks_writer_collision(self) -> None:
+        legacy = dict(self.definition, id="F-001", project_os_finding_proof="An existing owner value")
+        self.registry_path.write_text(P.canonical_json({"schema_version": 1, "next_id": 2, "findings": [legacy]}))
+        before = self.snapshot()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(P.check_project(self.root), 0)
+        for dry_run in (True, False):
+            with self.assertRaisesRegex(P.ProjectOSError, "namespace collision"):
+                self.record("F-001", dry_run)
+            self.assertEqual(self.snapshot(), before)
+
+    def test_cli_reviewed_223_migration_preserves_original_proof_and_is_repeatable(self) -> None:
+        self.record()
+        value = self.registry()
+        entry = value["findings"][0]
+        proof = entry.pop(P.FINDING_PROOF_KEY)
+        entry.update(evidence_sha256=proof["evidence_sha256"],
+                     capture_input_sha256=proof["capture_input_sha256"])
+        self.registry_path.write_text(P.canonical_json(value))
+        system_path = self.root / ".agents/SYSTEM.json"
+        system = json.loads(system_path.read_text())
+        system["project_os_version"] = "2.2.3"
+        system_path.write_text(P.canonical_json(system))
+        review = self.root / ".agents/evidence/proof-ownership.json"
+        review.write_text(P.canonical_json({
+            "schema_version": 1,
+            "registry_sha256": "sha256:" + hashlib.sha256(self.registry_path.read_bytes()).hexdigest(),
+            "ownership": {entry["id"]: "helper_2_2_3"},
+        }))
+        command = [sys.executable, "-B", str(SCRIPT), "upgrade", "--target", str(self.root),
+                   "--finding-proof-review", ".agents/evidence/proof-ownership.json"]
+        before = self.snapshot()
+        preview = subprocess.run([*command, "--dry-run"], capture_output=True, text=True)
+        self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+        self.assertIn(P.FINDING_PROOF_KEY, preview.stdout)
+        self.assertEqual(self.snapshot(), before)
+        applied = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
+        saved = self.registry()["findings"][0]
+        self.assertEqual(saved[P.FINDING_PROOF_KEY], proof)
+        self.assertEqual(saved["evidence_sha256"], entry["evidence_sha256"])
+        self.assertEqual(saved["capture_input_sha256"], entry["capture_input_sha256"])
+        migrated = self.snapshot()
+        repeated = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(repeated.returncode, 0, repeated.stdout + repeated.stderr)
+        self.assertEqual(self.snapshot(), migrated)
+
     def test_final_check_failure_rolls_back(self) -> None:
         before = self.snapshot()
         with mock.patch.object(P, "require_passing_check", side_effect=P.ProjectOSError("Injected final check failure")):
@@ -349,7 +436,7 @@ class FindingCaptureTest(unittest.TestCase):
         for proofs in [{}, {".agents/evidence/normalization.md": "wrong"},
                        {"../outside.md": "sha256:" + "0" * 64}]:
             with self.subTest(proofs=proofs):
-                value["findings"][0]["evidence_sha256"] = proofs
+                value["findings"][0][P.FINDING_PROOF_KEY]["evidence_sha256"] = proofs
                 self.registry_path.write_text(json.dumps(value))
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output):
