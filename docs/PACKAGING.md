@@ -2,6 +2,8 @@
 
 Project OS 2.2.4 corrects finding proof refresh and legacy ownership, retaining compact checkpoints and atomic completion. Completed final-commit Codex Review is a separate mandatory release gate. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built. GitHub distribution is the primary release path; Directory submission remains a separate channel.
 
+The 2.2.4 validation scope includes isolated native Codex persistence and recovery and actual ChatGPT companion snapshot reconstruction, record hashes and checkpoint receipts. Strict isolation of ChatGPT Work context from account Memory has not been established. Account Memory settings remain unchanged, and this is an open validation limitation for this release. Do not describe the companion checks as proof of Memory-isolated recovery; retain this disclosure in the GitHub Release notes.
+
 Retain the exact reviewed ZIP for the GitHub Release and verify its SHA-256 after download. Public documentation is part of that ZIP, so changing packaged copy before publication requires a new reproducible build and artifact checks. All selected skill files must match the behaviorally tested copy exactly. Preserve existing published artifacts unchanged.
 
 Ordinary repairs must save actual findings and companion transfers must save their current checkpoint before returning project files. Verify the actual exported bytes by reconstructing the returned snapshot and running structural and checkpoint checks there. Passing runtime tests or a successful knowledge import does not establish that result. Preserve failed observations when revising and retesting the candidate.

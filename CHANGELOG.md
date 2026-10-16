@@ -4,7 +4,7 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.4] - Unreleased
+## [2.2.4] - 2026-10-16
 
 ### Fixed
 
@@ -17,6 +17,11 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Require completed Codex code/security review of the final source commit and disposition of every remark before merge or publication, separately from CI.
 - Add a read-only final-head review guard with exact comment/evidence hashes, source checks and fail-closed handling of missing, running, stale or unresolved reviews.
 - Keep SYSTEM schema 5, plans schema 2 and findings, contracts, requests and new proof format version 1.
+
+### Validation scope
+
+- Native Codex persistence and recovery were verified in isolated sessions. Actual ChatGPT companion snapshots were reconstructed and their record hashes and checkpoint receipts checked.
+- Strict isolation of ChatGPT Work context from account Memory remains unverified. Memory settings were left unchanged; this release does not claim Memory-isolated companion recovery.
 
 ## [2.2.3] - 2026-10-16
 
