@@ -4,6 +4,18 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - Directory publication confirmed 2026-10-16
+
+Directory publication is separate from the corresponding GitHub source update, tag and Release. The original published ZIP is retained for GitHub distribution; later publication-status edits in repository documentation do not replace that artifact.
+
+### Changed
+
+- Led failure knowledge guidance with findings recorded by Codex during ordinary development, diagnosis and verification, without a separate save request for each observation.
+- Added simple natural-language recipes for reusing accumulated lessons in a new repository and carrying a portable bundle to another machine; individual commands remain advanced controls.
+- Explained how Codex prepares missing lessons from confirmed evidence, removes private context, checks destination applicability and presents one batch review of lesson changes before applying them.
+- Preserved source repositories during transfer, explicit human approval, applicability and version boundaries, lifecycle links, conflict handling and idempotent imports.
+- Retained schema 5, record formats and deterministic helper interfaces. Source/package preparation and fresh host acceptance remain separate from publication.
+
 ## [2.2.1] - Directory publication reported 2026-10-01
 
 Directory publication is separate from the corresponding GitHub source update, tag and Release.

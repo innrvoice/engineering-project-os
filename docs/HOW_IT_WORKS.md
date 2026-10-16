@@ -48,17 +48,19 @@ The archive is tamper-evident repository content. It is not immutable storage, a
 
 ## Scene four: reuse a failure without importing the old product
 
-Now imagine a React Native repository that has accumulated two months of confirmed failures: lifecycle races, image-memory problems and native handoff mistakes. A new repository begins. Repeating every investigation would not make the new codebase independent. It would only make the developer pay twice.
+As Codex develops, investigates and verifies work in a connected repository, it should record the findings it discovers without waiting for a separate `finding add` request. Findings retain observations, evidence, hypotheses and the next decisive check. Confirmed mechanisms can become project lessons; unresolved candidates remain findings. This depends on the agent following the repository workflow during the task, not on a background collector.
+
+Now imagine a React Native repository that has accumulated two months of confirmed failures: lifecycle races, image-memory problems and native handoff mistakes. A new repository begins. Ask Codex to reuse the useful lessons from the old repository and bring over only what fits the new project. Codex inspects both sides, prepares missing lessons and shows the proposed lesson changes for review. After approval, it applies the selection and validates the result. You do not need to issue every intermediate command. See the [simple recipes](../skills/project-os/references/knowledge.md).
 
 Project OS separates the local story from the reusable mechanism. A project lesson may mention private paths, product names and exact evidence. A reusable lesson must stand on its own: what triggers the failure, why it happens, how to prevent it, how to verify the prevention and where the lesson does not apply.
 
 The transfer has deliberate gates:
 
 1. A finding records the observed failure and the next decisive check.
-2. After the mechanism is confirmed, `knowledge capture` creates project-specific failure knowledge.
-3. `knowledge prepare` produces a read-only sanitized proposal.
+2. After the mechanism is confirmed, Codex captures project-specific failure knowledge.
+3. Codex prepares a sanitized proposal that preserves the mechanism and applicability boundaries.
 4. A person reviews the proposal and explicitly approves the lessons that remain safe and accurate without project history.
-5. Codex exports the approved library or reads it directly from another repository.
+5. Codex reads an approved library or prepares missing lessons from the read-only source and approves the reviewed matching proposals in the destination. A portable bundle supports another machine.
 6. The destination previews applicable lessons, explains skips and imports only after confirmation.
 
 `failure -> finding -> project lesson -> sanitized proposal -> approval -> user-owned reusable library -> explicit import`
@@ -108,7 +110,7 @@ The Python helper performs deterministic operations such as `detect`, `init`, `a
 
 The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
 
-Project OS 2.2.1 introduces schema 5 while preserving the existing knowledge bundle formats. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
+Project OS 2.2.2 retains schema 5 and the existing knowledge bundle formats. It clarifies ordinary finding capture and adds simple recipes for Codex to prepare and transfer applicable lessons. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
 
 ## ChatGPT is the companion surface
 

@@ -1,6 +1,6 @@
 # Reference
 
-This is the technical contract for Project OS 2.2.1. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.2.2. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
@@ -213,7 +213,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.2.1",
+  "created_with": "2.2.2",
   "entries": []
 }
 ~~~
@@ -502,7 +502,7 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.2.1 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- Release 2.2.2 identifies the installed skill, helper, package metadata and connected `project_os_version`.
 - `SYSTEM.schema_version` is 5.
 - Knowledge registries retain their own `schema_version: 1`.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.

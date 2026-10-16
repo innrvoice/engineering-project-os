@@ -1,6 +1,10 @@
 # Universal Plugin Directory and release packaging
 
-Project OS 2.2.1 is available in the Directory. Project OS 2.2.1 is the corrective source-tree candidate for GitHub delivery. It retains schema 5 and adds canonical ordinary intake, explicit readiness reporting and a pre-publication package acceptance guard. Passing local checks does not publish a GitHub tag or Release.
+Project OS 2.2.2 is available in the Directory; publication was confirmed on 2026-10-16. It leads with ordinary Codex finding capture and simple recipes for preparing and transferring only applicable lessons. It retains schema 5, existing helper interfaces and human approval of reusable lessons. Directory publication, fresh Codex/ChatGPT acceptance and GitHub source, tag and Release checks remain separate outcomes.
+
+Retain the exact owner-published ZIP for GitHub distribution and verify its SHA-256 after download. Repository documentation can record later publication observations without rebuilding or replacing that ZIP. All selected skill files must match the published artifact exactly.
+
+Fresh 2.2.2 Codex evaluation found an open behavior limitation: ordinary defect repair can finish without saving the required finding, even when the repository instructions require it. Passing runtime tests, a successful knowledge transfer and Directory publication do not verify that missing capture. Full host acceptance remains incomplete while this observation is unresolved.
 
 The Universal Plugin Directory is the primary installation route. The tagged standalone skill remains a Codex-only alternative. GitHub publication, Directory review and Directory publication are separate gates, so none may be inferred from the others.
 
@@ -10,8 +14,8 @@ Run the full suite, then build to a new path outside the checkout:
 
 ~~~shell
 python3 -B -m unittest discover -s tests -v
-python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.1-plugin.zip
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.1-plugin.zip
+python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.2-plugin.zip
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.2-plugin.zip
 ~~~
 
 The output path must not exist. The builder reads the current working tree, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python and zlib environment. Record the SHA-256, entry count, compressed bytes and extracted bytes for the exact reviewed ZIP.
@@ -24,7 +28,7 @@ The package must not contain a release-managed failure knowledge database. Capab
 
 ## Version and schema contract
 
-Release version must be `2.2.1` in the helper, both plugin manifests, marketplace reference, knowledge provenance, tests and active documentation. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1.
+Release version must be `2.2.2` in the helper, both plugin manifests, marketplace reference, knowledge provenance, tests and active documentation. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1.
 
 The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata without rewriting Markdown plans, context, state, findings, evidence or application code. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
@@ -59,7 +63,7 @@ Replay the multi-message cases in evals/continuity.json using the exact candidat
 Build candidate ZIPs freely for isolated testing. Package consistency alone reports NOT_EVALUATED and never proves release readiness. Before recommending publication or asking for release authorization, run the read-only guard against the exact tested ZIP and the connected repository that owns its acceptance:
 
 ~~~shell
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.1-plugin.zip --acceptance-target /path/to/repository --plan-id 007
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.2-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
 ~~~
 
 This guard rejects a ZIP differing from the candidate checkout and fails with NOT_READY when the selected plan has invalid records, stale proof, open requirements or pending acceptance. A successful result includes the exact ZIP SHA-256 and the named recorded outcome. It checks recorded proof consistency, not the semantic truth of evidence. The agent must verify that this is the release-preparation outcome and that it covers actual fresh Codex and ChatGPT behavior, not a narrower source-only plan. Acceptance files remain private and are never packaged.
@@ -81,7 +85,7 @@ Test all three public starter prompts in a fresh ChatGPT chat. The overview must
 3. Load the exact candidate in an isolated test environment and run discovery plus continuity cases in fresh Codex sessions. Preserve the installed stable copy.
 4. Test the three starter prompts in a fresh ChatGPT chat and confirm companion behavior.
 5. Pass the pre-publication acceptance guard above with all mandatory host results recorded. Only then recommend publication or request explicit owner authorization for commit, push, pull request, merge, tag and GitHub Release.
-6. Wait for required checks, create tag and GitHub Release `v2.2.1`, then verify the tagged standalone Codex installation in a fresh task.
+6. Wait for required checks, create tag and GitHub Release `v2.2.2`, then verify the tagged standalone Codex installation in a fresh task.
 7. Submit the same verified ZIP to the Directory through the owner-controlled Portal flow.
 8. Record approval separately from publication, then verify public Directory availability in fresh Codex and ChatGPT sessions.
 
@@ -93,6 +97,6 @@ Walk through Plugin Info, Prompts, Skills and Submit. Verify images, capabilitie
 
 Use these candidate release notes after the release gates pass:
 
-`2.2.1 corrects ordinary request intake and cancellation with locally available canonical formats and immediate validation. Readiness reports and a package acceptance guard block release recommendations while mandatory behavior checks remain open. Record schemas remain unchanged.`
+`2.2.2 explains how Codex records findings during ordinary work and adds simple recipes for preparing and transferring applicable lessons to another repository. Manual controls remain available as advanced guidance. Human review, source privacy, applicability filtering and record formats are preserved.`
 
 Use the official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/app-guidelines) for the external review. Local validation cannot establish Portal acceptance or public availability.

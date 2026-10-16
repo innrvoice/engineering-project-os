@@ -68,9 +68,9 @@ A successful setup requires the helper check to pass and the Git diff to contain
 
 Ordinary engineering work now uses ordinary requests. Use `$project-os` when the request concerns Project OS maintenance, durable plan state, findings, evidence, knowledge or Program lifecycle.
 
-## Upgrade from 2.1.1 to 2.2.1
+## Upgrade to 2.2.2
 
-Project OS 2.2.1 introduces SYSTEM schema 5, plans schema 2, JSON acceptance contracts, durable request intake and guarded plan completion. Knowledge transfer formats remain unchanged. Update the Directory plugin to use the published helper. The tagged standalone route requires the separate GitHub tag and Release.
+Project OS 2.2.2 is published in the Universal Plugin Directory. It retains SYSTEM schema 5, plans schema 2, JSON acceptance contracts, durable request intake and guarded plan completion. Upgrading from 2.1.1 also delivers the schema-5 continuity records; upgrading an existing schema-5 repository keeps the schema and knowledge-transfer formats unchanged. Update the installed Directory plugin before upgrading a repository. The tagged standalone route requires the separate GitHub tag and Release.
 
 First update the installed Directory plugin, then start a new Codex task in the repository and type:
 
@@ -78,7 +78,7 @@ First update the installed Directory plugin, then start a new Codex task in the 
 $project-os upgrade
 ~~~
 
-Codex must use the installed 2.2.1 helper transaction:
+Codex must use the installed 2.2.2 helper transaction:
 
 ~~~text
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
@@ -110,10 +110,10 @@ ChatGPT works against the supplied copies. It cannot connect to a live local che
 Use this route only when a standalone Codex-only installation is required. Send the following message in Codex chat, not Terminal:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.1/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.2/skills/project-os
 ~~~
 
-Start a new Codex task after installation. Use this candidate URL only after the versioned tag is published. It does not follow `main` automatically.
+Start a new Codex task after installation. Use this URL only after the versioned tag is published. It does not follow `main` automatically.
 
 Avoid keeping an older standalone skill active beside the Directory plugin. Remove the obsolete user-level `project-os` skill before relying on the Directory version so `$project-os` resolves to one intended installation.
 

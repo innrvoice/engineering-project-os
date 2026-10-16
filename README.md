@@ -8,7 +8,7 @@ Resume engineering work with durable state and reusable failure knowledge.
 
 [Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 
-Project OS 2.2.1 is available in the Directory. The corresponding GitHub source update, tag and Release are separate delivery steps.
+Project OS 2.2.2 is available in the Universal Plugin Directory with simple finding-capture and lesson-transfer recipes. GitHub source, tags and Releases are verified separately. See the [changelog](CHANGELOG.md) for recorded publication history.
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
@@ -76,7 +76,17 @@ The exact Codex requests and helper commands are documented in [Usage](docs/USAG
 
 ## Knowledge that compounds
 
-If a team spends weeks proving why a failure happens, the lesson should survive more than the conversation that found it. Project OS separates two kinds of knowledge:
+As you work in a connected repository, Codex should record the findings it discovers with evidence and the next check. You do not need to manually add each finding. Confirmed mechanisms can become project lessons; unresolved hypotheses stay in the findings register.
+
+To reuse those accumulated lessons, open the next repository in Codex and ask:
+
+~~~text
+$project-os Reuse the useful failure lessons from /path/to/earlier-repository here. Set up Project OS if needed, prepare anything that is missing and bring over only lessons that fit this project.
+~~~
+
+Codex handles setup, preparation and applicability checks, then shows a batch of proposed lesson changes for your review. After approval, it transfers the selected lessons, explains skips and validates the destination. You do not need to orchestrate every knowledge command yourself. The source stays unchanged during transfer.
+
+Project OS separates two kinds of knowledge:
 
 - **Project knowledge** stays with its repository and may include local names, paths, evidence and history.
 - **Reusable knowledge** contains only reviewed, sanitized failure mechanisms that the user has deliberately approved for transfer.
@@ -87,7 +97,7 @@ For repositories available on the same machine, Codex can transfer reviewed less
 
 The first repository records the lesson. The next repository does not need to repeat the failure. Software will still invent new ones, but at least it has to be creative.
 
-See [How it works](docs/HOW_IT_WORKS.md) for the knowledge model and [Usage](docs/USAGE.md) for the transfer workflows.
+See [simple recipes](skills/project-os/references/knowledge.md) for everyday use and advanced controls, [How it works](docs/HOW_IT_WORKS.md) for the knowledge model and [Usage](docs/USAGE.md) for the transfer workflows.
 
 ## Standard and Program
 
@@ -115,13 +125,13 @@ An overview needs no files. Advice about an existing setup requires the relevant
 
 The Universal Plugin Directory is the primary installation route. If you need a standalone Codex-only installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
 
-After the candidate is published with its versioned tag, the standalone installation request is:
+The standalone installation request uses the versioned release tag:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.1/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.2/skills/project-os
 ~~~
 
-Start a new Codex task after installation. The versioned URL does not follow `main` automatically.
+Use the 2.2.2 URL only after its versioned tag is published, then start a new Codex task after installation. The versioned URL does not follow `main` automatically.
 
 ## What is installed
 

@@ -111,7 +111,21 @@ $project-os program close stopped: the migration was replaced by a vendor-manage
 
 `completed` requires exit evidence. `stopped` requires a precise reason. Closure archives the exact contract with a SHA-256 digest and returns the repository to Standard.
 
-## Record a confirmed failure
+## Everyday findings and reusable lessons
+
+In a connected repository, ask Codex to implement, investigate or verify work normally. Codex should record the findings it discovers, preserve evidence and keep unresolved hypotheses distinct from confirmed mechanisms. You do not need a separate `finding add` request for every observation. Confirmed mechanisms can become project lessons; making them reusable and transferring them requires review and approval.
+
+For a new project, open its repository in Codex and send one request:
+
+~~~text
+$project-os Reuse the useful failure lessons from /path/to/earlier-repository here. Set up Project OS if needed, prepare anything that is missing and bring over only lessons that fit this project.
+~~~
+
+Codex inspects the destination and the read-only source, prepares missing lessons from confirmed evidence, removes private context and checks applicability. It explains irrelevant or unconfirmed skips, presents one batch review of lesson changes and applies only the approved selection. It then validates the destination. Setup is previewed if the new repository is not yet connected. The source stays unchanged during transfer.
+
+See [Failure knowledge](../skills/project-os/references/knowledge.md) for the complete recipes, including approved libraries and portable bundles. The individual operations below are useful when you want direct control of a particular stage.
+
+## Advanced: record a particular finding and prepare a lesson
 
 Start with an observation, not an invented mechanism:
 
@@ -191,7 +205,7 @@ Updating the installed plugin does not update repository-local records. In each 
 $project-os upgrade
 ~~~
 
-Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.1 upgrade, application code and project-owned knowledge must not change.
+Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.2 upgrade, application code and project-owned knowledge must not change.
 
 If a managed file has diverged from its recorded baseline, the helper reports a conflict instead of overwriting it. Resolve ownership deliberately and repeat the dry-run. Do not hand-edit `SYSTEM.release` or schema fields to simulate an upgrade.
 

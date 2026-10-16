@@ -17,6 +17,12 @@ Use this skill only for Project OS requests. The host may expose it automaticall
 
 Before inspecting or changing a repository, identify the available project input. In Codex, use the repository workspace selected for the current task and accept an explicit path to another schema 5 repository as a read-only knowledge source. In ChatGPT, setup advice and a new starter package may begin from the user's project description, selected project files or an archive provided in the current chat. Ask only for the missing details required to choose a safe setup and mark conclusions that are not backed by files as unverified. Reviewing, validating, repairing, adopting or upgrading an existing Project OS setup requires the relevant repository files, normally `AGENTS.md` and `.agents/`; ask for them when they are missing. Knowledge import requires an approved reusable bundle plus the destination Project OS context. Knowledge export requires the source reusable registry. Never inspect an empty host workspace or claim that the plugin is unavailable. Installation alone does not attach or connect a repository on either surface.
 
+## Everyday knowledge requests
+
+In a connected repository, ordinary development follows repository instructions that require Codex to record findings discovered during the task without a separate save request. Keep evidence, hypotheses and confirmed mechanisms distinct; prepare project lessons only after confirmation. This is agent-led work, not a background scan or a guarantee of exhaustive discovery.
+
+When the user asks to reuse accumulated lessons in another repository, treat that as an outcome to carry through, not a request for a manual command catalog. Read [knowledge.md](references/knowledge.md), inspect the destination and the read-only source, handle any required setup and preparation, select lessons that fit the destination and show one batch review of lesson changes. After approval, finish the reviewed transfer and validate the result. If the source has only confirmed findings or project lessons, prepare sanitized proposals outside both repositories and approve matching entries directly into the destination; do not modify the source merely to complete a transfer. Keep approval and applicability boundaries explicit.
+
 ## Interpret short requests
 
 Treat the following as canonical, memorable prompts rather than parser tokens:

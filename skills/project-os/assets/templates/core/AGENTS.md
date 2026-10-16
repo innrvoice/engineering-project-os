@@ -38,7 +38,7 @@ Ask a targeted question only when missing information would materially change be
 
 ## Findings and knowledge
 
-- Keep candidate and project-specific incidents in the findings register.
+- During ordinary work, record discovered defects, candidates and accepted risks in the findings register without waiting for a separate save request. Reuse existing finding IDs, preserve evidence and keep the next decisive check explicit.
 - Add knowledge only after confirming a failure mechanism.
 - Reusable lessons are user-owned. Sanitize them before approval, keep applicability and version or platform boundaries explicit and transfer them only through reviewed export or import.
 - Never treat copied historical evidence as current proof.
