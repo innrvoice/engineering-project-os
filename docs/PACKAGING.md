@@ -92,11 +92,35 @@ Test all three public starter prompts in a fresh ChatGPT chat. The overview must
 
 CI completion and Codex Review completion are separate prerequisites. Before merge or publication, verify both Codex code and security review have completed for the exact final source commit and every remark has a recorded disposition. Missing, running, unknown or wrong-commit review is NOT_READY. A later source commit invalidates the previous review. Local reviews and passing tests do not replace the configured GitHub review.
 
-Run the read-only repository guard against a clean checkout of the reviewed PR head:
+Run an independently trusted copy of the read-only guard outside the candidate checkout with Python isolated mode (`-I`). The PR checkout is data only: never execute its guard, packaging code or helper to establish review readiness. Choose the guard's immutable source commit and literal SHA-256 through an owner-approved trusted channel, independently of the candidate PR; a hash supplied by that PR is not a trust anchor. A previously reviewed guard can verify a newer candidate. If no trusted guard is available, stop with NOT_READY and obtain or independently review one before proceeding.
+
+Use trusted Python, Git and `gh` executables and a locally prepared checkout whose Git metadata and configuration are trusted. Replace every placeholder below with the reviewed values; this recipe extracts bytes from the separately trusted source, verifies them before execution and retains the external copy for the final checks:
 
 ~~~shell
-python3 -B scripts/check_codex_review.py --repo innrvoice/engineering-project-os --pr <number> --head <full-final-commit-sha> --target /path/to/clean/reviewed-checkout --dispositions /path/to/private/dispositions.json --json
+(
+set -eu
+trusted_source='/path/to/owner-trusted/source-repository'
+trusted_commit='<owner-trusted-immutable-commit-sha>'
+trusted_sha256='<independently-trusted-64-digit-guard-sha256>'
+guard_dir=$(mktemp -d "${TMPDIR:-/tmp}/project-os-review-guard.XXXXXXXX")
+git --no-replace-objects -C "$trusted_source" show "${trusted_commit}:scripts/check_codex_review.py" > "$guard_dir/check_codex_review.py"
+python3 -I -B - "$guard_dir/check_codex_review.py" "$trusted_sha256" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+actual = hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest()
+if actual != sys.argv[2]:
+    raise SystemExit('NOT_READY: trusted guard SHA-256 mismatch')
+PY
+chmod 400 "$guard_dir/check_codex_review.py"
+chmod 500 "$guard_dir"
+printf 'Retain trusted guard: %s\n' "$guard_dir/check_codex_review.py"
+python3 -I -B "$guard_dir/check_codex_review.py" --repo innrvoice/engineering-project-os --pr <number> --head <full-final-commit-sha> --target /path/to/clean/reviewed-checkout --dispositions /path/to/private/dispositions.json --json
+)
 ~~~
+
+The external directory must be outside `--target` and protected from untrusted writers. Read-only permissions prevent accidental edits; they do not establish provenance or protect against the file owner replacing it. Recheck the independently trusted hash before every invocation, retain the path and verified hash with the result and never refresh the guard from candidate bytes. The guard rejects non-isolated CLI launches before its own ordinary imports and rejects a runner whose resolved path is inside `--target`, including symlink aliases. These checks do not make an untrusted script trustworthy or prevent Python startup hooks that ran before an unsafe non-isolated launch. Programmatic imports are for trusted callers such as the unit suite, not candidate-provided launchers.
 
 The guard requires the canonical bot's completed final-head code/security status, no unresolved findings or review threads and a disposition for every marked bot finding across the PR history. With no findings, the disposition file is optional. It fails closed on missing API access, timeout, incomplete pagination, changed source, changed proof or concurrent review state. It does not merge, resolve threads or publish. Run it immediately before merge and again before publication using the retained reviewed checkout; verify the squash-merged tree matches that reviewed source.
 

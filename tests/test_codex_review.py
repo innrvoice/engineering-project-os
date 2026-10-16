@@ -6,6 +6,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -327,7 +328,8 @@ class CodexReviewTests(unittest.TestCase):
         for failure in [subprocess.TimeoutExpired(["gh"], 1), OSError("gh missing")]:
             output = io.StringIO()
             with mock.patch.object(GUARD.subprocess, "run", side_effect=failure), redirect_stdout(output):
-                code = GUARD.main(["--repo", REPOSITORY, "--pr", "10", "--head", HEAD, "--json"])
+                code = GUARD.main(["--repo", REPOSITORY, "--pr", "10", "--head", HEAD,
+                                   "--target", str(self.target), "--json"])
             self.assertEqual(code, 1)
             self.assertEqual(json.loads(output.getvalue())["readiness"], "NOT_READY")
         live = GUARD.Live(30)
@@ -520,6 +522,92 @@ class CodexReviewTests(unittest.TestCase):
         self.assertEqual(git("status", "--porcelain=v1"), "")
         with self.assertRaisesRegex(GUARD.NotReady, "bytes differ from reviewed HEAD"):
             GUARD.Live(30).source(target)
+
+    def test_cli_refuses_nonisolated_launch_before_shadowable_imports(self):
+        for module in ("hashlib", "json"):
+            with self.subTest(module=module):
+                target = self.target / ("nonisolated-" + module)
+                directory = target / "scripts"
+                directory.mkdir(parents=True)
+                runner = directory / "check_codex_review.py"
+                runner.write_bytes((ROOT / "scripts/check_codex_review.py").read_bytes())
+                marker = self.target / (module + "-unsafe-import.txt")
+                (directory / (module + ".py")).write_text(
+                    "with open(" + repr(str(marker)) + ", 'w') as stream:\n"
+                    "    stream.write('PR-controlled module executed')\n"
+                    "raise RuntimeError('harmless import canary')\n")
+                environment = {key: value for key, value in os.environ.items()
+                               if key not in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE")}
+                result = subprocess.run([sys.executable, "-B", str(runner), "--repo", REPOSITORY,
+                                         "--pr", "10", "--head", HEAD, "--target", str(target), "--json"],
+                                        cwd=target, env=environment, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(marker.exists(), result.stderr)
+                self.assertIn("NOT_READY", result.stdout + result.stderr)
+                self.assertIn("-I", result.stdout + result.stderr)
+
+    def test_isolated_external_cli_ignores_pr_modules_cwd_and_pythonpath(self):
+        target, git = self.packaged_checkout("shadowed-pr")
+        marker = self.target / "isolated-import-canary.txt"
+        canary = ("with open(" + repr(str(marker)) + ", 'w') as stream:\n"
+                  "    stream.write('PR-controlled code executed')\n"
+                  "raise RuntimeError('harmless import canary')\n")
+        # Even the PR's guard itself is data, never the runner being executed.
+        (target / "scripts/check_codex_review.py").write_text(canary)
+        for directory in (target, target / "scripts"):
+            for module in ("hashlib", "json", "re", "pathlib", "sitecustomize", "usercustomize"):
+                (directory / (module + ".py")).write_text(canary)
+        git("add", ".")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Untrusted PR canaries")
+        trusted = self.target / "trusted-runner"
+        trusted.mkdir()
+        runner = trusted / "check_codex_review.py"
+        runner.write_bytes((ROOT / "scripts/check_codex_review.py").read_bytes())
+        runner.chmod(0o444)
+        environment = dict(os.environ)
+        environment["PYTHONPATH"] = os.pathsep.join((str(target / "scripts"), str(target)))
+        environment["PYTHONUSERBASE"] = str(target)
+        before = {path.relative_to(target).as_posix(): path.read_bytes()
+                  for path in target.rglob("*") if path.is_file() and ".git" not in path.parts}
+        # A canonical, mismatched head reaches real source validation but no network.
+        result = subprocess.run([sys.executable, "-I", "-B", str(runner), "--repo", REPOSITORY,
+                                 "--pr", "10", "--head", HEAD, "--target", str(target), "--json"],
+                                cwd=target / "scripts", env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["readiness"], "NOT_READY")
+        self.assertIn("Local HEAD differs", value["blocker"])
+        self.assertFalse(marker.exists(), result.stderr)
+        self.assertEqual(before, {path.relative_to(target).as_posix(): path.read_bytes()
+                                 for path in target.rglob("*") if path.is_file() and ".git" not in path.parts})
+
+    def test_isolated_cli_rejects_a_runner_inside_the_target_checkout(self):
+        target = self.target / "in-checkout-runner"
+        directory = target / "scripts"
+        directory.mkdir(parents=True)
+        runner = directory / "check_codex_review.py"
+        runner.write_bytes((ROOT / "scripts/check_codex_review.py").read_bytes())
+        alias = self.target / "apparently-external-guard.py"
+        alias.symlink_to(runner)
+        for path in (runner, alias):
+            with self.subTest(runner=path):
+                result = subprocess.run([sys.executable, "-I", "-B", str(path), "--repo", REPOSITORY,
+                                         "--pr", "10", "--head", HEAD, "--target", str(target), "--json"],
+                                        cwd=target, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                value = json.loads(result.stdout)
+                self.assertEqual(value["readiness"], "NOT_READY")
+                self.assertRegex(value["blocker"], "outside|trusted external")
+
+    def test_direct_source_capture_refuses_an_in_target_runner_before_commands(self):
+        target = self.target / "direct-target"
+        target.mkdir()
+        live = GUARD.Live(30)
+        with mock.patch.object(GUARD, "__file__", str(target / "scripts/check_codex_review.py")), \
+                mock.patch.object(live, "command") as command:
+            with self.assertRaisesRegex(GUARD.NotReady, "outside|trusted external"):
+                live.source(target)
+        command.assert_not_called()
 
 
 if __name__ == "__main__":

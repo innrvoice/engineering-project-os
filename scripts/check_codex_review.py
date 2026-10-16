@@ -3,7 +3,17 @@
 
 This repository guard never merges, resolves threads or publishes. A green CI
 check is not a completed Codex review. Dispositions remain private local files.
+Execute an independently trusted copy outside the candidate checkout with -I.
 """
+
+import sys
+
+# sys is built in. Refuse before this script imports any shadowable module.
+# Python startup itself is safe only when the caller supplied -I already.
+if __name__ == "__main__" and not sys.flags.isolated:
+    print("NOT_READY: Run a trusted external guard with python3 -I -B; non-isolated execution is unsupported.",
+          file=sys.stderr)
+    raise SystemExit(1)
 
 import argparse
 import hashlib
@@ -66,6 +76,12 @@ def require(condition, message):
 
 def digest(data):
     return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def require_external_runner(target):
+    runner = Path(__file__).resolve()
+    require(runner != target and target not in runner.parents,
+            "Guard must run from a trusted path outside --target; never execute the candidate checkout guard.")
 
 
 def strict_json(data):
@@ -298,6 +314,8 @@ class Live:
         return {"graphql": graph, "issue_comments": [comment for page in pages for comment in page]}
 
     def source(self, target):
+        target = target.resolve()
+        require_external_runner(target)
         git = ["git", "--no-optional-locks", "--no-replace-objects", "-C", str(target)]
         top = Path(self.command(git + ["rev-parse", "--show-toplevel"]).strip()).resolve()
         require(top == target, "--target must be the checkout root")
@@ -362,7 +380,9 @@ def main(argv=None):
         require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repo) and args.pr > 0
                 and re.fullmatch(r"[0-9a-f]{40}", args.head), "Invalid repository, PR or exact head")
         require(0 < args.timeout_seconds <= 300, "--timeout-seconds must be in (0, 300]")
-        result = check(args.repo, args.pr, args.head, args.target.resolve(), args.dispositions, Live(args.timeout_seconds))
+        target = args.target.resolve()
+        require_external_runner(target)
+        result = check(args.repo, args.pr, args.head, target, args.dispositions, Live(args.timeout_seconds))
         code = 0
     except (NotReady, OSError, ValueError, TypeError, KeyError, AttributeError) as error:
         result = {"readiness": "NOT_READY", "repository": args.repo, "pr": args.pr,

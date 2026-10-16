@@ -112,7 +112,7 @@ Build and validate the exact working-tree ZIP using [GitHub distribution and rel
 
 ## Pull requests
 
-Wait separately for CI and completed Codex code/security review of the final commit. Address every remark with evidence, resolve its thread and pass the read-only [final-head review guard](docs/PACKAGING.md#required-final-commit-codex-review) before merge or publication. A source change requires another matching review. Do not infer completion from green check runs, lack of review comments or a locally completed review.
+Wait separately for CI and completed Codex code/security review of the final commit. Address every remark with evidence, resolve its thread and pass the read-only [final-head review guard](docs/PACKAGING.md#required-final-commit-codex-review) before merge or publication. Follow that section's independently trusted immutable guard acquisition, verify its literal hash and run the external copy with `python3 -I -B`; the candidate checkout is input data and must not provide the executable verifier. A source change requires another matching review. Do not infer completion from green check runs, lack of review comments or a locally completed review.
 
 Describe the concrete problem, smallest implemented change, checks run and remaining unverified boundaries. Do not claim deployment, production behavior or physical acceptance from source inspection or unit tests.
 

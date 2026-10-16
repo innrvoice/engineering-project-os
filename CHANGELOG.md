@@ -15,7 +15,7 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Require completed Codex code/security review of the final source commit and disposition of every remark before merge or publication, separately from CI.
-- Add a read-only final-head review guard with exact comment/evidence hashes, source checks and fail-closed handling of missing, running, stale or unresolved reviews.
+- Add a read-only final-head review guard with exact comment/evidence hashes, source checks and fail-closed handling of missing, running, stale or unresolved reviews; require an independently trusted external verifier and isolated Python imports.
 - Keep SYSTEM schema 5, plans schema 2 and findings, contracts, requests and new proof format version 1.
 
 ### Validation scope
