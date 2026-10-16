@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import stat
 import subprocess
 import sys
@@ -56,6 +57,12 @@ class DistributionTests(unittest.TestCase):
             ))
             for name in names:
                 self.assertEqual(archive.read(name), (ROOT / name).read_bytes(), name)
+            portable = json.loads(archive.read("plugin.json"))
+            compatibility = json.loads(archive.read(".codex-plugin/plugin.json"))
+            for interface in (portable["extensions"]["com.openai"]["interface"], compatibility["interface"]):
+                self.assertEqual(interface["category"], "Developer Tools")
+                self.assertEqual(interface["shortDescription"], "Developer workflows for Codex")
+                self.assertEqual(interface["supportURL"], "https://github.com/innrvoice/engineering-project-os/issues")
         with self.assertRaises(FileExistsError):
             PACKAGE.build_zip(ROOT, second)
 
@@ -121,10 +128,17 @@ class DistributionTests(unittest.TestCase):
         self.assertEqual(PACKAGE.markdown_layout_errors("README.md", "~~~text\nwrapped\ncontent\n~~~\n"), [])
 
     def test_packaged_markdown_avoids_oxford_commas(self):
+        oxford_comma = re.compile(r", [^,;\n]+, and ")
+        self.assertRegex("First, second, and third.", oxford_comma)
+        self.assertRegex("First, second, third, and fourth.", oxford_comma)
+        self.assertNotRegex("First, second and third.", oxford_comma)
+        self.assertNotRegex("Exclude an unsupported entry, and compare the actual lessons.", oxford_comma)
         with zipfile.ZipFile(self.archive) as archive:
             for name in archive.namelist():
                 if name.endswith(".md"):
-                    self.assertNotIn(", and ", archive.read(name).decode("utf-8"), name)
+                    text = archive.read(name).decode("utf-8")
+                    for sentence in re.split(r"[.!?](?:\s|$)", text):
+                        self.assertNotRegex(sentence, oxford_comma, name)
 
     def test_each_submission_fixture_is_self_contained_and_matches_runtime(self):
         helper = self.skill / "scripts/project_os.py"

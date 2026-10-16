@@ -21,7 +21,11 @@ Before inspecting or changing a repository, identify the available project input
 
 In a connected repository, ordinary development follows repository instructions that require Codex to record findings discovered during the task without a separate save request. Keep evidence, hypotheses and confirmed mechanisms distinct; prepare project lessons only after confirmation. This is agent-led work, not a background scan or a guarantee of exhaustive discovery.
 
-When the user asks to reuse accumulated lessons in another repository, treat that as an outcome to carry through, not a request for a manual command catalog. Read [knowledge.md](references/knowledge.md), inspect the destination and the read-only source, handle any required setup and preparation, select lessons that fit the destination and show one batch review of lesson changes. After approval, finish the reviewed transfer and validate the result. If the source has only confirmed findings or project lessons, prepare sanitized proposals outside both repositories and approve matching entries directly into the destination; do not modify the source merely to complete a transfer. Keep approval and applicability boundaries explicit.
+Use the connected WORKFLOW's required writeback before any engineering response or returned project snapshot, including bounded repairs and ChatGPT companion operations. A reproduced user-reported defect is a finding too. Save actual evidence with `finding record`, update the checkpoint through `checkpoint --draft` or guarded plan completion and pass `checkpoint --check`; plan completion writes its fresh idle receipt atomically. Successful application tests or knowledge import alone do not persist that handoff. On fresh recovery, verify the saved checkpoint against current files before using its next action. See [maintenance.md](references/maintenance.md) for the deterministic commands.
+
+Return only a validated snapshot of freshly reread on-disk bytes after all writes and checks. Preserve complete STATE including its HTML receipt, compute each file hash from those exact bytes and reconstruct the exact serialized snapshot into a new temporary directory. Run check and checkpoint --check on that reconstructed copy and compare original source hashes again after export. Never assemble returned files from drafts, cached variables or rendered Markdown. An exported-file mismatch is NOT_READY even when the source check reported CURRENT; deliver only the validated snapshot file. The connected WORKFLOW and maintenance reference give the full export protocol.
+
+When the user asks to reuse accumulated lessons in another repository, treat that as an outcome to carry through, not a request for a manual command catalog. Read [knowledge.md](references/knowledge.md), inspect the destination and the read-only source, handle any required setup and preparation, select lessons that fit the destination and show one batch review of lesson changes. This approval-dependent outcome needs a small plan: route its request and later approval to the same contract, then verify gates and mark the requests implemented before guarded completion. Captured requests are unresolved even if their decision text says completed. After approval, finish the reviewed transfer and validate the result. If the source has only confirmed findings or project lessons, prepare sanitized proposals outside both repositories and approve matching entries directly into the destination; do not modify the source merely to complete a transfer. Keep approval and applicability boundaries explicit.
 
 ## Interpret short requests
 
@@ -40,7 +44,7 @@ Treat the following as canonical, memorable prompts rather than parser tokens:
 - `program close completed`: require complete exit evidence.
 - `program close stopped: <reason>`: require a reason.
 - `plan open: <outcome>`: require one observable outcome.
-- `plan checkpoint`, `plan complete`: require an active plan. Completion uses the guarded helper.
+- `plan checkpoint`, `plan complete`: require an active plan. Completion uses the guarded helper and atomically writes a current idle checkpoint receipt.
 - `plan status[: <plan-id>]`: read-only gate and request report; require an ID when no single active plan exists.
 - `plan resume[: <plan-id>]`: continue the active plan or reactivate a selected blocked plan after verifying its blocker is resolved. Require a plan ID when the selection is ambiguous.
 - `plan block: <reason>`, `plan supersede: <reason>`: require a reason.
@@ -102,7 +106,7 @@ For reasoned plan, finding or knowledge edits without a dedicated helper subcomm
 - Never overwrite `AGENTS.md`, context, state, a Program, plan, finding, evidence or knowledge blindly.
 - Keep application code, production configuration, credentials, personal data and runtime artifacts outside Project OS operations unless the user's request independently authorizes them.
 - Follow the connected repository WORKFLOW for immediate durable user-request intake, canonical JSON, validation after each intake or cancellation, contract revisions and compaction recovery. Authorized clarifications require no separate permission to record or integrate.
-- Before final checkpoints, readiness claims or publication recommendations, run plan status --require-ready. Lead with NOT_READY when required acceptance is open; never present source checks or a ZIP as a verified release candidate.
+- Before final checkpoints, readiness claims or publication recommendations for a named durable plan, run plan status --require-ready. Lead with NOT_READY when required acceptance is open; never present source checks or a ZIP as a verified release candidate. Bounded plan-free engineering still requires finding/checkpoint writeback and checkpoint --check.
 - Record only verified repository facts. Mark unresolved claims as unverified.
 - Keep project incidents separate from portable lessons. Approve only confirmed, sanitized mechanisms and never require a Project OS release to transfer user knowledge.
 - Do not imply a daemon, watcher, hook, MCP server, hidden database, automatic upload or automatic cross-repository synchronization.

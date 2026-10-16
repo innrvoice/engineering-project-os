@@ -1,21 +1,23 @@
-# Universal Plugin Directory and release packaging
+# GitHub distribution and release packaging
 
-Project OS 2.2.2 is available in the Directory; publication was confirmed on 2026-10-16. It leads with ordinary Codex finding capture and simple recipes for preparing and transferring only applicable lessons. It retains schema 5, existing helper interfaces and human approval of reusable lessons. Directory publication, fresh Codex/ChatGPT acceptance and GitHub source, tag and Release checks remain separate outcomes.
+Project OS 2.2.3 adds deterministic finding capture, compact checkpoint writes, atomic completion with a current checkpoint and a read-only freshness guard. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built. GitHub distribution is the primary release path; Directory submission remains a separate channel.
 
-Retain the exact owner-published ZIP for GitHub distribution and verify its SHA-256 after download. Repository documentation can record later publication observations without rebuilding or replacing that ZIP. All selected skill files must match the published artifact exactly.
+Retain the exact reviewed ZIP for the GitHub Release and verify its SHA-256 after download. Public documentation is part of that ZIP, so changing packaged copy before publication requires a new reproducible build and artifact checks. All selected skill files must match the behaviorally tested copy exactly. Preserve existing published artifacts unchanged.
 
-Fresh 2.2.2 Codex evaluation found an open behavior limitation: ordinary defect repair can finish without saving the required finding, even when the repository instructions require it. Passing runtime tests, a successful knowledge transfer and Directory publication do not verify that missing capture. Full host acceptance remains incomplete while this observation is unresolved.
+Ordinary repairs must save actual findings and companion transfers must save their current checkpoint before returning project files. Verify the actual exported bytes by reconstructing the returned snapshot and running structural and checkpoint checks there. Passing runtime tests or a successful knowledge import does not establish that result. Preserve failed observations when revising and retesting the candidate.
 
-The Universal Plugin Directory is the primary installation route. The tagged standalone skill remains a Codex-only alternative. GitHub publication, Directory review and Directory publication are separate gates, so none may be inferred from the others.
+The primary installation route registers the GitHub marketplace from `main` and installs `engineering-project-os@engineering-project-os` from its pinned `v2.2.3` source. The tagged standalone Codex skill is the secondary route. [Setup](SETUP.md) contains the exact Terminal commands and skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
 
-## Build the candidate
+## Verify before building the release package
 
-Run the full suite, then build to a new path outside the checkout:
+Freeze the exact candidate skill files, install that frozen copy in isolated local sessions and run the ordinary finding, checkpoint and knowledge scenarios first. End the original sessions and repeat recovery in separate sessions that receive only the actual project files. Run the same exact candidate in the ChatGPT companion with supplied synthetic material before publication. Inspect actual findings, evidence hashes, current checkpoint receipts, material request routing and next actions. Preserve every initial failure and rerun affected cases after changes. An installed copy of an older release does not test candidate instructions.
+
+Only after those behavioral checks pass, run the complete suite including extracted-package checks, then build the release ZIP to a new path outside the checkout:
 
 ~~~shell
 python3 -B -m unittest discover -s tests -v
-python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.2-plugin.zip
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.2-plugin.zip
+python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.3-plugin.zip
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.3-plugin.zip
 ~~~
 
 The output path must not exist. The builder reads the current working tree, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python and zlib environment. Record the SHA-256, entry count, compressed bytes and extracted bytes for the exact reviewed ZIP.
@@ -28,25 +30,31 @@ The package must not contain a release-managed failure knowledge database. Capab
 
 ## Version and schema contract
 
-Release version must be `2.2.2` in the helper, both plugin manifests, marketplace reference, knowledge provenance, tests and active documentation. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1.
+Release version must be `2.2.3` in the helper, both plugin manifests, marketplace plugin-source ref, knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while its plugin source pins `v2.2.3`. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1. A dated legacy-channel status may name its own older version only inside an explicit Legacy Directory section.
 
 The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata without rewriting Markdown plans, context, state, findings, evidence or application code. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
 ## Selected metadata
 
-Use these values in both manifests and the Directory form:
+Use these values in both manifests. They describe the current GitHub package independently of the legacy Directory listing:
 
 - Name: `Engineering Project OS`
 - Descriptor: `Built for Codex.`
-- Subtitle: `Resume work. Reuse lessons.`
+- Subtitle: `Developer workflows for Codex`
+- Category: `Developer Tools`
 - Skill short description: `Resume Codex work and reuse failure knowledge`
 - Plugin description: `Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.`
-- Long description: `Use this when Codex work must survive multiple sessions, preserve verified decisions and evidence or carry reviewed failure lessons into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.`
+- Long description: `Developer tooling for Codex to resume repository work across sessions and persist plans, findings, evidence and checkpoints. Use this when work must survive context compaction or reviewed failure lessons need to move into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.`
 - Capabilities: `Resume Codex work across sessions`; `Keep plans, decisions and evidence with the repository`; `Capture verified failure knowledge`; `Reuse reviewed lessons across your own projects`.
+- Support URL: `https://github.com/innrvoice/engineering-project-os/issues`.
+
+The official [listing metadata reference](https://developers.openai.com/plugins/deploy/submission#listing-metadata) defines the presentation fields and lists `Developer Tools` as a supported category title.
 
 Keep `codex` before `chatgpt` in discovery keywords. The skill metadata file `skills/project-os/agents/openai.yaml` may contain only `policy.allow_implicit_invocation: true` under `policy`. Its `short_description` must contain 25 to 64 characters and its `default_prompt` must mention `$project-os` explicitly.
 
-The three Directory starter prompts must match both manifests exactly:
+Declare `supportURL` as `https://github.com/innrvoice/engineering-project-os/issues` under `extensions.com.openai.interface` in root `plugin.json` and under `interface` in `.codex-plugin/plugin.json`. Source metadata validation and visible support-link rendering are separate checks.
+
+The three companion starter prompts must match both manifests exactly:
 
 1. `Tell me how Project OS helps Codex resume real engineering work across sessions.`
 2. `Help me set up Project OS for this repository and start with a safe preview.`
@@ -56,14 +64,14 @@ The social preview is versionless. It uses the eyebrow `BUILT FOR CODEX`, the ti
 
 ## Continuity and host checks
 
-Replay the multi-message cases in evals/continuity.json using the exact candidate package. Verify request records and plan status after each message. End the initial session, start a fresh session with only the repository files and verify recovery, routing and the exact next action. A passing deterministic fixture test is not a host workflow pass. Keep inaccessible Codex or ChatGPT acceptance pending with the exact required action.
+Replay the multi-message cases in `skills/project-os/evals/continuity.json` and the ordinary repair and transfer cases in `evals/persistence.json` using a frozen exact candidate skill installation. Verify actual record files and plan status after each message. End the initial session, start a fresh session with only the repository files and verify recovery, routing and the exact next action. Repeat relevant checks through the extracted release package after packaging. A passing deterministic fixture test is not a host workflow pass. Keep inaccessible Codex or ChatGPT acceptance pending with the exact required action.
 
 ## Required pre-publication acceptance guard
 
-Build candidate ZIPs freely for isolated testing. Package consistency alone reports NOT_EVALUATED and never proves release readiness. Before recommending publication or asking for release authorization, run the read-only guard against the exact tested ZIP and the connected repository that owns its acceptance:
+Run the fresh-host persistence and files-only recovery scenarios against a frozen local skill copy before building the release ZIP. Package consistency alone reports NOT_EVALUATED and never proves release readiness. Before recommending publication or asking for release authorization, run the read-only guard against the exact tested ZIP and the connected repository that owns its acceptance:
 
 ~~~shell
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.2-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.3-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
 ~~~
 
 This guard rejects a ZIP differing from the candidate checkout and fails with NOT_READY when the selected plan has invalid records, stale proof, open requirements or pending acceptance. A successful result includes the exact ZIP SHA-256 and the named recorded outcome. It checks recorded proof consistency, not the semantic truth of evidence. The agent must verify that this is the release-preparation outcome and that it covers actual fresh Codex and ChatGPT behavior, not a narrower source-only plan. Acceptance files remain private and are never packaged.
@@ -74,29 +82,31 @@ If candidate host access is unavailable, report NOT_READY with the exact blocker
 
 Replay `skills/project-os/evals/discovery.json` in a fresh Codex task. The set covers direct Codex overview and setup, indirect continuity loss, cross-project failure knowledge, one-session negative control, explicit ChatGPT use with supplied files, missing ChatGPT files and rejection of automatic global sharing.
 
-The metadata follows the official [metadata optimization guide](https://developers.openai.com/plugins/guides/optimize-metadata): it begins the long description with when the plugin should be used, states negative cases and includes direct, indirect and negative golden prompts. Change one metadata field at a time during later tuning and keep experiment notes only in ignored local `.agents` records.
+The listing copy leads with Codex developer workflows, then states when to use the plugin and its boundaries. Discovery checks adapt the direct, indirect and negative prompt categories in the official [metadata optimization guide](https://developers.openai.com/plugins/guides/optimize-metadata). Change one metadata field at a time during later tuning and keep experiment notes only in ignored local `.agents` records.
 
 Test all three public starter prompts in a fresh ChatGPT chat. The overview must describe Project OS as built for Codex and ChatGPT as the companion. Existing-repository requests without supplied files must ask for them rather than inspecting an empty host workspace.
 
 ## Release sequence
 
-1. Finish source checks, validate the exact reproducible ZIP and review the complete diff. Existing versionless artwork remains unchanged.
-2. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit.
-3. Load the exact candidate in an isolated test environment and run discovery plus continuity cases in fresh Codex sessions. Preserve the installed stable copy.
-4. Test the three starter prompts in a fresh ChatGPT chat and confirm companion behavior.
-5. Pass the pre-publication acceptance guard above with all mandatory host results recorded. Only then recommend publication or request explicit owner authorization for commit, push, pull request, merge, tag and GitHub Release.
-6. Wait for required checks, create tag and GitHub Release `v2.2.2`, then verify the tagged standalone Codex installation in a fresh task.
-7. Submit the same verified ZIP to the Directory through the owner-controlled Portal flow.
-8. Record approval separately from publication, then verify public Directory availability in fresh Codex and ChatGPT sessions.
+1. Finish runtime/source checks and review the complete diff. Freeze exact candidate skill files for isolated installation; keep existing published artifacts unchanged.
+2. Run ordinary repair/discovery, knowledge review/approval, discovery and continuity scenarios in fresh Codex and ChatGPT sessions. Inspect actual findings, requests and current checkpoints; repeat recovery in separate sessions from files alone.
+3. After all mandatory behavioral acceptance passes, run the full suite including extracted-package checks, build the release ZIP, verify reproducibility and compare every packaged file to the tested candidate.
+4. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit. Test the three starter prompts and supplied-material companion boundaries.
+5. Pass the pre-publication acceptance guard above with all mandatory host results recorded against the exact final ZIP. Only then recommend publication or request explicit owner authorization for commit, push, pull request, merge, tag and GitHub Release.
+6. Complete the authorized source pull request, wait for required checks and merge. Verify the merged source, create tag `v2.2.3` on the accepted commit and attach the exact reviewed ZIP to the GitHub Release.
+7. Verify the remote tag, Release metadata and downloaded asset SHA-256. Test the documented GitHub marketplace and tagged standalone routes in isolated profiles, then inspect the selected installation in a fresh Codex task. Check the installed version, exact skill bytes, bootstrap or upgrade, actual finding/checkpoint persistence and files-only recovery.
+8. Report GitHub source, Release, artifact and installation results with their evidence. Report the legacy Directory status separately; a GitHub release does not require a new Portal submission or establish ChatGPT availability.
 
 Do not replace package contents under an existing version. Any content change after publication requires another version.
 
-## Directory form and release notes
+## Release notes
 
-Walk through Plugin Info, Prompts, Skills and Submit. Verify images, capabilities, prompt text, policy declarations and the package version before submission. Customer support information belongs in the Portal listing, not in unsupported manifest fields.
+Use these release notes after the release gates pass:
 
-Use these candidate release notes after the release gates pass:
+`2.2.3 brings durable findings, verified checkpoints and atomic plan completion to Codex developer workflows. Reviewed knowledge transfers preserve source privacy, filter for destination applicability and retain approval decisions. The GitHub marketplace is the primary installation route with a version-pinned plugin source; the tagged standalone skill remains available. Fresh-session persistence and files-only recovery checks precede release packaging. Schema compatibility is preserved.`
 
-`2.2.2 explains how Codex records findings during ordinary work and adds simple recipes for preparing and transferring applicable lessons to another repository. Manual controls remain available as advanced guidance. Human review, source privacy, applicability filtering and record formats are preserved.`
+## Legacy Directory
 
-Use the official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/app-guidelines) for the external review. Local validation cannot establish Portal acceptance or public availability.
+The existing [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) remains on 2.2.2. On 2026-10-16, the maintainer reported that the Portal would not accept an updated skills-only submission for Engineering Project OS. This observation concerns this plugin's submission and does not change the GitHub release gates.
+
+If a future owner-authorized submission is accepted, follow the then-current official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines). Verify the Portal form, images, capabilities, prompts, policies and exact package version. Declare the GitHub Issues support URL in both manifests, then verify actual Portal ingestion and public display separately. Record review approval, publication and fresh-host availability as distinct results. Preserve the existing published Directory artifact; GitHub release documentation does not replace it.

@@ -6,9 +6,9 @@
 
 Resume engineering work with durable state and reusable failure knowledge.
 
-[Install from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
+[Install in Codex from GitHub](docs/SETUP.md#1-install-in-codex-from-github)
 
-Project OS 2.2.2 is available in the Universal Plugin Directory with simple finding-capture and lesson-transfer recipes. GitHub source, tags and Releases are verified separately. See the [changelog](CHANGELOG.md) for recorded publication history.
+Project OS 2.2.3 adds deterministic finding capture and verifiable checkpoints. GitHub is the primary distribution channel for this Codex developer tool. See the [changelog](CHANGELOG.md) for release history.
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
@@ -42,7 +42,7 @@ One repository confirms a recurring React Native lifecycle failure and records t
 
 ## Start in Codex
 
-1. [Install Engineering Project OS from the Universal Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9).
+1. [Install Engineering Project OS in Codex from GitHub](docs/SETUP.md#1-install-in-codex-from-github).
 2. Open the repository in Codex and start a new task.
 3. Inspect the repository without changing it:
 
@@ -111,7 +111,7 @@ For example, one pagination fix belongs in Standard. An authentication migration
 
 ChatGPT is a companion for explanations, supplied project files and portable knowledge bundles. It does not gain access to a live local repository merely because the plugin is installed.
 
-Use the three Directory starter prompts to understand the system, prepare a setup from supplied material or work with a reviewed knowledge bundle:
+Where the companion is available, use these prompts to understand the system, prepare a setup from supplied material or work with a reviewed knowledge bundle:
 
 ~~~text
 @Engineering Project OS Tell me how Project OS helps Codex resume real engineering work across sessions.
@@ -119,19 +119,34 @@ Use the three Directory starter prompts to understand the system, prepare a setu
 @Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
 ~~~
 
-An overview needs no files. Advice about an existing setup requires the relevant Project OS files. If they are missing, ChatGPT must ask for them instead of pretending that an empty host workspace is your repository. Any changed files returned by ChatGPT remain artifacts until you deliberately apply them.
+An overview needs no files. Advice about an existing setup requires the relevant Project OS files. If they are missing, ChatGPT must ask for them instead of pretending that an empty host workspace is your repository. Any changed files returned by ChatGPT remain artifacts until you deliberately apply them. Codex marketplace installation does not install the companion in ChatGPT Web; see the [legacy Directory status](#legacy-directory).
 
-## Alternative: standalone Codex skill
+## Install in Codex from GitHub
 
-The Universal Plugin Directory is the primary installation route. If you need a standalone Codex-only installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
+Run these commands in Terminal using a Codex CLI with plugin support:
 
-The standalone installation request uses the versioned release tag:
-
-~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.2/skills/project-os
+~~~shell
+codex plugin marketplace add innrvoice/engineering-project-os --ref main
+codex plugin add engineering-project-os@engineering-project-os
 ~~~
 
-Use the 2.2.2 URL only after its versioned tag is published, then start a new Codex task after installation. The versioned URL does not follow `main` automatically.
+The marketplace catalog follows `main`; its plugin source is pinned to `v2.2.3`. Open the target repository in Codex and start a new task after installation. See [Setup](docs/SETUP.md) for verification, upgrades and resolving duplicate installations.
+
+## Standalone Codex skill
+
+For a standalone Codex installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
+
+~~~text
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.3/skills/project-os
+~~~
+
+Start a new Codex task after installation. The versioned URL does not follow `main` automatically. Keep one intended Project OS installation active.
+
+## Legacy Directory
+
+The existing [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) remains on 2.2.2. On 2026-10-16, the maintainer reported that the Portal would not accept an updated skills-only submission for Engineering Project OS. This observation concerns this plugin's submission; GitHub carries the current Codex release independently.
+
+Directory installation, including ChatGPT companion availability, remains a separate channel. Updating from GitHub does not update that listing or its installed copies.
 
 ## What is installed
 
@@ -147,7 +162,7 @@ Requirements are Python 3.9 or newer on macOS or Linux when the deterministic he
 - [How it works](docs/HOW_IT_WORKS.md)
 - [Usage](docs/USAGE.md)
 - [Reference](docs/REFERENCE.md)
-- [Directory and release packaging](docs/PACKAGING.md)
+- [GitHub distribution and release packaging](docs/PACKAGING.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

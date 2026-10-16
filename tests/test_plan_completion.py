@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -137,9 +138,139 @@ class PlanCompletionTest(unittest.TestCase):
         self.assertEqual(index['plans'][0]['completion']['revision'], 1)
         self.assertEqual(index['plans'][0]['completion']['requests'][0]['id'], 'R-001')
         self.assertEqual(index['plans'][1]['status'], 'planned')
-        self.assertEqual((self.root / '.agents/STATE.md').read_text(), self.checkpoint.read_text())
+        self.assertTrue((self.root / '.agents/STATE.md').read_text().startswith(self.checkpoint.read_text()))
+        checkpoint = run_cli('checkpoint', '--target', str(self.root), '--check', '--json')
+        self.assertEqual(checkpoint.returncode, 0, checkpoint.stdout + checkpoint.stderr)
+        receipt = json.loads(checkpoint.stdout)['receipt']
+        self.assertEqual(receipt['completed_plan'], '001')
+        self.assertEqual({item['path']: item['sha256'] for item in receipt['inputs']}['.agents/plans/index.json'],
+                         'sha256:' + hashlib.sha256(self.index_path.read_bytes()).hexdigest())
+        self.assertNotIn('.agents/plans/001.json', [item['path'] for item in receipt['inputs']])
         self.assertEqual(self.check().returncode, 0)
         self.assertNotEqual(self.complete().returncode, 0)
+
+    def test_completion_checkpoint_recovers_from_actual_copied_files_in_a_fresh_process(self):
+        self.request('implemented', target='001', gates=['sample'])
+        before = file_hashes(self.root)
+        preview = self.complete('--dry-run')
+        self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+        self.assertIn('"checkpoint_receipt"', preview.stdout)
+        self.assertEqual(file_hashes(self.root), before)
+        result = self.complete()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        recovered = self.root / 'fresh-copy'
+        shutil.copytree(self.root / '.agents', recovered / '.agents')
+        shutil.copyfile(self.root / 'AGENTS.md', recovered / 'AGENTS.md')
+        copy_before = file_hashes(recovered)
+        checked = run_cli('checkpoint', '--target', str(recovered), '--check', '--json')
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+        self.assertEqual(json.loads(checked.stdout)['checkpoint'], 'CURRENT')
+        self.assertEqual(run_cli('check', '--target', str(recovered)).returncode, 0)
+        self.assertEqual(file_hashes(recovered), copy_before)
+        self.assertEqual((recovered / '.agents/STATE.md').read_bytes(), (self.root / '.agents/STATE.md').read_bytes())
+
+    def test_completion_checkpoint_uses_custom_record_paths_and_program_inputs(self):
+        definition = write_program_definition(self.root)
+        started = run_cli('program', 'start', '--target', str(self.root), '--definition', str(definition))
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        system_path = self.root / '.agents/SYSTEM.json'
+        system = json.loads(system_path.read_text())
+        (self.root / 'records').mkdir()
+        for key in ('state', 'plans', 'requests', 'findings', 'reusable_knowledge'):
+            original = self.root / system['paths'][key]
+            destination = self.root / 'records' / (key + original.suffix)
+            original.rename(destination)
+            system['paths'][key] = destination.relative_to(self.root).as_posix()
+        write_json(system_path, system)
+        agents = self.root / 'AGENTS.md'
+        agents.write_text(agents.read_text().replace('.agents/STATE.md', system['paths']['state']))
+        result = self.complete()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        checked = run_cli('checkpoint', '--target', str(self.root), '--check', '--json')
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+        paths = {item['path'] for item in json.loads(checked.stdout)['receipt']['inputs']}
+        self.assertIn('records/plans.json', paths)
+        self.assertIn('records/reusable_knowledge.json', paths)
+        self.assertIn('.agents/PROGRAM.md', paths)
+        self.assertNotIn('.agents/plans/index.json', paths)
+        self.assertEqual(json.loads((self.root / 'records/plans.json').read_text())['execution_state'], 'idle')
+
+    def test_structural_pass_for_exported_copy_cannot_mask_a_dropped_checkpoint_receipt(self):
+        self.assertEqual(self.complete().returncode, 0)
+        self.assertEqual(run_cli('checkpoint', '--target', str(self.root), '--check').returncode, 0)
+        exported = self.root / 'exported-copy'
+        shutil.copytree(self.root / '.agents', exported / '.agents')
+        shutil.copyfile(self.root / 'AGENTS.md', exported / 'AGENTS.md')
+        # This matches an export assembled from an old draft despite valid source bytes.
+        (exported / '.agents/STATE.md').write_bytes(self.checkpoint.read_bytes())
+        before = file_hashes(exported)
+        self.assertEqual(run_cli('check', '--target', str(exported)).returncode, 0)
+        checked = run_cli('checkpoint', '--target', str(exported), '--check', '--json')
+        self.assertEqual(checked.returncode, 1)
+        self.assertEqual(json.loads(checked.stdout)['checkpoint'], 'STALE')
+        self.assertEqual(file_hashes(exported), before)
+        self.assertEqual(run_cli('checkpoint', '--target', str(self.root), '--check').returncode, 0)
+
+    def test_completion_checkpoint_receipt_validation_failure_rolls_back_the_entire_transition(self):
+        before = file_hashes(self.root)
+        with mock.patch.object(PROJECT_OS, 'checkpoint_check', return_value=1):
+            with self.assertRaisesRegex(PROJECT_OS.ProjectOSError, 'current checkpoint'):
+                PROJECT_OS.complete_plan(self.root, '001', self.checkpoint, False)
+        self.assertEqual(file_hashes(self.root), before)
+
+    def test_completion_guards_new_checkpoint_dependencies_before_write_and_after_validation(self):
+        for boundary in ('print_transaction_preview', 'require_passing_check'):
+            with self.subTest(boundary=boundary):
+                knowledge = self.root / '.agents/knowledge/reusable/failures.json'
+                original_bytes = knowledge.read_bytes()
+                before = file_hashes(self.root)
+                original = getattr(PROJECT_OS, boundary)
+                def race(*args):
+                    result = original(*args)
+                    knowledge.write_bytes(original_bytes + b'\n')
+                    return result
+                with mock.patch.object(PROJECT_OS, boundary, side_effect=race):
+                    with self.assertRaises(PROJECT_OS.ProjectOSError):
+                        PROJECT_OS.complete_plan(self.root, '001', self.checkpoint, False)
+                self.assertEqual(knowledge.read_bytes(), original_bytes + b'\n')
+                after = file_hashes(self.root)
+                before.pop('.agents/knowledge/reusable/failures.json')
+                after.pop('.agents/knowledge/reusable/failures.json')
+                self.assertEqual(after, before)
+                knowledge.write_bytes(original_bytes)
+
+    def test_completion_reserves_receipt_space_and_rejects_an_embedded_old_receipt(self):
+        original = self.checkpoint.read_text()
+        for draft in (original + '<!-- project-os-checkpoint: {} -->\n',
+                      original + 'Observed detail.\n' * (79 - len(original.splitlines()))):
+            with self.subTest(draft=draft[-70:]):
+                self.checkpoint.write_text(draft)
+                before = file_hashes(self.root)
+                result = self.complete()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(file_hashes(self.root), before)
+        self.checkpoint.write_text(original + 'Observed detail.\n' * (78 - len(original.splitlines())))
+        result = self.complete()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len((self.root / '.agents/STATE.md').read_text().splitlines()), 80)
+        self.assertEqual(run_cli('checkpoint', '--target', str(self.root), '--check').returncode, 0)
+
+    def test_completion_checkpoint_cannot_name_an_unknown_plan_or_hide_changed_inputs(self):
+        self.assertEqual(self.complete().returncode, 0)
+        state = self.root / '.agents/STATE.md'
+        original = state.read_text()
+        for identifier in ('002', 7):
+            with self.subTest(identifier=identifier):
+                state.write_text(original.replace('"completed_plan":"001"', '"completed_plan":' + json.dumps(identifier)))
+                result = run_cli('checkpoint', '--target', str(self.root), '--check', '--json')
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(json.loads(result.stdout)['checkpoint'], 'STALE')
+        state.write_text(original)
+        knowledge = self.root / '.agents/knowledge/reusable/failures.json'
+        knowledge.write_bytes(knowledge.read_bytes() + b'\n')
+        result = run_cli('checkpoint', '--target', str(self.root), '--check', '--json')
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(result.stdout)['checkpoint'], 'STALE')
 
     def test_manual_done_without_receipt_fails_check(self):
         index = json.loads(self.index_path.read_text())

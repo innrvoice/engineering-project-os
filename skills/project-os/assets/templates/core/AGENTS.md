@@ -14,6 +14,8 @@
 
 Before non-trivial work, inspect Git HEAD and status, then read `.agents/WORKFLOW.md`, CONTEXT, STATE, unresolved requests, the active plan and its JSON contract if one exists, applicable capability guidance, relevant knowledge entries and the code and callers being changed. Do not load complete history or unrelated evidence at startup.
 
+Follow WORKFLOW's required writeback even for a bounded bug fix: record reproduced defects with the helper, save a current checkpoint and pass `checkpoint --check` before the final response. Plan-free does not mean record-free. Recovery reads the saved files and verifies checkpoint freshness before relying on STATE.
+
 Capability guidance lives under `.agents/packs/`. Read only selected packs and overlays relevant to the requested change. Detected languages and frameworks are evidence, not behavioral profiles or permission to infer commands.
 
 Project OS is already connected to this repository. Ordinary engineering work follows this file and the routed records without requiring `$project-os`. That prefix explicitly invokes the installed Project OS skill for one message and is appropriate when the user wants to inspect, check, repair or upgrade the control plane, manage durable plans or checkpoints or curate findings and knowledge. It is not a shell command or a persistent mode.

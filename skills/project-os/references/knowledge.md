@@ -6,7 +6,7 @@ Project OS lets Codex record findings while working and carry useful lessons int
 
 Once a repository is connected, ask Codex to implement, investigate or verify work normally. Following the repository's instructions, Codex should record concrete defects, candidates and accepted risks it discovers during that work, with evidence and the next decisive check. You do not need to say `finding add` for each observation or prefix ordinary development with `$project-os`.
 
-Codex updates existing findings instead of creating duplicates and keeps observations separate from hypotheses. When evidence confirms a failure mechanism, it can capture a project lesson with the trigger, cause, prevention, decisive verification and applicability boundaries. An unresolved candidate stays a finding rather than becoming advice for another project.
+Codex updates existing findings instead of creating duplicates and keeps observations separate from hypotheses. A reproduced defect already named by the user is included, even in a bounded repair. Use the helper's finding record operation with observed evidence, then update the same ID after verification. When evidence confirms a failure mechanism, it can capture a project lesson with the trigger, cause, prevention, decisive verification and applicability boundaries. An unresolved candidate stays a finding rather than becoming advice for another project.
 
 This is agent-led work during the task. Project OS has no background scanner, central failure database or automatic cross-repository synchronization. It does not guarantee exhaustive discovery. Human review and approval are required before a sanitized lesson becomes reusable or moves to another repository.
 
@@ -22,9 +22,9 @@ Codex handles the sequence rather than asking you to run each knowledge operatio
 
 1. Inspect the new project's stack and version boundaries. If it is not connected yet, preview the appropriate setup and continue the same transfer after setup is approved.
 2. Read the source without changing it. Prefer its approved reusable library. If it only has project lessons or findings, inspect their evidence and prepare lessons only from confirmed mechanisms.
-3. Prepare missing reusable entries outside both repositories, removing private context while preserving the useful mechanism. Leave unconfirmed, misleading or inapplicable lessons out and explain why.
-4. Show one batch review of the proposed lesson changes: what fits, what is skipped, any conflicts and the exact destination changes. Complete preparation before asking for approval; the user need not provide a sequence of manual commands.
-5. Apply the approved selection, validate the destination and report the imported lessons and skips. Preserve existing destination edits and keep the source unchanged.
+3. Read each candidate's trigger, mechanism, prevention, verification and boundaries before selecting it. A matching title or applies_to tag is only a filter. Exclude an entry whose body does not support its title, and compare the actual lesson bodies for duplicate mechanisms before proposing the batch. The helper's duplicate report covers its canonical content comparison; an empty report does not establish semantic independence. Prepare missing reusable entries outside both repositories, removing private context while preserving the useful mechanism. Leave unconfirmed, misleading, duplicate or inapplicable lessons out and explain why.
+4. Before returning the batch review, open or reuse one small plan for this approval-dependent outcome, route the transfer request to its contract and retain the actual pending approval. Show one batch review of the proposed lesson changes: what fits, what is skipped, any conflicts and the exact destination changes. Complete preparation before asking for approval; the user need not provide a sequence of manual commands.
+5. Record and route the approval to the same contract, apply only the approved selection and validate the destination. Save evidence for the actual imported and skipped IDs, idempotence and source preservation. Once its gates are verified, mark the routed requests implemented and close through plan complete, which writes the idle checkpoint and fresh receipt atomically. Pass checkpoint --check before returning the completed result; no second checkpoint save is required. Do not leave requests captured with a "completed" decision or claim no remaining work while their routing is unresolved. Preserve existing destination edits and keep the source unchanged. When returning project files, follow WORKFLOW's exact-byte export protocol and validate the reconstructed serialized snapshot before delivery.
 
 The result is a local reusable library the next Codex task can read when relevant. The new project receives the applicable lessons rather than the old project's entire findings register, private history or unresolved hypotheses.
 
@@ -61,6 +61,8 @@ For already approved source entries, use the existing `knowledge import` helper 
 For `finding add: <observation>`, inspect current evidence and search for an existing owner first. Record a stable ID, status, impact, evidence, required next check and optional active plan. Keep observations separate from inference and do not claim an unverified mechanism.
 
 Preview the intended registry and evidence changes, preserve unrelated entries and run the checker after writing.
+
+Use `finding record --target <repository> --input <temporary-json> --dry-run` followed by the same command without `--dry-run`; add `--id <existing-id>` for an update. The input contains title, status, impact, evidence paths and required_check; verified or fixed_unverified also needs resolution. Store actual evidence in the repository first. The helper allocates a stable ID, retains SHA-256 evidence hashes and guards the transaction. Follow the connected WORKFLOW to save and verify the current checkpoint afterward.
 
 ### Capture project knowledge
 
@@ -118,7 +120,7 @@ python3 /absolute/path/to/project-os/scripts/project_os.py knowledge import --ta
 
 The source may also be a canonical JSON bundle. By default the helper selects active lessons whose `applies_to` values match `engineering`, a selected capability pack or a selected ecosystem overlay in the destination. It also considers retired and replaced tombstones regardless of their applicability tags, then recursively includes every linked entry needed to keep each selected replacement chain complete. The preview lists selected and skipped entries with reasons. Use `--ids FAIL-001,FAIL-002` for an exact reviewed set; it fails if a required lifecycle link is omitted. Use `--all` to consider every non-draft entry explicitly.
 
-Apply only the same reviewed command without `--dry-run`, then run `check` and repeat the import dry run. The repeated preview must report no pending writes. Import rejects detected URL forms in reusable content before changing the target, but human review remains mandatory for contextual disclosures the scanner cannot recognize.
+Apply only the same reviewed command without `--dry-run`, then run `check` and repeat the import dry run. The repeated preview must report no pending writes. Record the approval in requests, reconcile the checkpoint with actual imported/skipped IDs, source preservation and the exact next action, save it through `checkpoint --draft` and run `checkpoint --check` before returning files or a final response. Use the actual index execution/active state; writing a checkpoint does not close a plan. Import rejects detected URL forms in reusable content before changing the target, but human review remains mandatory for contextual disclosures the scanner cannot recognize.
 
 Import is conflict-safe:
 

@@ -1,8 +1,12 @@
 # Reference
 
-This is the technical contract for Project OS 2.2.2. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.2.3. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
+
+`finding record --target <repository> --input <json> [--id <existing-id>] [--dry-run]` transactionally captures or updates a finding. Input requires title, status, impact, nonempty repository-relative evidence paths and required_check; fixed_unverified and verified require resolution. Optional observation, cause and priority remain project-owned. New captures retain evidence_sha256 and capture_input_sha256; older records without these optional fields remain valid. Exact repeated input is idempotent, while semantic deduplication and status justification remain agent responsibilities.
+
+`checkpoint --target <repository> --draft <markdown> [--dry-run]` writes only the configured STATE owner and appends a receipt. Required nonempty lines are Updated, Execution state, Active plan, Outcome, Verified, Remaining and Next action. Execution/active values must match the index. The draft is at most 78 lines and the final checkpoint at most 80. The receipt binds body and current SYSTEM, plans, requests, findings, reusable/project knowledge, active plan/contract and active Program when applicable; it does not hash all historical plans. `checkpoint --target <repository> --check [--json]` is read-only and exits nonzero for absent, malformed or stale proof. The schema remains 5 and generic check remains structurally backward compatible. A current receipt proves captured file identity, not semantic completeness or host acceptance.
 
 | Interface | Used for | Invocation |
 | --- | --- | --- |
@@ -11,11 +15,11 @@ This is the technical contract for Project OS 2.2.2. Start with the [README](../
 | Python helper | Deterministic setup, validation, upgrade, Program transitions and reusable knowledge operations | `project_os.py ...` in Terminal |
 | ChatGPT companion | Explanations and workflows over project files or portable bundles supplied in the conversation | `@Engineering Project OS ...` with the needed material |
 
-Engineering Project OS was built for Codex. `$project-os` selects the bundled skill for one Codex message while `@Engineering Project OS` selects the ChatGPT companion. Text after either selector is natural language, not a helper command line or rigid parser. This release enables implicit invocation so the selected plugin can expose the skill for a clear Project OS request.
+Engineering Project OS was built for Codex. `$project-os` selects the bundled skill for one Codex message while `@Engineering Project OS` selects the ChatGPT companion where that companion is available. Text after either selector is natural language, not a helper command line or rigid parser. Implicit invocation lets the selected plugin expose the skill for a clear Project OS request. The primary installation route is the GitHub Codex marketplace; [Setup](SETUP.md) separates it from the standalone skill and legacy Directory channel.
 
 Installation and repository access are separate. Codex can use only the local workspace selected for the task. ChatGPT can use only the project description, files and portable bundles available in the chat. Choosing a setup can begin from a description while reviewing an existing setup requires its actual Project OS files. Neither surface gains repository access from installation alone.
 
-The ChatGPT Directory listing exposes three outcome-focused starter prompts:
+The package retains three outcome-focused companion starter prompts. They apply where the companion is available; Codex marketplace installation does not install into ChatGPT Web:
 
 | Starter prompt | Required initial context |
 | --- | --- |
@@ -173,16 +177,18 @@ Without --id, exactly one active plan must exist. JSON reports plan_id, outcome,
 python3 /absolute/path/to/project-os/scripts/project_os.py plan complete --target /path/to/repository --id 001 --checkpoint /path/to/checkpoint.md --dry-run
 ~~~
 
-The checkpoint draft is a separate regular UTF-8 file, not a Project OS record owner. It contains at most 80 lines, no reserved template tokens and these metadata lines:
+The checkpoint draft is a separate regular UTF-8 file, not a Project OS record owner. It contains at most 78 lines, no reserved template tokens or copied receipt and these metadata lines:
 
 ~~~text
 Execution state: idle.
 Active plan: none.
 ~~~
 
-Review the full transition, receipt and checkpoint, then remove only --dry-run. Completion requires a structurally valid repository, an active selected plan, a reviewed contract, all applicable gates verified and all scoped requirements implemented or explicitly withdrawn. It atomically writes done, idle, an optional null active_plan pointer and the reviewed STATE content. It leaves independent planned slices planned and does not perform migrations, deployment or production checks.
+Review the full transition, receipts and checkpoint, then remove only --dry-run. Completion requires a structurally valid repository, an active selected plan, a reviewed contract, all applicable gates verified and all scoped requirements implemented or explicitly withdrawn. It atomically writes done, idle, an optional null active_plan pointer and the reviewed STATE content with a fresh checkpoint receipt bound to the resulting index. The operation verifies CURRENT before success; a second checkpoint write is unnecessary. The final STATE remains at most 80 lines. It leaves independent planned slices planned and does not perform migrations, deployment or production checks.
 
 The new completion receipt contains closed_on, revision, contract_sha256, evidence path/hash pairs and hashes of scoped request records. The checker rejects new done records without a matching receipt. The operation guards all consumed record and evidence snapshots and validates written destinations after its final checker. A conflict or caught failure aborts or rolls back without overwriting divergent concurrent data. Receipt hashes are consistency checks, not signatures or proof of who ran the helper.
+
+When returning supplied project files, the agent rereads the actual file bytes after all writes, preserves the complete STATE receipt and computes hashes from those bytes. It reconstructs the exact serialized snapshot in a new temporary directory and runs both check and checkpoint --check there, then compares the original source hashes again. A CURRENT result in the source workspace does not prove that a different returned file set is current.
 
 For material changes, raise revision and record the reason and controlling request in the Markdown plan. Reassess evidence for the new revision. Revalidate evidence made stale by code or external changes as well. Once closed, preserve the historical receipt and use a new corrective slice for later requirements rather than rewriting the completed outcome.
 
@@ -213,7 +219,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.2.2",
+  "created_with": "2.2.3",
   "entries": []
 }
 ~~~
@@ -502,7 +508,7 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.2.2 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- Release 2.2.3 identifies the installed skill, helper, package metadata and connected `project_os_version`.
 - `SYSTEM.schema_version` is 5.
 - Knowledge registries retain their own `schema_version: 1`.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.

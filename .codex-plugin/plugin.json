@@ -1,6 +1,6 @@
 {
   "name": "engineering-project-os",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Keep long-running Codex work resumable and reuse verified failure knowledge safely between your own projects. ChatGPT is a companion for supplied files and portable bundles.",
   "author": {
     "name": "Pavel Bochkov Rastopchin",
@@ -13,10 +13,10 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Engineering Project OS",
-    "shortDescription": "Resume work. Reuse lessons.",
-    "longDescription": "Use this when Codex work must survive multiple sessions, preserve verified decisions and evidence or carry reviewed failure lessons into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.",
+    "shortDescription": "Developer workflows for Codex",
+    "longDescription": "Developer tooling for Codex to resume repository work across sessions and persist plans, findings, evidence and checkpoints. Use this when work must survive context compaction or reviewed failure lessons need to move into another repository you own. Project OS inspects, bootstraps, validates, repairs and upgrades visible repository records with previews before writes. ChatGPT is a companion for explanation, supplied project files and portable knowledge bundles. Do not use it for ordinary one-session coding or as an automatic global knowledge service.",
     "developerName": "Pavel Bochkov Rastopchin",
-    "category": "Productivity",
+    "category": "Developer Tools",
     "capabilities": [
       "Resume Codex work across sessions",
       "Keep plans, decisions and evidence with the repository",
@@ -24,6 +24,7 @@
       "Reuse reviewed lessons across your own projects"
     ],
     "websiteURL": "https://github.com/innrvoice/engineering-project-os",
+    "supportURL": "https://github.com/innrvoice/engineering-project-os/issues",
     "privacyPolicyURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/innrvoice/engineering-project-os/blob/main/docs/TERMS.md",
     "defaultPrompt": [

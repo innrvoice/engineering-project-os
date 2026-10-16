@@ -92,9 +92,9 @@ Project OS uses ordinary files with narrow ownership:
 
 One fact should have one owner. `STATE.md` is a compact handoff, not a diary. `CONTEXT.md` is durable context, not an active task list. The full `.agents` tree is not inserted into every prompt. `AGENTS.md` routes Codex to the smallest relevant records.
 
-## Installing the plugin is not connecting a repository
+## Installation and repository connection
 
-Installation makes the reusable skill available. It does not create files, attach a repository or turn Project OS into a permanent mode.
+The primary GitHub marketplace route installs the Codex plugin. A pinned standalone Codex skill is the secondary route. Either makes the reusable skill available without creating repository records, attaching a repository or turning Project OS into a permanent mode. ChatGPT companion access belongs to its separate distribution channel; see [Setup](SETUP.md).
 
 In Codex, open the repository and run `$project-os inspect`. Project OS reads Git state, instructions and engineering configuration without writing. It then recommends a clean bootstrap, a bootstrap that preserves existing authority or adoption of compatible records. Every mutating route follows the same sequence:
 
@@ -110,13 +110,15 @@ The Python helper performs deterministic operations such as `detect`, `init`, `a
 
 The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
 
-Project OS 2.2.2 retains schema 5 and the existing knowledge bundle formats. It clarifies ordinary finding capture and adds simple recipes for Codex to prepare and transfer applicable lessons. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
+Project OS 2.2.3 retains schema 5 and the existing knowledge bundle formats. It adds transactional finding capture, verifiable checkpoint writes and atomic completion with a current idle checkpoint. Updating the selected plugin or standalone skill does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
 
 ## ChatGPT is the companion surface
 
 ChatGPT can explain Project OS, reason about supplied project files and work with portable knowledge bundles. It does not see a live local checkout merely because the plugin is installed. An overview needs no files, but a claim about an existing repository needs the relevant files or a supplied snapshot.
 
 This makes ChatGPT useful for understanding the model, preparing setup artifacts from supplied material and carrying a reviewed bundle across machines. The full repository-native benefit appears in Codex, where the agent can read current Git state, follow `AGENTS.md`, run the helper and keep the control plane reconciled with the code.
+
+Returned project files need their own verification. The agent rereads actual bytes, preserves the complete checkpoint receipt, reconstructs the exact serialized snapshot in a separate directory and runs structural and checkpoint checks there. Fresh-session acceptance reads that returned file set. Successful checks in the original workspace cannot validate an export assembled from different bytes.
 
 ## Safety boundary
 

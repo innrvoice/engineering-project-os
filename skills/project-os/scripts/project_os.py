@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.2.2"
+VERSION = "2.2.3"
 SCHEMA_VERSION = 5
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
@@ -1220,6 +1220,28 @@ def execute_sync_transaction(
         fs.close()
 
 
+WORKFLOW_WRITEBACK_ROUTE = (
+    "Read `.agents/WORKFLOW.md` for every engineering task, including bounded bug fixes. "
+    "Record reproduced defects, save a current checkpoint and pass `checkpoint --check` "
+    "before the final response. Current user and repository instructions take precedence."
+)
+
+
+def with_workflow_writeback_route(text: str) -> str:
+    template_route = (
+        "Follow WORKFLOW's required writeback even for a bounded bug fix: record reproduced "
+        "defects with the helper, save a current checkpoint and pass `checkpoint --check` "
+        "before the final response. Plan-free does not mean record-free. Recovery reads "
+        "the saved files and verifies checkpoint freshness before relying on STATE."
+    )
+    if WORKFLOW_WRITEBACK_ROUTE in text or (
+        ".agents/WORKFLOW.md" in text and template_route in text
+    ):
+        return text
+    separator = "" if text.endswith("\n\n") else "\n" if text.endswith("\n") else "\n\n"
+    return text + separator + WORKFLOW_WRITEBACK_ROUTE + "\n"
+
+
 def init_project(
     root: Path,
     packs_value: str,
@@ -1311,13 +1333,14 @@ def init_project(
     operations.append(("create", system_path, json.dumps(system, indent=2) + "\n"))
     if agents_exists:
         original, _ = read_regular_at_path(agents_path)
-        agents_draft = original.decode("utf-8")
+        agents_draft = with_workflow_writeback_route(original.decode("utf-8"))
         replacements_for_init = []
-        if ".agents/WORKFLOW.md" not in agents_draft:
-            agents_draft = agents_draft.rstrip() + "\n\nRead `.agents/WORKFLOW.md` before non-trivial work and after context compaction. Current user and repository instructions take precedence.\n"
+        if agents_draft != original.decode("utf-8"):
             replacements_for_init.append((agents_path, agents_draft, hashlib.sha256(original).hexdigest()))
         creates_for_init = [(path, content or "") for action, path, content in operations if action == "create"]
         print_transaction_preview(root, creates_for_init, replacements_for_init)
+        for path, content, _ in replacements_for_init:
+            print(f"preview: {path.relative_to(root)}\n{content}")
         if not dry_run:
             execute_sync_transaction(root, creates_for_init, replacements_for_init,
                                      after_write=lambda: require_passing_check(root, "Initialization"),
@@ -1756,7 +1779,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         original_plans = load_json(plans)
         if migrate_plan_index(original_plans) != original_plans:
             modified.append(paths["plans"])
-    if ".agents/WORKFLOW.md" not in agents_text:
+    if with_workflow_writeback_route(agents_text) != agents_text:
         modified.append("AGENTS.md")
     report: dict[str, Any] = {
         "target": str(root),
@@ -1767,7 +1790,7 @@ def discover_adoption(root: Path, include_inventory: bool = False) -> dict[str, 
         "existing_files_modified": modified,
         "proposed_record_changes": ({
             paths["plans"]: migrate_plan_index(load_json(plans)),
-            "AGENTS.md": agents_text if ".agents/WORKFLOW.md" in agents_text else agents_text.rstrip() + "\n\nRead `.agents/WORKFLOW.md` before non-trivial work and after context compaction. It owns durable request intake and guarded plan completion; current user and repository instructions take precedence.\n",
+            "AGENTS.md": with_workflow_writeback_route(agents_text),
             ".agents/WORKFLOW.md": (CORE_TEMPLATE / ".agents/WORKFLOW.md").read_text(encoding="utf-8"),
             paths["requests"]: {"schema_version": 1, "next_id": 1, "requests": []},
         } if not errors and plans is not None else {}),
@@ -2499,6 +2522,7 @@ def validate_adoption_records(root: Path, paths: dict[str, Any], errors: list[st
                     for finding in findings:
                         if not isinstance(finding, dict):
                             continue
+                        validate_finding_proofs(root, finding, errors)
                         evidence = finding.get("evidence", [])
                         if not isinstance(evidence, list):
                             errors.append(
@@ -3304,8 +3328,8 @@ def complete_plan(root: Path, plan_id: str, checkpoint: Path, dry_run: bool) -> 
         draft = content.decode("utf-8")
     except UnicodeError as error:
         raise ProjectOSError("Checkpoint must be UTF-8") from error
-    if not draft.strip() or len(draft.splitlines()) > 80:
-        raise ProjectOSError("Checkpoint must contain non-empty text of at most 80 lines")
+    if not draft.strip() or len(draft.splitlines()) > 78:
+        raise ProjectOSError("Checkpoint draft must contain non-empty text of at most 78 lines, reserving space for its receipt")
     if not re.search(r"^Execution state: idle\.?$", draft, re.MULTILINE) or not re.search(
         r"^Active plan: none\.?$", draft, re.MULTILINE
     ):
@@ -3329,9 +3353,13 @@ def complete_plan(root: Path, plan_id: str, checkpoint: Path, dry_run: bool) -> 
     index["execution_state"] = "idle"
     if "active_plan" in index:
         index["active_plan"] = None
-    replacements = [(index_path, canonical_json(index), snapshots[index_path]), (state_path, draft, state_digest)]
+    index_text = canonical_json(index)
+    validate_checkpoint_body(draft, index, completed_plan=plan_id)
+    checkpoint_records = checkpoint_record_inputs(root, system, index, snapshots, index_text=index_text)
+    written, receipt = render_checkpoint(root, draft, checkpoint_records, completed_plan=plan_id)
+    replacements = [(index_path, index_text, snapshots[index_path]), (state_path, written, state_digest)]
     print(json.dumps({"transition": {"plan_id": plan_id, "from": "active", "to": "done", "execution_state": "idle"},
-                      "completion": plan["completion"], "checkpoint": draft}, indent=2, ensure_ascii=False))
+                      "completion": plan["completion"], "checkpoint": written, "checkpoint_receipt": receipt}, indent=2, ensure_ascii=False))
     print_transaction_preview(root, [], replacements)
     if dry_run:
         print("dry-run: no files written")
@@ -3348,10 +3376,216 @@ def complete_plan(root: Path, plan_id: str, checkpoint: Path, dry_run: bool) -> 
     def validate_completion() -> None:
         require_passing_check(root, "Plan completion")
         verify_checkpoint()
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            status = checkpoint_check(root, True)
+        if status:
+            raise ProjectOSError("Plan completion did not produce a current checkpoint: " + output.getvalue().strip())
 
     verify_checkpoint()
     execute_sync_transaction(root, [], replacements,
                              after_write=validate_completion, preconditions=snapshots)
+    return 0
+
+
+CHECKPOINT_RECEIPT_PREFIX = "<!-- project-os-checkpoint: "
+
+
+def checkpoint_record_inputs(
+    root: Path, system: dict[str, Any], index: dict[str, Any], snapshots: dict[Path, str],
+    *, index_text: str | None = None,
+) -> dict[Path, str]:
+    """Bind the selected index state while guarding the original on-disk inputs."""
+    paths = system["paths"]
+    raw_paths = [".agents/SYSTEM.json", *(paths[key] for key in ("plans", "requests", "findings", "reusable_knowledge"))]
+    raw_paths.extend(paths.get("project_knowledge", []))
+    if paths.get("program") is not None:
+        raw_paths.append(paths["program"])
+    for plan in index["plans"]:
+        if plan["status"] == "active":
+            raw_paths.extend(plan[key] for key in ("path", "contract_path") if plan.get(key) is not None)
+    records: dict[Path, str] = {}
+    for raw_path in raw_paths:
+        path = safe_relative(root, raw_path)
+        if path is None:
+            raise ProjectOSError(f"Checkpoint input has an unsafe path: {raw_path!r}")
+        reject_symlink_path(root, path)
+        content, _ = read_regular_at_path(path)
+        digest = hashlib.sha256(content).hexdigest()
+        retain_snapshot(snapshots, path, digest)
+        records[path] = hashlib.sha256(index_text.encode("utf-8")).hexdigest() if (
+            raw_path == paths["plans"] and index_text is not None
+        ) else digest
+    return records
+
+
+def checkpoint_inputs(root: Path) -> tuple[dict[str, Any], dict[str, Any], dict[Path, str]]:
+    """Snapshot record owners; this is content identity, not acceptance evidence."""
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        result = check_project(root)
+    if result:
+        raise ProjectOSError("Checkpoint requires a clean structural check: " + output.getvalue().strip())
+    snapshots: dict[Path, str] = {}
+    system = require_current_system(root, snapshots)
+    paths = system["paths"]
+    index_path = safe_relative(root, paths["plans"])
+    assert index_path is not None
+    index, digest = load_json_snapshot(index_path)
+    retain_snapshot(snapshots, index_path, digest)
+    errors: list[str] = []
+    validate_plan_records(root, system, errors, index_value=index)
+    if errors:
+        raise ProjectOSError("Checkpoint plan inputs are invalid: " + "; ".join(errors))
+    return system, index, checkpoint_record_inputs(root, system, index, snapshots)
+
+
+def validate_checkpoint_body(body: str, index: dict[str, Any], *, completed_plan: str | None = None) -> None:
+    if not body.strip() or len(body.splitlines()) > 78:
+        raise ProjectOSError("Checkpoint draft must contain non-empty text of at most 78 lines")
+    if CHECKPOINT_RECEIPT_PREFIX in body or any(token in body for token in RESERVED_TEMPLATE_TOKENS):
+        raise ProjectOSError("Checkpoint draft contains a receipt or unresolved template tokens")
+    fields = ("Updated", "Execution state", "Active plan", "Outcome", "Verified", "Remaining", "Next action")
+    if completed_plan is not None:
+        matches = [plan for plan in index["plans"] if plan["id"] == completed_plan and plan["status"] == "done"
+                   and isinstance(plan.get("completion"), dict)]
+        if len(matches) != 1:
+            raise ProjectOSError("Completion checkpoint must name a validated completed plan")
+        # Existing closure drafts require only the transition lines. The index receipt
+        # owns acceptance; do not invent narrative fields to upgrade an older draft.
+        fields = ("Execution state", "Active plan")
+    for field in fields:
+        matches = re.findall(r"^" + re.escape(field) + r": (.+)$", body, re.MULTILINE)
+        if len(matches) != 1 or not matches[0].strip():
+            raise ProjectOSError(f"Checkpoint requires one non-empty {field}: line")
+    updated = re.search(r"^Updated: (.+)$", body, re.MULTILINE)
+    if updated is not None:
+        canonical_date(updated[1].removesuffix("."), "Checkpoint Updated")
+    expected_execution = index["execution_state"]
+    active = next((plan["id"] for plan in index["plans"] if plan["status"] == "active"), "none")
+    for field, expected in (("Execution state", expected_execution), ("Active plan", active)):
+        if not re.search(r"^" + field + r": " + re.escape(expected) + r"\.?$", body, re.MULTILINE):
+            raise ProjectOSError(f"Checkpoint {field} must match the plan registry: {expected}")
+
+
+def checkpoint_receipt(
+    root: Path, body: str, snapshots: dict[Path, str], *, completed_plan: str | None = None,
+) -> dict[str, Any]:
+    receipt = {
+        "schema_version": 1,
+        "body_sha256": "sha256:" + hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        "inputs": [{"path": path.relative_to(root).as_posix(), "sha256": "sha256:" + digest}
+                   for path, digest in sorted(snapshots.items())],
+    }
+    if completed_plan is not None:
+        receipt["completed_plan"] = completed_plan
+    return receipt
+
+
+def render_checkpoint(
+    root: Path, body: str, snapshots: dict[Path, str], *, completed_plan: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    body = body.rstrip("\n") + "\n"
+    receipt = checkpoint_receipt(root, body, snapshots, completed_plan=completed_plan)
+    written = body + "\n" + CHECKPOINT_RECEIPT_PREFIX + json.dumps(receipt, sort_keys=True, separators=(",", ":")) + " -->\n"
+    if len(written.splitlines()) > 80:
+        raise ProjectOSError("Checkpoint with its receipt exceeds 80 lines")
+    return written, receipt
+
+
+def checkpoint_check(root: Path, as_json: bool = False) -> int:
+    root = root.resolve()
+    report: dict[str, Any] = {"checkpoint": "STALE", "errors": []}
+    try:
+        system, index, snapshots = checkpoint_inputs(root)
+        state_path = safe_relative(root, system["paths"]["state"])
+        assert state_path is not None
+        reject_symlink_path(root, state_path)
+        content, _ = read_regular_at_path(state_path)
+        text = content.decode("utf-8")
+        if len(text.splitlines()) > 80:
+            raise ProjectOSError("Checkpoint exceeds 80 lines")
+        matches = list(re.finditer(r"^" + re.escape(CHECKPOINT_RECEIPT_PREFIX) + r"(.+) -->\n?\Z", text, re.MULTILINE))
+        if len(matches) != 1 or text.count(CHECKPOINT_RECEIPT_PREFIX) != 1:
+            raise ProjectOSError("Checkpoint has no unique helper receipt; write a current checkpoint")
+        body = text[:matches[0].start()].removesuffix("\n")
+        receipt = json.loads(matches[0][1])
+        if not isinstance(receipt, dict):
+            raise ProjectOSError("Checkpoint receipt must contain an object")
+        completed_plan = receipt.get("completed_plan")
+        if completed_plan is not None and not isinstance(completed_plan, str):
+            raise ProjectOSError("Checkpoint completed_plan must be a plan ID")
+        validate_checkpoint_body(body, index, completed_plan=completed_plan)
+        if receipt != checkpoint_receipt(root, body, snapshots, completed_plan=completed_plan):
+            raise ProjectOSError("Checkpoint receipt is stale or changed; reconcile the current record owners")
+        for path, digest in {**snapshots, state_path: hashlib.sha256(content).hexdigest()}.items():
+            reject_symlink_path(root, path)
+            current, _ = read_regular_at_path(path)
+            if hashlib.sha256(current).hexdigest() != digest:
+                raise ProjectOSError(f"Checkpoint input changed during verification: {path.relative_to(root)}")
+        report["checkpoint"] = "CURRENT"
+        report["receipt"] = receipt
+    except (ProjectOSError, OSError, UnicodeError, ValueError) as error:
+        report["errors"].append(str(error))
+    if as_json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print("Checkpoint: " + report["checkpoint"])
+        for error in report["errors"]:
+            print("remaining: " + error)
+    return 1 if report["errors"] else 0
+
+
+def write_checkpoint(root: Path, draft_path: Path, dry_run: bool) -> int:
+    root = root.resolve()
+    system, index, snapshots = checkpoint_inputs(root)
+    state_path = safe_relative(root, system["paths"]["state"])
+    assert state_path is not None
+    reject_symlink_path(root, state_path)
+    state_bytes, _ = read_regular_at_path(state_path)
+    state_digest = hashlib.sha256(state_bytes).hexdigest()
+    draft_path = draft_path.absolute()
+    if draft_path.is_relative_to(root):
+        reject_symlink_path(root, draft_path)
+    if draft_path.is_symlink() or not draft_path.is_file():
+        raise ProjectOSError("Checkpoint draft must be a regular file")
+    draft_path = draft_path.parent.resolve() / draft_path.name
+    reject_symlink_path(Path(draft_path.anchor), draft_path)
+    content, details = read_regular_at_path(draft_path)
+    draft_digest = hashlib.sha256(content).hexdigest()
+    draft_identity = (details.st_dev, details.st_ino)
+    for path in [state_path, *snapshots]:
+        owner_details = path.stat()
+        if draft_identity == (owner_details.st_dev, owner_details.st_ino):
+            raise ProjectOSError("Checkpoint draft must be separate from Project OS record owners")
+    try:
+        body = content.decode("utf-8").rstrip("\n") + "\n"
+    except UnicodeError as error:
+        raise ProjectOSError("Checkpoint must be UTF-8") from error
+    validate_checkpoint_body(body, index)
+    written, receipt = render_checkpoint(root, body, snapshots)
+    replacements = [(state_path, written, state_digest)]
+    print(json.dumps({"checkpoint": body, "receipt": receipt}, indent=2, ensure_ascii=False))
+    print_transaction_preview(root, [], replacements)
+    if dry_run:
+        print("dry-run: no files written")
+        return 0
+
+    def verify_draft() -> None:
+        reject_symlink_path(Path(draft_path.anchor), draft_path)
+        current, current_details = read_regular_at_path(draft_path)
+        if hashlib.sha256(current).hexdigest() != draft_digest or (
+            current_details.st_dev, current_details.st_ino
+        ) != draft_identity:
+            raise ProjectOSError("Checkpoint draft changed during operation")
+
+    def validate_write() -> None:
+        require_passing_check(root, "Checkpoint")
+        verify_draft()
+
+    verify_draft()
+    execute_sync_transaction(root, [], replacements, after_write=validate_write,
+                             preconditions={**snapshots, state_path: state_digest})
     return 0
 
 
@@ -3388,33 +3622,31 @@ def plan_continuity_migration(
     creates: list[tuple[Path, str | bytes]] = []
     replacements: list[tuple[Path, str, str]] = []
     paths = next_system["paths"]
-    if original_system.get("schema_version") == SCHEMA_VERSION:
-        return creates, replacements
-    if "requests" in paths:
-        raise ProjectOSError("Legacy SYSTEM requests owner collides with schema-5 migration")
-    paths["requests"] = DEFAULT_PATHS["requests"]
-    request_path = root / paths["requests"]
-    reject_symlink_path(root, request_path)
-    if request_path.exists():
-        raise ProjectOSError("Requests destination already exists; resolve ownership before upgrade")
-    creates.append((request_path, canonical_json({"schema_version": 1, "next_id": 1, "requests": []})))
-    index_path = safe_relative(root, paths.get("plans"))
-    if index_path is None:
-        raise ProjectOSError("Plans owner is unsafe")
-    reject_symlink_path(root, index_path)
-    value, digest = load_json_snapshot(index_path)
-    snapshots[index_path] = digest
-    migrated = migrate_plan_index(value)
-    if migrated != value:
-        replacements.append((index_path, canonical_json(migrated), digest))
+    if original_system.get("schema_version") != SCHEMA_VERSION:
+        if "requests" in paths:
+            raise ProjectOSError("Legacy SYSTEM requests owner collides with schema-5 migration")
+        paths["requests"] = DEFAULT_PATHS["requests"]
+        request_path = root / paths["requests"]
+        reject_symlink_path(root, request_path)
+        if request_path.exists():
+            raise ProjectOSError("Requests destination already exists; resolve ownership before upgrade")
+        creates.append((request_path, canonical_json({"schema_version": 1, "next_id": 1, "requests": []})))
+        index_path = safe_relative(root, paths.get("plans"))
+        if index_path is None:
+            raise ProjectOSError("Plans owner is unsafe")
+        reject_symlink_path(root, index_path)
+        value, digest = load_json_snapshot(index_path)
+        snapshots[index_path] = digest
+        migrated = migrate_plan_index(value)
+        if migrated != value:
+            replacements.append((index_path, canonical_json(migrated), digest))
     agents_path = root / "AGENTS.md"
     reject_symlink_path(root, agents_path)
     data, _ = read_regular_at_path(agents_path)
     digest = hashlib.sha256(data).hexdigest()
     snapshots[agents_path] = digest
-    text = data.decode("utf-8")
-    if ".agents/WORKFLOW.md" not in text:
-        text = text.rstrip() + "\n\nRead `.agents/WORKFLOW.md` before non-trivial work and after context compaction. It owns durable request intake and guarded plan completion; current user and repository instructions take precedence.\n"
+    text = with_workflow_writeback_route(data.decode("utf-8"))
+    if text != data.decode("utf-8"):
         replacements.append((agents_path, text, digest))
     return creates, replacements
 
@@ -3626,6 +3858,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
                 for finding in findings:
                     if not isinstance(finding, dict):
                         continue
+                    validate_finding_proofs(root, finding, errors)
                     evidence = finding.get("evidence", [])
                     if not isinstance(evidence, list):
                         errors.append(f"finding {finding.get('id')!r} evidence must be an array")
@@ -5580,10 +5813,11 @@ def upgrade_project(
     print(f"upgrade schema: {schema} -> {SCHEMA_VERSION}")
     print(f"upgrade mode: {original_system.get('mode')} -> {next_system.get('mode')}")
     print_transaction_preview(root, creates, replacements, deletions)
-    if schema != SCHEMA_VERSION:
-        for path, content, *_ in [*creates, *replacements]:
-            if path.name in {"AGENTS.md", "WORKFLOW.md", "requests.json"} or path == safe_relative(root, next_paths.get("plans")):
-                print(f"preview: {path.relative_to(root)}\n{content}")
+    for path, content, *_ in [*creates, *replacements]:
+        if path.name == "AGENTS.md" or schema != SCHEMA_VERSION and (
+            path.name in {"WORKFLOW.md", "requests.json"} or path == safe_relative(root, next_paths.get("plans"))
+        ):
+            print(f"preview: {path.relative_to(root)}\n{content}")
     if dry_run:
         print("dry-run: no files written")
         return 0
@@ -5598,9 +5832,188 @@ def upgrade_project(
     return 0
 
 
+FINDING_INPUT_FIELDS = {
+    "title", "status", "impact", "evidence", "required_check",
+    "observation", "cause", "resolution", "priority",
+}
+
+
+def validate_finding_proofs(root: Path, finding: dict[str, Any], errors: list[str]) -> None:
+    """Legacy findings retain path evidence; new captures additionally pin its bytes."""
+    if "evidence_sha256" not in finding:
+        return
+    label = f"finding {finding.get('id')!r}"
+    proofs = finding["evidence_sha256"]
+    evidence = finding.get("evidence")
+    if (
+        not isinstance(proofs, dict) or not isinstance(evidence, list)
+        or any(not isinstance(path, str) for path in evidence)
+        or set(proofs) != set(evidence)
+    ):
+        errors.append(f"{label} evidence_sha256 must cover exactly its evidence paths")
+        return
+    for raw_path, expected in proofs.items():
+        path = safe_relative(root, raw_path)
+        if path is None or not isinstance(expected, str) or FULL_SHA256_PATTERN.fullmatch(expected) is None:
+            errors.append(f"{label} has invalid evidence_sha256 proof: {raw_path!r}")
+            continue
+        try:
+            reject_symlink_path(root, path)
+            content, _ = read_regular_at_path(path)
+            if "sha256:" + hashlib.sha256(content).hexdigest() != expected:
+                errors.append(f"{label} evidence changed: {raw_path}")
+        except (ProjectOSError, OSError) as error:
+            errors.append(f"{label} evidence is unavailable: {raw_path}: {error}")
+
+
+def record_finding(root: Path, input_path: Path, identifier: str | None, dry_run: bool) -> int:
+    try:
+        return _record_finding(root, input_path, identifier, dry_run)
+    except OSError as error:
+        raise ProjectOSError(f"Finding capture could not safely read its inputs: {error}") from error
+
+
+def _record_finding(root: Path, input_path: Path, identifier: str | None, dry_run: bool) -> int:
+    root = root.resolve()
+    snapshots: dict[Path, str] = {}
+    _, _, system = read_selected_system(root, snapshots)
+    registry_path = safe_relative(root, system["paths"].get("findings"))
+    if registry_path is None:
+        raise ProjectOSError("Findings registry path is unsafe or missing")
+    reject_symlink_path(root, registry_path)
+    registry, registry_digest = load_json_snapshot(registry_path)
+    if not isinstance(registry, dict):
+        raise ProjectOSError("Findings registry must contain an object")
+    errors: list[str] = []
+    validate_registry_schema(registry, "findings registry", errors)
+    findings = registry.get("findings")
+    check_unique_ids(findings, "findings", errors,
+                     ("id", "status", "impact", "evidence", "required_check"), FINDING_STATUSES)
+    if not positive_integer(registry.get("next_id")):
+        errors.append("findings registry next_id must be a positive integer")
+    if errors:
+        raise ProjectOSError("Invalid findings registry: " + "; ".join(errors))
+    snapshots[registry_path] = registry_digest
+
+    input_path = input_path.absolute()
+    if input_path.is_relative_to(root):
+        reject_symlink_path(root, input_path)
+    if input_path.is_symlink() or not input_path.is_file():
+        raise ProjectOSError("Finding input must be a regular file")
+    # Select an explicitly supplied external parent once, including macOS /tmp.
+    input_path = input_path.parent.resolve() / input_path.name
+    reject_symlink_path(Path(input_path.anchor), input_path)
+    input_bytes, input_details = read_regular_at_path(input_path)
+    input_digest = hashlib.sha256(input_bytes).hexdigest()
+    input_identity = (input_details.st_dev, input_details.st_ino)
+    try:
+        definition = json.loads(input_bytes.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ProjectOSError("Finding input must be a UTF-8 JSON object") from error
+    required = {"title", "status", "impact", "evidence", "required_check"}
+    if not isinstance(definition, dict) or not required <= set(definition) or set(definition) - FINDING_INPUT_FIELDS:
+        raise ProjectOSError("Finding input requires title, status, impact, evidence and required_check; optional fields: observation, cause, resolution, priority")
+    for key, value in definition.items():
+        if key != "evidence" and (not isinstance(value, str) or not value.strip()):
+            raise ProjectOSError(f"Finding {key} must be non-empty text")
+    if definition["status"] not in FINDING_STATUSES:
+        raise ProjectOSError("Finding status is invalid")
+    if definition["status"] in {"fixed_unverified", "verified"} and not definition.get("resolution", "").strip():
+        raise ProjectOSError("A fixed or verified finding requires its observed resolution")
+    evidence = definition["evidence"]
+    if not isinstance(evidence, list) or not evidence or any(not isinstance(path, str) for path in evidence):
+        raise ProjectOSError("Finding evidence must be a non-empty array of repository-relative file paths")
+    if len(set(evidence)) != len(evidence):
+        raise ProjectOSError("Finding evidence paths must be unique")
+    proofs: dict[str, str] = {}
+    for raw_path in evidence:
+        path = safe_relative(root, raw_path)
+        if path is None or path == registry_path or path.relative_to(root).as_posix() != raw_path:
+            raise ProjectOSError(f"Finding evidence path is unsafe or owned by the findings registry: {raw_path!r}")
+        reject_symlink_path(root, path)
+        content, _ = read_regular_at_path(path)
+        digest = hashlib.sha256(content).hexdigest()
+        retain_snapshot(snapshots, path, digest)
+        proofs[raw_path] = "sha256:" + digest
+
+    by_id = {finding["id"]: finding for finding in findings}
+    if identifier is not None:
+        if identifier not in by_id:
+            raise ProjectOSError(f"Unknown finding ID: {identifier}; omit --id to allocate a new ID")
+        existing = by_id[identifier]
+    else:
+        # Only an identical capture is idempotent. Similar titles are not proof of one incident.
+        matches = [finding for finding in findings if (
+            finding.get("capture_input_sha256") == record_hash(definition)
+            or {key: finding[key] for key in FINDING_INPUT_FIELDS if key in finding} == definition
+        )]
+        if len(matches) > 1:
+            raise ProjectOSError("Identical findings are ambiguous; choose the stable --id")
+        existing = matches[0] if matches else None
+        if existing is not None:
+            identifier = existing["id"]
+    next_registry = copy.deepcopy(registry)
+    if identifier is None:
+        numeric_ids = [re.fullmatch(r"([A-Z][A-Z0-9-]*)-([0-9]+)", value) for value in by_id]
+        prefixes = {match.group(1) for match in numeric_ids if match is not None}
+        prefix = next(iter(prefixes)) if len(prefixes) == 1 and all(numeric_ids) else "F"
+        sequence = max(registry["next_id"], 1 + max(
+            (int(match.group(2)) for match in numeric_ids if match is not None), default=0))
+        identifier = f"{prefix}-{sequence:03d}"
+        while identifier in by_id:
+            sequence += 1
+            identifier = f"{prefix}-{sequence:03d}"
+        next_registry["next_id"] = sequence + 1
+    entry = copy.deepcopy(existing) if existing is not None else {"id": identifier}
+    entry.update(definition)
+    entry["evidence_sha256"] = proofs
+    entry["capture_input_sha256"] = record_hash(definition)
+    if existing is None:
+        next_registry["findings"].append(entry)
+    else:
+        next_registry["findings"] = [entry if finding["id"] == identifier else finding for finding in findings]
+    replacements = [] if next_registry == registry else [(registry_path, canonical_json(next_registry), registry_digest)]
+    print(canonical_json({"operation": "finding record", "finding": entry,
+                          "changed": bool(replacements)}), end="")
+    print_transaction_preview(root, [], replacements)
+    if dry_run:
+        print("dry-run: no files written")
+        return 0
+
+    def verify_input() -> None:
+        reject_symlink_path(Path(input_path.anchor), input_path)
+        current, details = read_regular_at_path(input_path)
+        if hashlib.sha256(current).hexdigest() != input_digest or (details.st_dev, details.st_ino) != input_identity:
+            raise ProjectOSError("Finding input changed during operation")
+
+    def validate_result() -> None:
+        require_passing_check(root, "Finding capture")
+        verify_input()
+
+    verify_input()
+    execute_sync_transaction(root, [], replacements, after_write=validate_result, preconditions=snapshots)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    checkpoint_parser = subparsers.add_parser("checkpoint", help="Save or verify a compact handoff bound to current records")
+    checkpoint_parser.add_argument("--target", required=True, type=Path)
+    checkpoint_mode = checkpoint_parser.add_mutually_exclusive_group(required=True)
+    checkpoint_mode.add_argument("--draft", type=Path)
+    checkpoint_mode.add_argument("--check", action="store_true")
+    checkpoint_parser.add_argument("--dry-run", action="store_true")
+    checkpoint_parser.add_argument("--json", action="store_true")
+
+    finding_parser = subparsers.add_parser("finding", help="Persist concrete findings with checked evidence")
+    finding_commands = finding_parser.add_subparsers(dest="finding_command", required=True)
+    finding_record_parser = finding_commands.add_parser("record", help="Capture or update a finding transactionally")
+    finding_record_parser.add_argument("--target", required=True, type=Path)
+    finding_record_parser.add_argument("--input", required=True, type=Path)
+    finding_record_parser.add_argument("--id", help="Update an existing stable ID; omit for a new capture")
+    finding_record_parser.add_argument("--dry-run", action="store_true")
 
     plan_parser = subparsers.add_parser("plan", help="Inspect or transactionally complete a plan")
     plan_commands = plan_parser.add_subparsers(dest="plan_command", required=True)
@@ -5759,10 +6172,20 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if args.command == "finding":
+            return record_finding(args.target, args.input, args.id, args.dry_run)
         if args.command == "plan":
             if args.plan_command == "status":
                 return plan_status(args.target, args.id, args.json, args.require_ready)
             return complete_plan(args.target, args.id, args.checkpoint, args.dry_run)
+        if args.command == "checkpoint":
+            if args.check:
+                if args.dry_run:
+                    raise ProjectOSError("checkpoint --check does not accept --dry-run")
+                return checkpoint_check(args.target, args.json)
+            if args.json:
+                raise ProjectOSError("checkpoint --json requires --check")
+            return write_checkpoint(args.target, args.draft, args.dry_run)
         if args.command == "detect":
             print(json.dumps(detect_repository(args.target), indent=2, ensure_ascii=False))
             return 0

@@ -4,6 +4,24 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2026-10-16
+
+### Changed
+
+- Made the GitHub Codex marketplace the primary installation route with a version-pinned plugin source and the tagged standalone skill as the secondary route.
+- Led plugin listing metadata with developer workflows for Codex and aligned installation, upgrade, companion and duplicate-copy guidance across public documentation.
+- Kept the existing Directory listing as a separate legacy channel and separated GitHub release verification from Portal submission and ChatGPT availability.
+
+### Fixed
+
+- Added transactional finding capture with stable IDs, explicit updates and evidence SHA-256 validation for reproduced and discovered defects.
+- Added compact checkpoint writes and a read-only freshness guard that binds current record owners and active contracts without closing plans.
+- Made guarded completion save and validate the resulting idle checkpoint receipt in the same transaction and required exact returned-file reconstruction checks for companion snapshots.
+- Required ordinary repairs and supplied-material companion operations to persist findings, material decisions and current checkpoints before returning results or project files.
+- Updated existing repository routing as well as new templates and required approval-dependent transfers to reconcile their requests through a real contract before completion.
+- Declared the GitHub Issues support URL in both supported plugin manifest formats.
+- Kept fresh-session behavioral acceptance and file-only recovery mandatory before preparing the release ZIP. Source and helper tests do not establish that acceptance or publication.
+
 ## [2.2.2] - Directory publication confirmed 2026-10-16
 
 Directory publication is separate from the corresponding GitHub source update, tag and Release. The original published ZIP is retained for GitHub distribution; later publication-status edits in repository documentation do not replace that artifact.
