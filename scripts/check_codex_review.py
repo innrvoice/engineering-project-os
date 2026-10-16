@@ -8,6 +8,7 @@ check is not a completed Codex review. Dispositions remain private local files.
 import argparse
 import hashlib
 import json
+import os
 import re
 import stat
 import subprocess
@@ -23,6 +24,12 @@ FINDING_MARKERS = {
     "<!-- codex-code-review-finding:v1 -->": "code_review",
     "<!-- codex-security-review-finding:v1 -->": "security_review",
 }
+# Keep this read-only input policy in sync with package_plugin.source_files.
+# Never import or execute the target checkout's packaging code to inspect it.
+PACKAGE_FILES = ("plugin.json", ".codex-plugin/plugin.json", "README.md", "LICENSE",
+                 "SECURITY.md", "CHANGELOG.md", "CONTRIBUTING.md", "scripts/package_plugin.py",
+                 "scripts/check_codex_review.py")
+PACKAGE_TREES = ("skills", "assets", "docs")
 QUERY = """query($owner:String!,$name:String!,$number:Int!) {
   repository(owner:$owner,name:$name) {
     nameWithOwner
@@ -194,6 +201,39 @@ def evidence_file(target, relative):
     return current
 
 
+def package_inputs(target):
+    """Enumerate actual package inputs without trusting target code or Git ignores."""
+    paths = set()
+    for relative in PACKAGE_FILES:
+        path = target / relative
+        if path.exists() or path.is_symlink():
+            evidence_file(target, relative)
+            require(stat.S_ISREG(path.lstat().st_mode), "Non-regular package input: " + relative)
+            paths.add(relative)
+
+    def visit(directory):
+        with os.scandir(directory) as entries:
+            children = sorted(entries, key=lambda entry: entry.name)
+        for entry in children:
+            path = Path(entry.path)
+            relative = path.relative_to(target).as_posix()
+            mode = entry.stat(follow_symlinks=False).st_mode
+            require(not stat.S_ISLNK(mode), "Symlink package input is not allowed: " + relative)
+            if stat.S_ISDIR(mode):
+                # The packager also inspects excluded cache trees for symlinks.
+                visit(path)
+            elif "__pycache__" not in path.parts and path.suffix != ".pyc":
+                require(stat.S_ISREG(mode), "Non-regular package input: " + relative)
+                paths.add(relative)
+
+    for relative in PACKAGE_TREES:
+        directory = target / relative
+        if directory.exists() or directory.is_symlink():
+            require(stat.S_ISDIR(directory.lstat().st_mode), "Expected a real package directory: " + relative)
+            visit(directory)
+    return paths
+
+
 def inspect_dispositions(path, target, repository, number, head, findings):
     """Return hashes for every local input that must remain unchanged."""
     if path is None:
@@ -278,7 +318,10 @@ class Live:
                 require(bool(path.stat().st_mode & stat.S_IXUSR) == (mode == "100755"),
                         "Source executable mode differs from reviewed HEAD: " + relative)
                 hashes[relative] = {"sha256": digest(data), "mode": mode}
-        return {"head": head, "files": hashes}
+        packaged = package_inputs(target)
+        unreviewed = sorted(packaged - set(hashes))
+        require(not unreviewed, "Unreviewed package input is absent from reviewed HEAD: " + ", ".join(unreviewed))
+        return {"head": head, "files": hashes, "package_files": sorted(packaged)}
 
 
 def check(repository, number, head, target, dispositions, live):

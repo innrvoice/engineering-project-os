@@ -98,6 +98,8 @@ python3 -B scripts/check_codex_review.py --repo innrvoice/engineering-project-os
 
 The guard requires the canonical bot's completed final-head code/security status, no unresolved findings or review threads and a disposition for every marked bot finding across the PR history. With no findings, the disposition file is optional. It fails closed on missing API access, timeout, incomplete pagination, changed source, changed proof or concurrent review state. It does not merge, resolve threads or publish. Run it immediately before merge and again before publication using the retained reviewed checkout; verify the squash-merged tree matches that reviewed source.
 
+Every actual package input must belong to the reviewed HEAD, including files hidden by Git ignore rules. The guard independently inventories the package's fixed files and directory trees before and after review validation, rejects unreviewed inputs, symlinks and included non-regular entries and preserves the packager's regular cache exclusions. Ignored private working records outside package inputs remain allowed.
+
 Dispositions stay private and bind the repository, PR, reviewed head, exact comment body and local verification evidence. Each finding uses its real comment URL, `decision: fixed` or `decision: rejected`, a reason, `comment_sha256: sha256:<actual-comment-body-digest>` and `evidence: [{path: <repository-relative-proof>, sha256: sha256:<actual-file-digest>}]`. The top-level fields are `schema_version: 1`, `repository`, `pr`, `reviewed_head` and `findings`. An accepted-risk declaration or a resolved thread alone is insufficient. Refresh review after fixes, address every remark and preserve the actual guard result as the separate acceptance evidence.
 
 ## Release sequence

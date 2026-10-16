@@ -4,6 +4,7 @@ import copy
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -16,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("check_codex_review", ROOT / "scripts/check_codex_review.py")
 GUARD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GUARD)
+PACKAGE_SPEC = importlib.util.spec_from_file_location("trusted_test_packager", ROOT / "scripts/package_plugin.py")
+PACKAGER = importlib.util.module_from_spec(PACKAGE_SPEC)
+PACKAGE_SPEC.loader.exec_module(PACKAGER)
 REPOSITORY = "owner/project"
 HEAD = "a" * 40
 URL = "https://github.com/owner/project/pull/10"
@@ -373,6 +377,112 @@ class CodexReviewTests(unittest.TestCase):
         source.write_text("x = 1\n"); (target / "untracked.py").write_text("x = 3\n")
         with self.assertRaisesRegex(GUARD.NotReady, "dirty"):
             GUARD.Live(30).source(target)
+
+    def packaged_checkout(self, name):
+        target = self.target / name
+        target.mkdir()
+        for relative in PACKAGER.FILES:
+            path = target / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # The guard must enumerate this target without executing its code.
+            path.write_text("raise AssertionError('target code must not execute')\n")
+        for relative in PACKAGER.TREES:
+            directory = target / relative
+            directory.mkdir(exist_ok=True)
+            (directory / "tracked.txt").write_text("Reviewed package bytes.\n")
+        (target / ".gitignore").write_text(".DS_Store\n__pycache__/\n*.pyc\n.agents/\n")
+        def git(*args):
+            return subprocess.run(["git", "-C", str(target), *args], check=True,
+                                  capture_output=True, text=True).stdout.strip()
+        git("init", "-q")
+        git("add", ".")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Reviewed package baseline")
+        return target, git
+
+    def completed_live(self, head, on_refresh=None):
+        value = snapshot()
+        pr(value)["headRefOid"] = head
+        for kind in ("code_review", "security_review"):
+            update_state(value, kind=kind, commit_sha=head)
+        class ReviewedLive(GUARD.Live):
+            def __init__(self):
+                super().__init__(30)
+                self.snapshots = 0
+            def snapshot(self, repository, number):
+                self.snapshots += 1
+                if self.snapshots == 2 and on_refresh:
+                    on_refresh()
+                return copy.deepcopy(value)
+        return ReviewedLive()
+
+    def test_package_input_policy_matches_actual_packager_and_keeps_exclusions(self):
+        self.assertEqual(GUARD.PACKAGE_FILES, PACKAGER.FILES)
+        self.assertEqual(GUARD.PACKAGE_TREES, PACKAGER.TREES)
+        target, git = self.packaged_checkout("package-policy")
+        before = GUARD.Live(30).source(target)
+        (target / ".agents").mkdir()
+        (target / ".agents/private.json").write_text("Private working records.\n")
+        (target / "skills/__pycache__").mkdir()
+        (target / "skills/__pycache__/module.pyc").write_bytes(b"Ignored cache")
+        (target / "docs/cache.pyc").write_bytes(b"Ignored bytecode")
+        expected = {path.relative_to(target).as_posix() for path in PACKAGER.source_files(target)}
+        self.assertEqual(GUARD.package_inputs(target), expected)
+        self.assertEqual(git("status", "--porcelain=v1"), "")
+        self.assertEqual(GUARD.Live(30).source(target), before)
+        result = GUARD.check(REPOSITORY, 10, before["head"], target, None, self.completed_live(before["head"]))
+        self.assertEqual(result["readiness"], "READY")
+
+    def test_ignored_regular_inputs_in_each_packaged_tree_block_ready(self):
+        for tree in PACKAGER.TREES:
+            with self.subTest(tree=tree):
+                target, git = self.packaged_checkout("ignored-" + tree)
+                head = git("rev-parse", "HEAD")
+                hidden = target / tree / ".DS_Store"
+                hidden.write_bytes(b"Unreviewed package bytes")
+                self.assertEqual(git("status", "--porcelain=v1"), "")
+                self.assertIn(hidden, PACKAGER.source_files(target))
+                self.assertIn(hidden.relative_to(target).as_posix(), GUARD.package_inputs(target))
+                with self.assertRaisesRegex(GUARD.NotReady, "Unreviewed package input.*" + tree):
+                    GUARD.check(REPOSITORY, 10, head, target, None, self.completed_live(head))
+
+    def test_ignored_fixed_package_input_must_also_exist_in_reviewed_head(self):
+        target, git = self.packaged_checkout("ignored-fixed")
+        (target / ".git/info/exclude").write_text("/README.md\n")
+        git("rm", "--cached", "README.md")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "No reviewed README")
+        self.assertEqual(git("status", "--porcelain=v1"), "")
+        self.assertIn(target / "README.md", PACKAGER.source_files(target))
+        with self.assertRaisesRegex(GUARD.NotReady, "Unreviewed package input.*README.md"):
+            GUARD.Live(30).source(target)
+
+    def test_ignored_package_symlinks_and_nonregular_entries_are_rejected(self):
+        for kind in ("symlink", "fifo", "cache-symlink"):
+            with self.subTest(kind=kind):
+                target, git = self.packaged_checkout("unsafe-" + kind)
+                hidden = target / "assets/.DS_Store"
+                if kind == "fifo":
+                    os.mkfifo(hidden)
+                else:
+                    if kind == "cache-symlink":
+                        hidden = target / "skills/__pycache__/module.pyc"
+                        hidden.parent.mkdir()
+                    hidden.symlink_to(target / "README.md")
+                self.assertEqual(git("status", "--porcelain=v1"), "")
+                with self.assertRaises(ValueError):
+                    PACKAGER.source_files(target)
+                with self.assertRaisesRegex(GUARD.NotReady, "package input"):
+                    GUARD.Live(30).source(target)
+
+    def test_concurrent_ignored_package_input_addition_blocks_final_check(self):
+        target, git = self.packaged_checkout("concurrent-ignored")
+        head = git("rev-parse", "HEAD")
+        def add_ignored():
+            (target / "assets/.DS_Store").write_bytes(b"Appeared during remote review collection")
+        live = self.completed_live(head, on_refresh=add_ignored)
+        with self.assertRaisesRegex(GUARD.NotReady, "Unreviewed package input.*assets/.DS_Store"):
+            GUARD.check(REPOSITORY, 10, head, target, None, live)
+        self.assertEqual(live.snapshots, 2)
+        self.assertEqual(git("status", "--porcelain=v1"), "")
 
     def test_hidden_worktree_bytes_and_modes_must_equal_reviewed_git_blobs(self):
         for flag in ("--assume-unchanged", "--skip-worktree"):
