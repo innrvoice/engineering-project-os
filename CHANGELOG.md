@@ -4,6 +4,26 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] - 2026-10-16
+
+### Fixed
+
+- Reject implicit finding recapture when evidence bytes or managed input changed; require a reviewed explicit ID update and preserve true no-op repeats.
+- Separate helper-owned proof metadata from project-owned finding extensions and migrate earlier helper captures through an explicit hash-bound ownership review without refreshing changed evidence.
+- Preserve legacy fields on validation, upgrade and explicit finding updates; reject namespace collisions and concurrent proof/review changes without overwriting data.
+- Carry valid evidence for files rewritten during upgrade through explicitly reviewed historical snapshots in the same transaction; retain original bytes, hashes and provenance without claiming the new files were verified.
+
+### Changed
+
+- Require completed Codex code/security review of the final source commit and disposition of every remark before merge or publication, separately from CI.
+- Add a read-only final-head review guard with exact comment/evidence hashes, source checks and fail-closed handling of missing, running, stale or unresolved reviews; require an independently trusted external verifier, isolated Python imports, bound external tools and every mandatory package path.
+- Keep SYSTEM schema 5, plans schema 2 and findings, contracts, requests and new proof format version 1.
+
+### Validation scope
+
+- Native Codex persistence and recovery were verified in isolated sessions. Actual ChatGPT companion snapshots were reconstructed and their record hashes and checkpoint receipts checked.
+- Strict isolation of ChatGPT Work context from account Memory remains unverified. Memory settings were left unchanged; this release does not claim Memory-isolated companion recovery.
+
 ## [2.2.3] - 2026-10-16
 
 ### Changed

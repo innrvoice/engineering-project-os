@@ -173,7 +173,24 @@ Inspect release, schema, managed guidance baselines, user-owned knowledge and Pr
 
 If the repository release is newer than the helper, stop and use a matching or newer helper. Upgrade never downgrades repository state. Do not lower version fields manually to bypass this check.
 
-Upgrade preserves existing instructions and project content. Schema 5 adds managed WORKFLOW, an empty requests registry, minimal AGENTS routing and plan-index format metadata in the same transaction. Historical closed dispositions are registered as legacy_closed; unfinished plans without contracts become legacy_uncontracted and must be reviewed on resume. It does not reconstruct chat history or invent proof. Markdown plans, context, state, findings, evidence and application code remain unchanged apart from an explicitly required legacy lifecycle or knowledge migration. The schema 3 to 4 migration removes release-managed seed entries, promotes user-owned lessons proven by adoption coverage and keeps compatible unresolved local entries as drafts that require review. It aborts without writes if classifying any retained local entry would discard lifecycle metadata or unsupported user fields.
+For a source repository recorded as 2.2.3, bare finding evidence_sha256 or capture_input_sha256 fields are ambiguous. Read the real configured registry and capture history, prepare one review file inside the target with schema_version1, exact registry_sha256 and an ownership map of every ambiguous ID to project_owned or helper_2_2_3. Ask only if ownership cannot be established from the supplied evidence. Pass --finding-proof-review <absolute-inside-target-file> to both preview and apply. Proven helper hashes are copied unchanged into project_os_finding_proof; changed evidence, stale or incomplete reviews and namespace collisions refuse writes. Preserve raw legacy values, custom paths and the complete review. Earlier source releases preserve these fields as project data automatically; never infer helper ownership merely from a matching shape.
+
+If a valid helper proof references a file the prospective upgrade rewrites or deletes, preserve its historical bytes through the same reviewed transaction. Extend the review with snapshot_evidence mapping each affected finding ID to the exact original path and its recorded sha256 digest. Include every affected unarchived proof path and no unaffected paths; preview reports the required map. For an already namespaced proof, ownership is empty. Read and verify the actual bytes and complete preview before applying the same command. Do not refresh the old hash to match new managed content, classify genuine helper proof as project-owned or lower a version to bypass migration.
+
+For example, replace both digest placeholders with the exact registry and recorded evidence hashes; include other affected paths and ownership decisions when the preview requires them:
+
+```json
+{
+  "schema_version": 1,
+  "registry_sha256": "sha256:<exact-registry-digest>",
+  "ownership": {"F-001": "helper_2_2_3"},
+  "snapshot_evidence": {"F-001": {"AGENTS.md": "sha256:<recorded-evidence-digest>"}}
+}
+```
+
+Upgrade writes content-addressed files below the configured evidence directory's finding-proof-snapshots/ and adds evidence_snapshots inside the owned proof namespace. Each mapping records the original path's snapshot file, source_release, registry_sha256 and review_sha256; original evidence paths, capture digest, evidence digests and raw legacy values remain unchanged. The checker validates these historical bytes against the original digest, not the rewritten current file. These archives are tamper-evident, not immutable or current acceptance proof. Ordinary unsnapshotted evidence remains sensitive to current-file changes. Existing exact archives are reused, changed or unsafe destinations refuse writes and repeated upgrades do not snapshot archived proof again. An explicitly reviewed finding --id update captures current evidence as a new proof and preserves raw legacy values and existing archive files. After upgrade, save a current checkpoint and report which evidence is historical and what remains unverified about the new files.
+
+Upgrade preserves existing instructions and project content. Schema 5 adds managed WORKFLOW, an empty requests registry, minimal AGENTS routing and plan-index format metadata in the same transaction. Historical closed dispositions are registered as legacy_closed; unfinished plans without contracts become legacy_uncontracted and must be reviewed on resume. It does not reconstruct chat history or invent proof. Markdown plans, context, state, evidence and application code remain unchanged apart from an explicitly required legacy lifecycle or knowledge migration. Findings retain all raw fields; only explicitly reviewed helper proof adoption adds its versioned namespace. The schema 3 to 4 migration removes release-managed seed entries, promotes user-owned lessons proven by adoption coverage and keeps compatible unresolved local entries as drafts that require review. It aborts without writes if classifying any retained local entry would discard lifecycle metadata or unsupported user fields.
 
 A schema 2 repository with a legacy Program contract needs explicit classification:
 
@@ -185,6 +202,8 @@ Never infer this classification from the file alone. The closed date is the actu
 `--closed-on` is valid only for a closed schema 2 migration. Do not pass it for an active legacy Program or a current-schema upgrade.
 
 Do not edit version or schema fields manually. Since 2.1.0, `sync-knowledge` is a read-only deprecation route and cannot replace upgrade. Schema, lifecycle, managed guidance, user-owned knowledge migration and metadata remain one transaction.
+
+For pull request delivery or release with Codex Review configured or required, keep a separate contract gate targeting the repository, PR and exact final source commit. Wait for completed code/security reviews, inspect every remark and retain evidence-backed dispositions before merge or publication. CI success and local reviews are separate checks. A later source commit invalidates the review evidence and requires a new matching review; missing, running or unresolved review means NOT_READY. Use the repository live guard when available and preserve its exact final-head result.
 
 ## Self-hosting
 

@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Project OS 2.2.3 is the supported release line. Install the GitHub Codex plugin or pinned standalone Codex skill using [Setup](docs/SETUP.md), verify the selected copy and upgrade each connected repository explicitly. GitHub source, tags, Releases and legacy Directory availability are separate observations. Updating the plugin or skill does not update repositories by itself.
+Project OS 2.2.4 is the supported release line. Install the GitHub Codex plugin or pinned standalone Codex skill using [Setup](docs/SETUP.md), verify the selected copy and upgrade each connected repository explicitly. GitHub source, tags, Releases and legacy Directory availability are separate observations. Updating the plugin or skill does not update repositories by itself.
 
 ## Report a vulnerability
 
@@ -20,7 +20,7 @@ Include:
 
 ## Runtime boundary
 
-The 2.2.3 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal`, `--checkpoint`, `--input`, `--draft` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Marketplace registration, GitHub installation and legacy Directory installation are separate network operations performed by the host.
+The 2.2.4 helper uses the Python standard library and initiates no network request. It reads bundled assets and the target files selected by the user. Commands with an explicit `--config`, `--definition`, `--proposal`, `--checkpoint`, `--input`, `--draft` or `--source` may also read that user-selected file or repository outside the target. Mutating operations write only inside the target repository except `knowledge export`, which creates one user-selected bundle outside the repository and refuses to overwrite an existing path. Knowledge import never writes to its source. Finding proof ownership review files must be safe regular files inside the target; migration guards the exact registry, review and retained proof bytes. Bare legacy finding extensions are not silently reassigned to the helper. Marketplace registration, GitHub installation and legacy Directory installation are separate network operations performed by the host.
 
 Project OS contains no daemon, watcher, MCP server, lifecycle hook, hidden database, central failure database or automatic cross-project synchronization. The helper runs only when a person or Codex invokes it locally. ChatGPT can work only with material supplied in its conversation.
 

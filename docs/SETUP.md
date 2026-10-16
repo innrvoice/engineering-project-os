@@ -18,7 +18,7 @@ codex plugin marketplace add innrvoice/engineering-project-os --ref main
 codex plugin add engineering-project-os@engineering-project-os
 ~~~
 
-The first command registers the repository marketplace from `main`. The catalog's plugin entry pins the installed source to `v2.2.3`. Open the target repository in Codex and start a new task so the installed skill is available. Confirm the selected helper's version is `2.2.3` before connecting or upgrading a repository:
+The first command registers the repository marketplace from `main`. The catalog's plugin entry pins the installed source to `v2.2.4`. Open the target repository in Codex and start a new task so the installed skill is available. Confirm the selected helper's version is `2.2.4` before connecting or upgrading a repository:
 
 ~~~shell
 python3 -B -c 'import runpy; print(runpy.run_path("/absolute/path/to/project-os/scripts/project_os.py")["VERSION"])'
@@ -78,9 +78,9 @@ A successful setup requires the helper check to pass and the Git diff to contain
 
 Ordinary engineering work now uses ordinary requests. Use `$project-os` when the request concerns Project OS maintenance, durable plan state, findings, evidence, knowledge or Program lifecycle.
 
-## Upgrade to 2.2.3
+## Upgrade to 2.2.4
 
-Project OS 2.2.3 retains SYSTEM schema 5, plans schema 2, JSON acceptance contracts and durable request intake, adding finding capture, current-checkpoint verification and guarded completion that saves its checkpoint atomically. Upgrading a legacy schema also delivers the schema-5 continuity records; upgrading an existing schema-5 repository keeps the schema and knowledge-transfer formats unchanged.
+Project OS 2.2.4 retains SYSTEM schema 5, plans schema 2, JSON acceptance contracts and durable request intake. It corrects proof refresh and separates helper-owned finding proofs from project extensions while retaining checkpoint verification and atomic completion. Upgrading a legacy schema also delivers the schema-5 continuity records; upgrading an existing schema-5 repository keeps the schema and knowledge-transfer formats unchanged.
 
 For an already registered GitHub marketplace, refresh its catalog and install the pinned plugin in Terminal:
 
@@ -95,7 +95,7 @@ For a first GitHub installation, use the registration commands above. For a stan
 $project-os upgrade
 ~~~
 
-Codex must use the installed 2.2.3 helper transaction:
+Codex must use the installed 2.2.4 helper transaction:
 
 ~~~text
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
@@ -104,9 +104,15 @@ python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/
 git diff --check
 ~~~
 
-Review the dry-run before applying it. After the check, inspect the exact changed paths. The reviewed transaction adds managed WORKFLOW, an empty requests registry, minimal AGENTS routing and plan-index migration metadata. Existing Markdown plans, context, state, findings, evidence and application code remain unchanged. Historical closed plans retain their dispositions without new proof. Before resuming a legacy unfinished plan, review its contract and remove its migration mark. Existing legacy knowledge migration rules remain applicable.
+Review the dry-run before applying it. After the check, inspect the exact changed paths. The reviewed transaction adds managed WORKFLOW, an empty requests registry, minimal AGENTS routing and plan-index migration metadata. Existing Markdown plans, context, state, evidence and application code remain unchanged. Findings retain their legacy fields; an explicitly reviewed proof adoption can add only the helper-owned namespace. Historical closed plans retain their dispositions without new proof. Before resuming a legacy unfinished plan, review its contract and remove its migration mark. Existing legacy knowledge migration rules remain applicable.
 
 Updating the installed plugin or standalone skill alone does not upgrade a connected repository. Each repository keeps its recorded release until this explicit transaction succeeds.
+
+## Legacy finding proof ownership
+
+When the source repository records 2.2.3 and contains bare finding proof-like fields, Codex must prepare an explicit ownership review before upgrade. It preserves every project-owned field and adopts proven helper proofs without changing their original hashes. Ambiguous ownership stays pending; it is not resolved by deleting data or accepting changed evidence.
+
+The [technical ownership migration contract](REFERENCE.md#legacy-finding-proof-ownership) describes `--finding-proof-review`, its exact registry hash, complete ID decisions and preview/apply commands. Earlier repositories preserve bare extension fields automatically. Updating the installed plugin does not perform this review or upgrade project records by itself.
 
 ## ChatGPT companion setup
 
@@ -127,7 +133,7 @@ ChatGPT works against the supplied copies. It cannot connect to a live local che
 The secondary route installs only the standalone Codex skill. Send the following message in Codex chat, not Terminal:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.3/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.4/skills/project-os
 ~~~
 
 Start a new Codex task after installation. This versioned URL does not follow `main` automatically. Verify the selected helper version before upgrading any repository.

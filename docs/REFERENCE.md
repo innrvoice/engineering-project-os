@@ -1,10 +1,12 @@
 # Reference
 
-This is the technical contract for Project OS 2.2.3. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+This is the technical contract for Project OS 2.2.4. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
 
 ## Interfaces
 
-`finding record --target <repository> --input <json> [--id <existing-id>] [--dry-run]` transactionally captures or updates a finding. Input requires title, status, impact, nonempty repository-relative evidence paths and required_check; fixed_unverified and verified require resolution. Optional observation, cause and priority remain project-owned. New captures retain evidence_sha256 and capture_input_sha256; older records without these optional fields remain valid. Exact repeated input is idempotent, while semantic deduplication and status justification remain agent responsibilities.
+`finding record --target <repository> --input <json> [--id <existing-id>] [--dry-run]` transactionally captures or updates a finding. Input requires title, status, impact, nonempty repository-relative evidence paths and required_check; fixed_unverified and verified require resolution. Optional observation, cause and priority remain project-owned. New captures store a versioned `project_os_finding_proof` with owner `engineering-project-os`, schema_version 1, evidence_sha256 and capture_input_sha256. Bare legacy fields are project-owned and remain untouched. Implicit repeated capture is idempotent only when both supplied fields and the managed proof match; changed or unowned proof requires an explicit reviewed update. Namespace collisions fail without overwriting owner data. See the legacy proof ownership section before upgrading earlier captures. Exact unchanged input and proof are idempotent, while semantic deduplication and status justification remain agent responsibilities.
+
+The owned namespace can also contain evidence_snapshots after a reviewed upgrade. This nonempty map is a subset of the original evidence paths; each value has path, source_release, registry_sha256 and review_sha256. It redirects proof validation to the preserved historical bytes while evidence_sha256 and the finding's original evidence list stay unchanged. Those hashes do not prove the upgraded current file. Ordinary evidence keeps its current-file tamper check. See historical evidence snapshots below for consent, provenance and recapture behavior.
 
 `checkpoint --target <repository> --draft <markdown> [--dry-run]` writes only the configured STATE owner and appends a receipt. Required nonempty lines are Updated, Execution state, Active plan, Outcome, Verified, Remaining and Next action. Execution/active values must match the index. The draft is at most 78 lines and the final checkpoint at most 80. The receipt binds body and current SYSTEM, plans, requests, findings, reusable/project knowledge, active plan/contract and active Program when applicable; it does not hash all historical plans. `checkpoint --target <repository> --check [--json]` is read-only and exits nonzero for absent, malformed or stale proof. The schema remains 5 and generic check remains structurally backward compatible. A current receipt proves captured file identity, not semantic completeness or host acceptance.
 
@@ -28,6 +30,40 @@ The package retains three outcome-focused companion starter prompts. They apply 
 | `Help me reuse verified failure knowledge from an earlier project in this one.` | An approved reusable bundle plus destination context; Codex can also use both repositories |
 
 The helper lives at `scripts/project_os.py` inside the installed skill. Terminal examples use an absolute placeholder path so the target repository does not need its own helper copy.
+
+## Legacy finding proof ownership
+
+Repositories recorded as 2.2.3 can contain helper captures and project extensions under the same bare keys. Their shape cannot establish ownership. Upgrade requires a complete explicit review of every finding with `evidence_sha256` or `capture_input_sha256`; repositories from earlier releases preserve those keys as project data automatically. Do not delete or rename user data to make upgrade pass.
+
+Codex resolves the actual findings path from SYSTEM, reads the existing capture history and prepares one review file inside the target. Use `project_owned` for user extensions and `helper_2_2_3` only for proven earlier helper captures. The review format is:
+
+~~~json
+{
+  "schema_version": 1,
+  "registry_sha256": "sha256:<actual-current-registry-digest>",
+  "ownership": {
+    "F-001": "helper_2_2_3",
+    "F-002": "project_owned"
+  }
+}
+~~~
+
+Use the real IDs and exact current registry hash. Every ambiguous ID must be classified once. Review ownership from repository evidence; if it remains uncertain, ask the owner and keep the upgrade pending. The file must be a separate regular file inside the target, with no symlink path. Preview and apply the same operation:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --finding-proof-review /path/to/repository/.agents/finding-proof-review.json --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --finding-proof-review /path/to/repository/.agents/finding-proof-review.json
+~~~
+
+Adoption copies the original helper input/evidence hashes into `project_os_finding_proof`; it does not refresh them. Changed or invalid old proof, an incomplete/stale review, namespace collision or concurrent change aborts without overwriting data. Raw legacy keys are preserved. Registry, review, existing proof and managed guidance share one guarded transaction and rollback. Repeating an already applied upgrade is idempotent; the old review remains historical rather than being reused to reclassify newer records.
+
+## Historical evidence snapshots during upgrade
+
+If the prospective upgrade rewrites or deletes a valid finding's evidence, extend the same hash-bound review with snapshot_evidence: a map of each affected finding ID to its original path/hash pairs. The map must match all affected unarchived proof paths exactly, with no extra decisions. An already namespaced finding needs no ownership classification; use an empty ownership object when no legacy classifications are required. Preview reports the required snapshot map. Review actual source bytes and the complete preview, then apply the same --finding-proof-review command. A stale proof cannot be repaired by snapshotting changed bytes.
+
+The transaction stores old bytes as `<configured-evidence>/finding-proof-snapshots/<sha256-hex>.bin`, records the source release and hashes of the source registry and review in evidence_snapshots and retains all original proof hashes, raw fields and evidence paths. Existing archives must match exactly; unsafe paths, conflicting contents or concurrent edits abort or roll back without overwriting divergent data. Content shared by findings uses the same archive. Snapshot hashes are tamper-evident, not immutable storage. Already archived evidence is validated from the archive on future upgrades and does not require another snapshot. An applied no-op upgrade ignores its old historical review rather than reclassifying records.
+
+Reusing the original finding input without --id still refuses when current files differ from its historical proof. After deliberately reviewing current evidence, an explicit --id update creates a fresh current proof; it preserves bare legacy fields and existing archive files. Report historical findings separately from checks of the upgraded files and save a new current checkpoint after upgrade.
 
 ## Project OS requests
 
@@ -219,7 +255,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.2.3",
+  "created_with": "2.2.4",
   "entries": []
 }
 ~~~
@@ -508,7 +544,7 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.2.3 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- Release 2.2.4 identifies the installed skill, helper, package metadata and connected `project_os_version`.
 - `SYSTEM.schema_version` is 5.
 - Knowledge registries retain their own `schema_version: 1`.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.

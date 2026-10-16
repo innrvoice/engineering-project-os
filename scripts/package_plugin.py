@@ -18,7 +18,8 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("plugin.json", ".codex-plugin/plugin.json", "README.md", "LICENSE",
-         "SECURITY.md", "CHANGELOG.md", "CONTRIBUTING.md", "scripts/package_plugin.py")
+         "SECURITY.md", "CHANGELOG.md", "CONTRIBUTING.md", "scripts/package_plugin.py",
+         "scripts/check_codex_review.py")
 TREES = ("skills", "assets", "docs")
 MAX_ENTRIES = 5000
 MAX_COMPRESSED = 100 * 1024 * 1024
