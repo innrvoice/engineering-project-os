@@ -20,7 +20,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 import subprocess
 import time
@@ -298,17 +297,17 @@ def tool_stat(path):
 
 
 class Live:
-    def __init__(self, timeout, target, git=None, gh=None):
+    def __init__(self, timeout, target, git, gh):
         self.deadline = time.monotonic() + timeout
         self.target = target.resolve()
         self.tools = {}
         self.tool_proofs = {}
         # Bind both before executing either: a rejected gh must not run a git canary.
         for name, configured in (("git", git), ("gh", gh)):
-            located = str(configured) if configured is not None else shutil.which(name)
-            require(located, "Missing trusted executable: " + name)
-            candidate = Path(located)
-            require(configured is None or candidate.is_absolute(), "--" + name + " must be an absolute trusted executable path")
+            require(isinstance(configured, (str, Path)) and bool(str(configured)),
+                    "Explicit --" + name + " absolute trusted executable path is required")
+            candidate = Path(configured)
+            require(candidate.is_absolute(), "--" + name + " must be an absolute trusted executable path")
             lexical = Path(os.path.abspath(str(candidate)))
             resolved = lexical.resolve(strict=True)
             for path in (lexical, resolved):
@@ -422,8 +421,8 @@ def main(argv=None):
     parser.add_argument("--pr", required=True, type=int)
     parser.add_argument("--head", required=True, help="exact lowercase 40-digit commit SHA")
     parser.add_argument("--target", type=Path, default=Path.cwd())
-    parser.add_argument("--git", type=Path, help="owner-trusted absolute git executable; otherwise resolve PATH outside target")
-    parser.add_argument("--gh", type=Path, help="owner-trusted absolute gh executable; otherwise resolve PATH outside target")
+    parser.add_argument("--git", type=Path, required=True, help="required owner-trusted absolute git executable")
+    parser.add_argument("--gh", type=Path, required=True, help="required owner-trusted absolute gh executable")
     parser.add_argument("--dispositions", type=Path, help="private JSON; never commit the working review register")
     parser.add_argument("--timeout-seconds", type=float, default=30)
     parser.add_argument("--json", action="store_true")

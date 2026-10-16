@@ -363,7 +363,8 @@ class CodexReviewTests(unittest.TestCase):
     def test_plain_cli_error_is_actionable_and_never_ready(self):
         output = io.StringIO()
         with redirect_stdout(output):
-            self.assertEqual(GUARD.main(["--repo", REPOSITORY, "--pr", "10", "--head", "wrong"]), 1)
+            self.assertEqual(GUARD.main(["--repo", REPOSITORY, "--pr", "10", "--head", "wrong",
+                                        "--git", str(self.git), "--gh", str(self.gh)]), 1)
         self.assertTrue(output.getvalue().startswith("NOT_READY:"))
 
     def test_expired_deadline_never_starts_a_subprocess(self):
@@ -681,7 +682,8 @@ class CodexReviewTests(unittest.TestCase):
                     try:
                         os.chdir(target / "bin")
                         with mock.patch.dict(os.environ, environment), mock.patch.object(GUARD.subprocess, "run") as command:
-                            with self.assertRaisesRegex(GUARD.NotReady, "outside --target"):
+                            message = "Explicit --" + name if route in ("path", "dot-path") else "outside --target"
+                            with self.assertRaisesRegex(GUARD.NotReady, message):
                                 GUARD.Live(30, target, **explicit)
                             command.assert_not_called()
                     finally:
@@ -697,6 +699,43 @@ class CodexReviewTests(unittest.TestCase):
                 with self.assertRaises((GUARD.NotReady, OSError)):
                     GUARD.Live(30, target, git=invalid, gh=self.gh)
                 command.assert_not_called()
+
+    def test_cli_requires_both_explicit_tools_even_with_external_path_canaries(self):
+        target = self.target / "omitted-tool-target"; target.mkdir()
+        external = Path(self.external.name)
+        marker = self.target / "external-path-canary.txt"
+        for name in ("git", "gh"):
+            path = external / ("poison-" + name)
+            path.write_text("#!/bin/sh\nprintf touched > '" + str(marker) + "'\nexit 17\n")
+            path.chmod(0o700)
+        poison = external / "poison-tools"; poison.mkdir()
+        for name in ("git", "gh"):
+            (poison / name).symlink_to(external / ("poison-" + name))
+        runner = external / "trusted-guard.py"
+        runner.write_bytes((ROOT / "scripts/check_codex_review.py").read_bytes())
+        for flags, missing in (([], ("--git", "--gh")), (["--git", str(self.git)], ("--gh",)),
+                               (["--gh", str(self.gh)], ("--git",))):
+            with self.subTest(missing=missing):
+                result = subprocess.run([sys.executable, "-I", "-B", str(runner), "--repo", REPOSITORY,
+                                         "--pr", "10", "--head", HEAD, "--target", str(target), *flags],
+                                        cwd=target, env={**os.environ, "PATH": str(poison)},
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("required", result.stderr)
+                for argument in missing:
+                    self.assertIn(argument, result.stderr)
+                self.assertFalse(marker.exists())
+
+    def test_live_api_requires_explicit_tools_before_any_subprocess(self):
+        for configured in ({"git": None, "gh": self.gh}, {"git": self.git, "gh": None}):
+            with self.subTest(configured=configured), mock.patch.object(GUARD.subprocess, "run") as command:
+                with self.assertRaisesRegex(GUARD.NotReady, "Explicit --"):
+                    GUARD.Live(30, self.target, **configured)
+                command.assert_not_called()
+        with mock.patch.object(GUARD.subprocess, "run") as command:
+            with self.assertRaises(TypeError):
+                GUARD.Live(30, self.target)
+            command.assert_not_called()
 
     def test_bound_absolute_tools_ignore_later_path_poisoning_and_record_proof(self):
         target, git = self.packaged_checkout("bound-tools")
