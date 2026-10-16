@@ -14,6 +14,38 @@ python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/
 
 The command is read-only. Report each concrete error and the owning record. Do not turn a structural pass into a claim about application, artifact, deployment, production, manual or physical behavior.
 
+## Save findings and a current handoff
+
+The connected WORKFLOW requires writeback even for a bounded repair without a plan and for supplied project copies in ChatGPT. Reproduce the defect and save observed commands/results in a repository evidence file, then use the finding helper with a temporary JSON input:
+
+~~~json
+{
+  "title": "Describe the observed defect",
+  "status": "confirmed",
+  "impact": "Describe the affected behavior",
+  "evidence": [".agents/evidence/reproduction.md"],
+  "required_check": "Name the decisive remaining check"
+}
+~~~
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py finding record --target /path/to/repository --input /private/tmp/finding.json --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py finding record --target /path/to/repository --input /private/tmp/finding.json
+~~~
+
+Search existing findings first. Use `--id <existing-id>` to update the same finding; verified or fixed_unverified input also needs resolution. The helper allocates the next stable ID, retains evidence SHA-256 values, preserves local fields on explicit updates and reuses an exact repeated input. It does not guess semantic equivalence or whether your status is justified. `check` verifies captured evidence hashes when present, while legacy findings remain compatible.
+
+After the task, a pending knowledge review or an approved transfer, reconcile STATE against the real records. Create a UTF-8 draft outside record owners with Updated, Execution state, Active plan, Outcome, Verified, Remaining and Next action lines. Use the actual index state and the connected WORKFLOW example; keep the draft at most 78 lines. Then preview, save and verify:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py checkpoint --target /path/to/repository --draft /private/tmp/checkpoint.md --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py checkpoint --target /path/to/repository --draft /private/tmp/checkpoint.md
+python3 /absolute/path/to/project-os/scripts/project_os.py checkpoint --target /path/to/repository --check --json
+python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/to/repository
+~~~
+
+The helper writes only STATE and appends a receipt binding its body and current record owners, active plan/contract and active Program where applicable. Checkpoint does not complete or activate a plan. `checkpoint --check` is read-only and fails for missing, malformed or stale proof, including a later registry or active-contract change. General `check` still validates structure and preserves old records. CURRENT proves file identity and consistency, not the completeness or truth of your prose. A read-only fresh session reports stale/missing receipts without rewriting them; with write authority, reconcile and save before continuing.
+
 ## Repair
 
 Inspect the repository and reproduce the checker error first. Preview the smallest change to its actual owner. Do not create duplicate state to silence an invariant. Preserve unrelated work, apply only a clean preview and run the checker again.
@@ -59,13 +91,19 @@ python3 /absolute/path/to/project-os/scripts/project_os.py plan status --target 
 
 Use --id when no single active plan exists. Status reports READY or NOT_READY for the named outcome, gates, proof errors, scoped requests, blockers and following planned slices. --require-ready fails while any mandatory acceptance or request remains open. Lead with NOT_READY and the blockers before local successes; do not call the candidate verified or ask to publish it. Run required host scenarios on an exact isolated candidate before publication, preserving stable. A code-only scope cannot be used to imply release readiness. It cannot independently inspect production or judge the meaning of evidence.
 
-Prepare a UTF-8 checkpoint draft in a temporary file outside repository record owners. Preserve relevant verified state and report the finished outcome, its evidence and remaining independent work. The draft must declare Execution state: idle and Active plan: none on separate lines and fit the 80-line checkpoint limit. Preview closure:
+Prepare a UTF-8 checkpoint draft in a temporary file outside repository record owners. Preserve relevant verified state and report the finished outcome, its evidence and remaining independent work. The draft must declare Execution state: idle and Active plan: none on separate lines and contain at most 78 lines, reserving two lines for the helper receipt within the 80-line STATE limit. Existing closure narratives remain supported; the helper does not invent missing narrative fields. Preview closure:
 
 ~~~shell
 python3 /absolute/path/to/project-os/scripts/project_os.py plan complete --target /path/to/repository --id 001 --checkpoint /path/to/checkpoint.md --dry-run
 ~~~
 
-Review the entire transition, receipt and checkpoint, then apply the identical command without --dry-run. The helper guards the index, SYSTEM, STATE, plan, contract, request registry and proof snapshots; it validates resulting state and written files before success. It updates only the index and STATE and leaves successors planned. A failed gate, stale proof, unresolved request, write failure or concurrent input change prevents completion. Do not substitute a manual status edit or call a prerequisite independent to bypass closure.
+Review the entire transition, completion receipt and checkpoint receipt, then apply the identical command without --dry-run. The helper guards the index, SYSTEM, STATE, plan, contract, request registry, checkpoint owner records and proof snapshots; it validates resulting state and written files before success. It updates only the index and STATE, writes a checkpoint receipt bound to the post-transition index and validates CURRENT inside the same transaction. Successors remain planned. A failed gate, stale proof, unresolved request, write failure, stale resulting checkpoint or concurrent input change prevents completion. Do not substitute a manual status edit or call a prerequisite independent to bypass closure.
+
+Guarded plan completion already writes the now-idle checkpoint and its fresh receipt atomically; a second checkpoint save is unnecessary. Run the read-only `checkpoint --check` to verify the result. Preserve the complete STATE bytes, including the HTML receipt, when returning project files. A separate checkpoint write remains appropriate when later work changes the record owners or the handoff narrative.
+
+### Return exact project files
+
+After all writes and checks, collect each exported file with a fresh `read_bytes()` from its actual path. Preserve the whole STATE file, including its HTML receipt; compute each exported content hash from those exact bytes. Do not rebuild a snapshot from checkpoint drafts, cached variables, response prose or rendered Markdown. Serialize one snapshot file, reconstruct that exact serialized file into a new temporary directory and run both `check` and `checkpoint --check` there. Verify every reconstructed path and hash and compare the source hashes again after export to detect concurrent changes. Return only that validated snapshot file. A source CURRENT result does not override missing or altered bytes in the returned file set: report NOT_READY and repair the export before delivery. Read-only recovery must inspect the actual supplied files and preserve them.
 
 ## Start a Program
 

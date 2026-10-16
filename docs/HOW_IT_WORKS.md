@@ -48,17 +48,19 @@ The archive is tamper-evident repository content. It is not immutable storage, a
 
 ## Scene four: reuse a failure without importing the old product
 
-Now imagine a React Native repository that has accumulated two months of confirmed failures: lifecycle races, image-memory problems and native handoff mistakes. A new repository begins. Repeating every investigation would not make the new codebase independent. It would only make the developer pay twice.
+As Codex develops, investigates and verifies work in a connected repository, it should record the findings it discovers without waiting for a separate `finding add` request. Findings retain observations, evidence, hypotheses and the next decisive check. Confirmed mechanisms can become project lessons; unresolved candidates remain findings. This depends on the agent following the repository workflow during the task, not on a background collector.
+
+Now imagine a React Native repository that has accumulated two months of confirmed failures: lifecycle races, image-memory problems and native handoff mistakes. A new repository begins. Ask Codex to reuse the useful lessons from the old repository and bring over only what fits the new project. Codex inspects both sides, prepares missing lessons and shows the proposed lesson changes for review. After approval, it applies the selection and validates the result. You do not need to issue every intermediate command. See the [simple recipes](../skills/project-os/references/knowledge.md).
 
 Project OS separates the local story from the reusable mechanism. A project lesson may mention private paths, product names and exact evidence. A reusable lesson must stand on its own: what triggers the failure, why it happens, how to prevent it, how to verify the prevention and where the lesson does not apply.
 
 The transfer has deliberate gates:
 
 1. A finding records the observed failure and the next decisive check.
-2. After the mechanism is confirmed, `knowledge capture` creates project-specific failure knowledge.
-3. `knowledge prepare` produces a read-only sanitized proposal.
+2. After the mechanism is confirmed, Codex captures project-specific failure knowledge.
+3. Codex prepares a sanitized proposal that preserves the mechanism and applicability boundaries.
 4. A person reviews the proposal and explicitly approves the lessons that remain safe and accurate without project history.
-5. Codex exports the approved library or reads it directly from another repository.
+5. Codex reads an approved library or prepares missing lessons from the read-only source and approves the reviewed matching proposals in the destination. A portable bundle supports another machine.
 6. The destination previews applicable lessons, explains skips and imports only after confirmation.
 
 `failure -> finding -> project lesson -> sanitized proposal -> approval -> user-owned reusable library -> explicit import`
@@ -90,9 +92,9 @@ Project OS uses ordinary files with narrow ownership:
 
 One fact should have one owner. `STATE.md` is a compact handoff, not a diary. `CONTEXT.md` is durable context, not an active task list. The full `.agents` tree is not inserted into every prompt. `AGENTS.md` routes Codex to the smallest relevant records.
 
-## Installing the plugin is not connecting a repository
+## Installation and repository connection
 
-Installation makes the reusable skill available. It does not create files, attach a repository or turn Project OS into a permanent mode.
+The primary GitHub marketplace route installs the Codex plugin. A pinned standalone Codex skill is the secondary route. Either makes the reusable skill available without creating repository records, attaching a repository or turning Project OS into a permanent mode. ChatGPT companion access belongs to its separate distribution channel; see [Setup](SETUP.md).
 
 In Codex, open the repository and run `$project-os inspect`. Project OS reads Git state, instructions and engineering configuration without writing. It then recommends a clean bootstrap, a bootstrap that preserves existing authority or adoption of compatible records. Every mutating route follows the same sequence:
 
@@ -108,13 +110,15 @@ The Python helper performs deterministic operations such as `detect`, `init`, `a
 
 The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
 
-Project OS 2.2.1 introduces schema 5 while preserving the existing knowledge bundle formats. Updating the plugin does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
+Project OS 2.2.3 retains schema 5 and the existing knowledge bundle formats. It adds transactional finding capture, verifiable checkpoint writes and atomic completion with a current idle checkpoint. Updating the selected plugin or standalone skill does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
 
 ## ChatGPT is the companion surface
 
 ChatGPT can explain Project OS, reason about supplied project files and work with portable knowledge bundles. It does not see a live local checkout merely because the plugin is installed. An overview needs no files, but a claim about an existing repository needs the relevant files or a supplied snapshot.
 
 This makes ChatGPT useful for understanding the model, preparing setup artifacts from supplied material and carrying a reviewed bundle across machines. The full repository-native benefit appears in Codex, where the agent can read current Git state, follow `AGENTS.md`, run the helper and keep the control plane reconciled with the code.
+
+Returned project files need their own verification. The agent rereads actual bytes, preserves the complete checkpoint receipt, reconstructs the exact serialized snapshot in a separate directory and runs structural and checkpoint checks there. Fresh-session acceptance reads that returned file set. Successful checks in the original workspace cannot validate an export assembled from different bytes.
 
 ## Safety boundary
 

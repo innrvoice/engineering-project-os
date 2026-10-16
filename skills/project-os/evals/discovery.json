@@ -64,6 +64,8 @@
       "expected_intent": "knowledge-import",
       "expected": [
         "ask for a source repository or portable bundle when none is available",
+        "carry out the transfer workflow rather than returning only a manual command catalog",
+        "prepare missing lessons from confirmed evidence and present one batch review of lesson changes without modifying the source",
         "preview applicable and skipped lessons with reasons",
         "import only after explicit confirmation"
       ]
@@ -90,6 +92,7 @@
       "expected": [
         "recognize a cross-project failure knowledge workflow",
         "keep the user's library independent from Project OS releases",
+        "handle preparation and destination applicability checks rather than requiring a separate user command for each stage",
         "offer direct repository transfer in Codex or a portable bundle in either product"
       ]
     },

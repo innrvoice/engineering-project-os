@@ -1,22 +1,32 @@
 # Setup
 
-Engineering Project OS is built for Codex. The primary installation route is the Universal Plugin Directory. Installation makes the Project OS skill available, but it does not attach a repository or write Project OS records.
+Engineering Project OS is a Codex developer tool distributed primarily through its GitHub marketplace. Installation makes the Project OS skill available, but it does not attach a repository or write Project OS records.
 
 ## Requirements
 
-- A supported Codex surface with plugin access.
+- A Codex CLI with plugin support for marketplace installation, or the built-in Codex skill installer for a standalone skill.
 - A local repository opened as the Codex workspace.
 - Python 3.9 or newer on macOS or Linux for deterministic helper operations.
 - A clean understanding of any existing `AGENTS.md`, `.agents/` records and uncommitted work before setup.
 
-## 1. Install from the Universal Plugin Directory
+## 1. Install in Codex from GitHub
 
-1. Open [Engineering Project OS](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9).
-2. Select the plus button or `Install`.
-3. Open the target repository in Codex.
-4. Start a new Codex task so the installed skill is available.
+Run these commands in Terminal:
 
-Do not copy plugin files into the repository. The Directory installation belongs to the user profile while Project OS records belong to each connected repository.
+~~~shell
+codex plugin marketplace add innrvoice/engineering-project-os --ref main
+codex plugin add engineering-project-os@engineering-project-os
+~~~
+
+The first command registers the repository marketplace from `main`. The catalog's plugin entry pins the installed source to `v2.2.3`. Open the target repository in Codex and start a new task so the installed skill is available. Confirm the selected helper's version is `2.2.3` before connecting or upgrading a repository:
+
+~~~shell
+python3 -B -c 'import runpy; print(runpy.run_path("/absolute/path/to/project-os/scripts/project_os.py")["VERSION"])'
+~~~
+
+Resolve this path from the installed skill selected by Codex. Do not guess a cache path or copy plugin files into the repository. Marketplace registration and plugin installation belong to the user profile while Project OS records belong to each connected repository. For a standalone skill, use the [secondary installation route](#standalone-codex-skill).
+
+The official [plugin packaging guide](https://developers.openai.com/plugins/build/plugins#add-a-marketplace-from-the-cli) describes marketplace registration and local plugin sources for supported clients, including Codex CLI and Codex in the ChatGPT desktop app. The commands here use the CLI; desktop marketplace controls follow the host's current UI.
 
 ## 2. Inspect the repository
 
@@ -68,17 +78,24 @@ A successful setup requires the helper check to pass and the Git diff to contain
 
 Ordinary engineering work now uses ordinary requests. Use `$project-os` when the request concerns Project OS maintenance, durable plan state, findings, evidence, knowledge or Program lifecycle.
 
-## Upgrade from 2.1.1 to 2.2.1
+## Upgrade to 2.2.3
 
-Project OS 2.2.1 introduces SYSTEM schema 5, plans schema 2, JSON acceptance contracts, durable request intake and guarded plan completion. Knowledge transfer formats remain unchanged. Update the Directory plugin to use the published helper. The tagged standalone route requires the separate GitHub tag and Release.
+Project OS 2.2.3 retains SYSTEM schema 5, plans schema 2, JSON acceptance contracts and durable request intake, adding finding capture, current-checkpoint verification and guarded completion that saves its checkpoint atomically. Upgrading a legacy schema also delivers the schema-5 continuity records; upgrading an existing schema-5 repository keeps the schema and knowledge-transfer formats unchanged.
 
-First update the installed Directory plugin, then start a new Codex task in the repository and type:
+For an already registered GitHub marketplace, refresh its catalog and install the pinned plugin in Terminal:
+
+~~~shell
+codex plugin marketplace upgrade engineering-project-os
+codex plugin add engineering-project-os@engineering-project-os
+~~~
+
+For a first GitHub installation, use the registration commands above. For a standalone installation, use the pinned skill-installer request below. Resolve duplicate installations and verify the selected helper version, then start a new Codex task in the repository and type:
 
 ~~~text
 $project-os upgrade
 ~~~
 
-Codex must use the installed 2.2.1 helper transaction:
+Codex must use the installed 2.2.3 helper transaction:
 
 ~~~text
 python3 /absolute/path/to/project-os/scripts/project_os.py upgrade --target /path/to/repository --dry-run
@@ -89,11 +106,11 @@ git diff --check
 
 Review the dry-run before applying it. After the check, inspect the exact changed paths. The reviewed transaction adds managed WORKFLOW, an empty requests registry, minimal AGENTS routing and plan-index migration metadata. Existing Markdown plans, context, state, findings, evidence and application code remain unchanged. Historical closed plans retain their dispositions without new proof. Before resuming a legacy unfinished plan, review its contract and remove its migration mark. Existing legacy knowledge migration rules remain applicable.
 
-Updating the installed plugin alone does not upgrade a connected repository. Each repository keeps its recorded release until this explicit transaction succeeds.
+Updating the installed plugin or standalone skill alone does not upgrade a connected repository. Each repository keeps its recorded release until this explicit transaction succeeds.
 
 ## ChatGPT companion setup
 
-ChatGPT is a companion for explanations, supplied project files and portable knowledge bundles. After Directory installation, start a new ChatGPT chat and select the plugin with `@Engineering Project OS`.
+ChatGPT is a companion for explanations, supplied project files and portable knowledge bundles. Where the companion is available in ChatGPT, start a new chat and select it with `@Engineering Project OS`. Codex marketplace commands install into Codex; they do not install a plugin in ChatGPT Web. See the [legacy Directory status](#legacy-directory) for that separate channel.
 
 An overview needs no repository input:
 
@@ -105,17 +122,25 @@ Setup advice can begin from a project description. Claims about an existing setu
 
 ChatGPT works against the supplied copies. It cannot connect to a live local checkout through installation alone. Any generated or changed files remain chat artifacts until the user deliberately applies them to the repository and validates the result in Codex.
 
-## Alternative: standalone Codex skill
+## Standalone Codex skill
 
-Use this route only when a standalone Codex-only installation is required. Send the following message in Codex chat, not Terminal:
+The secondary route installs only the standalone Codex skill. Send the following message in Codex chat, not Terminal:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.1/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.3/skills/project-os
 ~~~
 
-Start a new Codex task after installation. Use this candidate URL only after the versioned tag is published. It does not follow `main` automatically.
+Start a new Codex task after installation. This versioned URL does not follow `main` automatically. Verify the selected helper version before upgrading any repository.
 
-Avoid keeping an older standalone skill active beside the Directory plugin. Remove the obsolete user-level `project-os` skill before relying on the Directory version so `$project-os` resolves to one intended installation.
+## Resolve duplicate installations
+
+Keep one intended Project OS installation active. Inspect the selected skill path and helper version before relying on `$project-os`; a GitHub plugin, an older Directory plugin and a standalone skill can otherwise compete. Disable an obsolete plugin through its host controls or remove an obsolete standalone skill only after confirming its path and obtaining any required authorization. Preserve repository-owned `AGENTS.md` and `.agents/` records. Start a new task and verify the selected version again.
+
+## Legacy Directory
+
+The existing [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) remains on 2.2.2. On 2026-10-16, the maintainer reported that the Portal would not accept an updated skills-only submission for Engineering Project OS. This observation concerns this plugin's submission, so the GitHub release proceeds independently.
+
+An existing Directory installation can retain its own companion access and older skill. Installing from GitHub does not upgrade that listing or prove that a new version is available in ChatGPT. Resolve any duplicate Codex installation before using the GitHub helper.
 
 ## Setup boundaries
 

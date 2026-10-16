@@ -32,3 +32,5 @@ Commit, push, tag, GitHub Release, installed-skill replacement and directory sub
 State what changed, what was verified and what remains unverified. Do not publish credentials, private data or internal working history in code, documentation, commit messages or release notes.
 
 Read `.agents/WORKFLOW.md` before non-trivial work and after context compaction. It owns durable request intake and guarded plan completion; current user and repository instructions take precedence.
+
+Read `.agents/WORKFLOW.md` for every engineering task, including bounded bug fixes. Record reproduced defects, save a current checkpoint and pass `checkpoint --check` before the final response. Current user and repository instructions take precedence.

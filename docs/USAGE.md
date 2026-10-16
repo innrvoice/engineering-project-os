@@ -56,7 +56,7 @@ Complete only when the plan's required evidence exists:
 $project-os plan complete
 ~~~
 
-The request invokes the helper plan complete with a checkpoint draft and reviewed dry run. It cannot close a plan with a pending prerequisite, invalid proof or unresolved scoped request. Following slices remain planned. Source checks, deployment, public availability and physical acceptance remain separate gates. A passing CI job cannot satisfy a device-specific acceptance condition unless the plan explicitly defines that equivalence.
+The request invokes the helper plan complete with a checkpoint draft and reviewed dry run. It cannot close a plan with a pending prerequisite, invalid proof or unresolved scoped request. Completion saves the idle checkpoint and its fresh receipt in the same transaction and verifies CURRENT. Following slices remain planned. Source checks, deployment, public availability and physical acceptance remain separate gates. A passing CI job cannot satisfy a device-specific acceptance condition unless the plan explicitly defines that equivalence.
 
 ## Add a requirement during work
 
@@ -111,7 +111,32 @@ $project-os program close stopped: the migration was replaced by a vendor-manage
 
 `completed` requires exit evidence. `stopped` requires a precise reason. Closure archives the exact contract with a SHA-256 digest and returns the repository to Standard.
 
-## Record a confirmed failure
+## Everyday findings and reusable lessons
+
+In a connected repository, ask Codex to implement, investigate or verify work normally. Codex should record the findings it discovers, preserve evidence and keep unresolved hypotheses distinct from confirmed mechanisms. You do not need a separate `finding add` request for every observation. Confirmed mechanisms can become project lessons; making them reusable and transferring them requires review and approval.
+
+Bounded repairs also save a finding for a reproduced defect already named by the user. Codex handles `finding record`, the checkpoint draft and its freshness check. A knowledge transfer that pauses for approval uses a small plan: the initial request and approval belong to the same contract and become implemented only after its gates are verified. After guarded completion, the idle checkpoint records the actual imported and skipped IDs, source preservation and next action. A captured request remains unresolved even if its decision text says completed. A structural check alone does not detect a checkpoint that was never updated.
+
+For a new project, open its repository in Codex and send one request:
+
+~~~text
+$project-os Reuse the useful failure lessons from /path/to/earlier-repository here. Set up Project OS if needed, prepare anything that is missing and bring over only lessons that fit this project.
+~~~
+
+Codex inspects the destination and the read-only source, prepares missing lessons from confirmed evidence, removes private context and checks applicability. It explains irrelevant or unconfirmed skips, presents one batch review of lesson changes and applies only the approved selection. It then validates the destination. Setup is previewed if the new repository is not yet connected. The source stays unchanged during transfer.
+
+See [Failure knowledge](../skills/project-os/references/knowledge.md) for the complete recipes, including approved libraries and portable bundles. The individual operations below are useful when you want direct control of a particular stage.
+
+## Advanced: record a particular finding and prepare a lesson
+
+The deterministic finding command accepts a temporary JSON file with title, status, impact, evidence paths and required_check. Use `--id` for an existing finding; fixed_unverified and verified also require resolution. Store real evidence in the repository before previewing:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py finding record --target /path/to/repository --input /private/tmp/finding.json --dry-run
+python3 /absolute/path/to/project-os/scripts/project_os.py finding record --target /path/to/repository --input /private/tmp/finding.json
+~~~
+
+Save a reconciled compact checkpoint with `checkpoint --target /path/to/repository --draft /private/tmp/checkpoint.md`, previewing first with `--dry-run`. Run `checkpoint --target /path/to/repository --check --json` afterward and during fresh recovery. CURRENT verifies the saved body and referenced record hashes; it does not independently prove that the narrative or acceptance claims are complete. See [Maintenance](../skills/project-os/references/maintenance.md) for the draft fields and compatibility boundaries.
 
 Start with an observation, not an invented mechanism:
 
@@ -175,23 +200,23 @@ In the destination repository, import the supplied bundle:
 $project-os knowledge import: /path/to/failure-knowledge.json
 ~~~
 
-In ChatGPT, attach the bundle and select the plugin:
+Where the ChatGPT companion is available, attach the bundle and select the plugin:
 
 ~~~text
 @Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
 ~~~
 
-ChatGPT works against the supplied bundle and project material. It cannot write to a live local checkout. Apply returned artifacts deliberately, then validate the real destination in Codex.
+ChatGPT works against the supplied bundle and project material. It cannot write to a live local checkout. Apply returned artifacts deliberately, then validate the real destination in Codex. GitHub marketplace installation applies to Codex; companion availability follows the separate [legacy Directory channel](SETUP.md#legacy-directory).
 
 ## Upgrade Project OS
 
-Updating the installed plugin does not update repository-local records. In each connected repository, start a new Codex task and request:
+First update the selected GitHub plugin or standalone Codex skill using [Setup](SETUP.md), resolve duplicate installations and verify the helper version. Updating an installed copy does not update repository-local records. In each connected repository, start a new Codex task and request:
 
 ~~~text
 $project-os upgrade
 ~~~
 
-Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.1 upgrade, application code and project-owned knowledge must not change.
+Codex uses the installed helper to inspect the current release, dry-run the upgrade, review conflicts, apply the same clean operation and run `check`. For the schema-preserving 2.2.3 upgrade, application code and project-owned knowledge must not change.
 
 If a managed file has diverged from its recorded baseline, the helper reports a conflict instead of overwriting it. Resolve ownership deliberately and repeat the dry-run. Do not hand-edit `SYSTEM.release` or schema fields to simulate an upgrade.
 

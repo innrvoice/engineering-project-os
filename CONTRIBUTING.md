@@ -104,11 +104,11 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - portable bundle metadata;
 - CI assertions, fixtures, documentation and release notes.
 
-Candidate 2.2.1 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Project OS 2.2.3 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 
-Build and validate the exact working-tree ZIP using [Directory packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh Codex and ChatGPT plugin-loader evaluation, Portal scan, hosted URL verification or publication authorization.
+Build and validate the exact working-tree ZIP using [GitHub distribution and release packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh Codex and supplied-material ChatGPT evaluation, native marketplace installation, tagged installation, hosted URL verification or publication authorization. Directory submission is a separate channel with its own availability and review requirements.
 
 ## Pull requests
 

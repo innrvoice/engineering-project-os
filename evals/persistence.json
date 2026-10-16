@@ -1,0 +1,71 @@
+{
+  "format": "project-os-host-persistence-evals",
+  "schema_version": 1,
+  "candidate_identity": "Freeze and hash the complete selected skill tree before these sessions. Use that exact isolated candidate without building a release ZIP first. Record its manifest and helper SHA-256 with actual snapshots.",
+  "cases": [
+    {
+      "name": "ordinary-reported-defect-finding",
+      "surface": "BOTH",
+      "fixture": "Use a synthetic connected repository with initialized Project OS, no active plan and an empty findings registry. Supply normalization.py whose normalize(value) calls value.strip(). Add one passing ordinary-text test and one failing test requiring ValueError for None. Run the failing test before the session and record initial file hashes. ChatGPT receives the actual synthetic project files and permission to repair them.",
+      "messages": [
+        "normalize(None) raises AttributeError. Fix it so None raises ValueError and ordinary text still normalizes correctly. Run the focused tests."
+      ],
+      "expected_records": [
+        "The ordinary user prompt contains no Project OS invocation or request to save a finding.",
+        "The application repair passes both focused tests and the findings registry contains one stable incident ID for the reported defect.",
+        "The finding retains the observed failure, impact, relevant mechanism or supported cause, repair, actual check and repository-local evidence.",
+        "Evidence paths exist and evidence_sha256 values match actual file contents. A narrative claim without the record and proof fails this case.",
+        "The checkpoint states the repaired outcome, observed verification, remaining obligations and exact next action. checkpoint --check returns CURRENT and structural check passes.",
+        "A bounded repair does not create an unnecessary active plan or claim deployment or publication."
+      ],
+      "restart_prompt": "This is a fresh session. Use only the supplied current repository files. Read the repository guidance and inspect the persisted finding and checkpoint. Report what was repaired, the evidence and verification actually stored, remaining obligations and the exact next action. Do not change files or infer previous conversation.",
+      "fresh_recovery": [
+        "End the initial session and supply only its actual resulting files to a separate session. Do not pass the previous chat or a narrative of expected results.",
+        "The new session recovers the same finding ID, repair and proof from files and independently runs structural check and checkpoint --check.",
+        "Every recovered path and SHA-256 matches the captured snapshot and read-only recovery preserves all file hashes."
+      ]
+    },
+    {
+      "name": "ordinary-discovered-defect-finding",
+      "surface": "CODEX",
+      "fixture": "Use a synthetic initialized repository with no active plan and empty findings. A valid count parser accepts zero even though its adjacent documented contract requires a positive integer. Existing positive-input tests pass. Capture the baseline before asking for the bounded code review and repair.",
+      "messages": [
+        "Check the count parser against its documented positive-integer contract. Fix any concrete mismatch you can reproduce and run focused tests."
+      ],
+      "expected_records": [
+        "The agent reproduces the zero-input mismatch before claiming a confirmed defect and records the discovered incident with a stable ID.",
+        "The repaired behavior has decisive tests, actual evidence hashes and a current checkpoint. The finding is not omitted because the request lacked a capture shortcut.",
+        "The agent records a confirmed mechanism only when source and reproduction support it and does not automatically promote a project incident into reusable knowledge."
+      ],
+      "restart_prompt": "Recover the last completed bounded repair from these repository files only. Read the stored finding and checkpoint, verify their recorded file identities and give the next action without writing anything.",
+      "fresh_recovery": [
+        "A distinct session receives only the actual resulting repository files and recovers the same incident ID, checked repair and exact next action.",
+        "Structural check and checkpoint --check pass and all recovery file hashes remain unchanged."
+      ]
+    },
+    {
+      "name": "review-approval-import-checkpoint",
+      "surface": "BOTH",
+      "fixture": "Use a synthetic React web destination with initialized Project OS, no active plan, an empty reusable registry and the initial scaffold STATE. Supply a read-only source bundle containing valid active user-reviewed CORE-OWNERSHIP-001 applicable to engineering and MOBILE-ROUTE-001 applicable only to mobile. Snapshot the actual source bytes. Send the review and approval as separate messages.",
+      "messages": [
+        "Review this reusable-knowledge bundle for this React web project. Show which lessons apply and which do not. Wait for my approval before importing.",
+        "Approve and import only CORE-OWNERSHIP-001. Keep the source unchanged."
+      ],
+      "expected_records": [
+        "The review-only turn leaves the reusable registry empty and does not invent approval.",
+        "After the explicit approval, the helper imports only CORE-OWNERSHIP-001 with its valid user-reviewed provenance and leaves MOBILE-ROUTE-001 excluded.",
+        "The source bundle or source repository remains byte-identical and repeating the exact selected dry run reports no additions or updates.",
+        "The checkpoint is updated from scaffold defaults and explicitly names the selected imported lesson, supplied approval scope, actual verification, excluded material, remaining obligations and next action.",
+        "checkpoint --check returns CURRENT and structural check passes. Successful import with untouched scaffold STATE or STALE checkpoint fails the whole case.",
+        "The agent preserves material user instructions in their correct record owner and does not leave a captured request falsely unresolved or fabricate a plan to claim completion."
+      ],
+      "restart_prompt": "This is a new read-only session over the supplied resulting files, with no earlier conversation. Verify the stored reusable entry and current checkpoint from files. Report exactly what was imported, what remains excluded, which approval provenance is recorded, any unresolved request and the next action. Distinguish recorded approval from independent proof of the old conversation. Do not change files.",
+      "fresh_recovery": [
+        "Terminate the first session. Provide only the actual destination snapshot to a distinct session, with path and SHA-256 validation before reconstruction when the host requires supplied files.",
+        "The new session recovers the chosen entry and next action without old conversation, detects no stale scaffold and confirms CURRENT checkpoint plus structural PASS.",
+        "Before and after hashes for every destination file are equal and the source snapshot remains unchanged."
+      ]
+    }
+  ],
+  "release_rule": "These definitions and deterministic source tests are not host acceptance. Any missing record, stale checkpoint, unavailable host or failed files-only recovery keeps preparation NOT_READY. Preserve initial failures. Build the release package only after required real fresh-session persistence and recovery pass, then verify that package against the frozen tested skill bytes."
+}
