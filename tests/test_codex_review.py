@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -77,6 +78,9 @@ class FakeLive:
         self.on_refresh = on_refresh
         self.source_after = source_after
 
+    def verify_tools(self, full=True):
+        return {}
+
     def source(self, target):
         self.source_calls += 1
         return self.source_after if self.source_after and self.source_calls > 1 else {"head": HEAD, "files": {"a": "b"}}
@@ -96,6 +100,25 @@ class CodexReviewTests(unittest.TestCase):
         self.proof = self.target / "proof.md"
         self.proof.write_text("Observed regression and verification.\n")
         self.dispositions = self.target / "private-dispositions.json"
+        self.external = tempfile.TemporaryDirectory()
+        self.addCleanup(self.external.cleanup)
+        self.gh = Path(self.external.name).resolve() / "gh"
+        self.gh.write_text("#!/bin/sh\nexit 0\n")
+        self.gh.chmod(0o700)
+        self.git = Path(shutil.which("git")).resolve()
+
+    def live(self, target=None):
+        return GUARD.Live(30, target or self.target, git=self.git, gh=self.gh)
+
+    def package_layout(self, target):
+        for relative in PACKAGER.FILES:
+            path = target / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("raise AssertionError('target code must not execute')\n")
+        for relative in PACKAGER.TREES:
+            directory = target / relative
+            directory.mkdir(exist_ok=True)
+            (directory / "tracked.txt").write_text("Reviewed package bytes.\n")
 
     def dispositions_file(self, decision="fixed", **changes):
         row = {"comment_url": FINDING_URL, "decision": decision, "reason": "Verified the reported regression.",
@@ -316,11 +339,11 @@ class CodexReviewTests(unittest.TestCase):
             GUARD.strict_json('{"reviewed_head":"old","reviewed_head":"new"}')
 
     def test_live_wrapper_uses_canonical_host_and_actual_pagination(self):
-        live = GUARD.Live(30)
+        live = self.live()
         with mock.patch.object(live, "command", side_effect=["{}", "[[{\"id\":1}],[{\"id\":2}]]"]) as command:
             self.assertEqual([x["id"] for x in live.snapshot(REPOSITORY, 10)["issue_comments"]], [1, 2])
         for call in command.call_args_list:
-            self.assertEqual(call.args[0][:4], ["gh", "api", "--hostname", "github.com"])
+            self.assertEqual(call.args[0][:4], [str(self.gh), "api", "--hostname", "github.com"])
         self.assertIn("--paginate", command.call_args_list[1].args[0])
         self.assertIn("--slurp", command.call_args_list[1].args[0])
 
@@ -329,10 +352,10 @@ class CodexReviewTests(unittest.TestCase):
             output = io.StringIO()
             with mock.patch.object(GUARD.subprocess, "run", side_effect=failure), redirect_stdout(output):
                 code = GUARD.main(["--repo", REPOSITORY, "--pr", "10", "--head", HEAD,
-                                   "--target", str(self.target), "--json"])
+                                   "--target", str(self.target), "--git", str(self.git), "--gh", str(self.gh), "--json"])
             self.assertEqual(code, 1)
             self.assertEqual(json.loads(output.getvalue())["readiness"], "NOT_READY")
-        live = GUARD.Live(30)
+        live = self.live()
         with mock.patch.object(GUARD.subprocess, "run", return_value=subprocess.CompletedProcess(["gh"], 1, "", "API denied")):
             with self.assertRaisesRegex(GUARD.NotReady, "Read-only command failed"):
                 live.snapshot(REPOSITORY, 10)
@@ -344,7 +367,7 @@ class CodexReviewTests(unittest.TestCase):
         self.assertTrue(output.getvalue().startswith("NOT_READY:"))
 
     def test_expired_deadline_never_starts_a_subprocess(self):
-        live = GUARD.Live(30)
+        live = self.live()
         live.deadline = 0
         with mock.patch.object(GUARD.subprocess, "run") as command:
             with self.assertRaisesRegex(GUARD.NotReady, "timed out"):
@@ -368,30 +391,25 @@ class CodexReviewTests(unittest.TestCase):
         ignore = target / ".gitignore"; ignore.write_text(".agents/\n")
         git("add", "source.py", ".gitignore")
         git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Synthetic baseline")
-        recorded = GUARD.Live(30).source(target)
-        self.assertEqual(recorded["files"], {"source.py": {"sha256": GUARD.digest(source.read_bytes()), "mode": "100644"},
-                                             ".gitignore": {"sha256": GUARD.digest(ignore.read_bytes()), "mode": "100644"}})
+        self.package_layout(target)
+        git("add", ".")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Complete package baseline")
+        recorded = self.live(target).source(target)
+        self.assertEqual(recorded["files"], {relative: {"sha256": GUARD.digest((target / relative).read_bytes()), "mode": "100644"}
+                                           for relative in git("ls-files").splitlines()})
         private = target / ".agents"; private.mkdir(); (private / "dispositions.json").write_text("{}\n")
-        self.assertEqual(GUARD.Live(30).source(target), recorded)
+        self.assertEqual(self.live(target).source(target), recorded)
         source.write_text("x = 2\n")
         with self.assertRaisesRegex(GUARD.NotReady, "dirty"):
-            GUARD.Live(30).source(target)
+            self.live(target).source(target)
         source.write_text("x = 1\n"); (target / "untracked.py").write_text("x = 3\n")
         with self.assertRaisesRegex(GUARD.NotReady, "dirty"):
-            GUARD.Live(30).source(target)
+            self.live(target).source(target)
 
     def packaged_checkout(self, name):
         target = self.target / name
         target.mkdir()
-        for relative in PACKAGER.FILES:
-            path = target / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            # The guard must enumerate this target without executing its code.
-            path.write_text("raise AssertionError('target code must not execute')\n")
-        for relative in PACKAGER.TREES:
-            directory = target / relative
-            directory.mkdir(exist_ok=True)
-            (directory / "tracked.txt").write_text("Reviewed package bytes.\n")
+        self.package_layout(target)
         (target / ".gitignore").write_text(".DS_Store\n__pycache__/\n*.pyc\n.agents/\n")
         def git(*args):
             return subprocess.run(["git", "-C", str(target), *args], check=True,
@@ -401,14 +419,16 @@ class CodexReviewTests(unittest.TestCase):
         git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Reviewed package baseline")
         return target, git
 
-    def completed_live(self, head, on_refresh=None):
+    def completed_live(self, head, on_refresh=None, target=None):
         value = snapshot()
         pr(value)["headRefOid"] = head
         for kind in ("code_review", "security_review"):
             update_state(value, kind=kind, commit_sha=head)
+        bound_target = target or self.target
+        bound_git, bound_gh = self.git, self.gh
         class ReviewedLive(GUARD.Live):
             def __init__(self):
-                super().__init__(30)
+                super().__init__(30, bound_target, git=bound_git, gh=bound_gh)
                 self.snapshots = 0
             def snapshot(self, repository, number):
                 self.snapshots += 1
@@ -421,7 +441,7 @@ class CodexReviewTests(unittest.TestCase):
         self.assertEqual(GUARD.PACKAGE_FILES, PACKAGER.FILES)
         self.assertEqual(GUARD.PACKAGE_TREES, PACKAGER.TREES)
         target, git = self.packaged_checkout("package-policy")
-        before = GUARD.Live(30).source(target)
+        before = self.live(target).source(target)
         (target / ".agents").mkdir()
         (target / ".agents/private.json").write_text("Private working records.\n")
         (target / "skills/__pycache__").mkdir()
@@ -430,8 +450,8 @@ class CodexReviewTests(unittest.TestCase):
         expected = {path.relative_to(target).as_posix() for path in PACKAGER.source_files(target)}
         self.assertEqual(GUARD.package_inputs(target), expected)
         self.assertEqual(git("status", "--porcelain=v1"), "")
-        self.assertEqual(GUARD.Live(30).source(target), before)
-        result = GUARD.check(REPOSITORY, 10, before["head"], target, None, self.completed_live(before["head"]))
+        self.assertEqual(self.live(target).source(target), before)
+        result = GUARD.check(REPOSITORY, 10, before["head"], target, None, self.completed_live(before["head"], target=target))
         self.assertEqual(result["readiness"], "READY")
 
     def test_ignored_regular_inputs_in_each_packaged_tree_block_ready(self):
@@ -445,7 +465,7 @@ class CodexReviewTests(unittest.TestCase):
                 self.assertIn(hidden, PACKAGER.source_files(target))
                 self.assertIn(hidden.relative_to(target).as_posix(), GUARD.package_inputs(target))
                 with self.assertRaisesRegex(GUARD.NotReady, "Unreviewed package input.*" + tree):
-                    GUARD.check(REPOSITORY, 10, head, target, None, self.completed_live(head))
+                    GUARD.check(REPOSITORY, 10, head, target, None, self.completed_live(head, target=target))
 
     def test_ignored_fixed_package_input_must_also_exist_in_reviewed_head(self):
         target, git = self.packaged_checkout("ignored-fixed")
@@ -455,7 +475,7 @@ class CodexReviewTests(unittest.TestCase):
         self.assertEqual(git("status", "--porcelain=v1"), "")
         self.assertIn(target / "README.md", PACKAGER.source_files(target))
         with self.assertRaisesRegex(GUARD.NotReady, "Unreviewed package input.*README.md"):
-            GUARD.Live(30).source(target)
+            self.live(target).source(target)
 
     def test_ignored_package_symlinks_and_nonregular_entries_are_rejected(self):
         for kind in ("symlink", "fifo", "cache-symlink"):
@@ -473,14 +493,14 @@ class CodexReviewTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     PACKAGER.source_files(target)
                 with self.assertRaisesRegex(GUARD.NotReady, "package input"):
-                    GUARD.Live(30).source(target)
+                    self.live(target).source(target)
 
     def test_concurrent_ignored_package_input_addition_blocks_final_check(self):
         target, git = self.packaged_checkout("concurrent-ignored")
         head = git("rev-parse", "HEAD")
         def add_ignored():
             (target / "assets/.DS_Store").write_bytes(b"Appeared during remote review collection")
-        live = self.completed_live(head, on_refresh=add_ignored)
+        live = self.completed_live(head, on_refresh=add_ignored, target=target)
         with self.assertRaisesRegex(GUARD.NotReady, "Unreviewed package input.*assets/.DS_Store"):
             GUARD.check(REPOSITORY, 10, head, target, None, live)
         self.assertEqual(live.snapshots, 2)
@@ -493,27 +513,29 @@ class CodexReviewTests(unittest.TestCase):
                 target.mkdir()
                 def git(*args):
                     return subprocess.run(["git", "-C", str(target), *args], check=True, capture_output=True, text=True).stdout
+                self.package_layout(target)
                 git("init", "-q")
                 source = target / "source.py"; source.write_text("x = 1\n")
-                git("add", "source.py")
+                git("add", ".")
                 git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Synthetic baseline")
                 git("update-index", flag, "source.py"); source.write_text("x = 2\n")
                 self.assertEqual(git("status", "--porcelain=v1"), "")
                 with self.assertRaisesRegex(GUARD.NotReady, "bytes differ from reviewed HEAD"):
-                    GUARD.Live(30).source(target)
+                    self.live(target).source(target)
                 source.write_text("x = 1\n"); source.chmod(source.stat().st_mode | 0o100)
                 self.assertEqual(git("status", "--porcelain=v1"), "")
                 with self.assertRaisesRegex(GUARD.NotReady, "executable mode differs"):
-                    GUARD.Live(30).source(target)
+                    self.live(target).source(target)
 
     def test_git_replacement_objects_cannot_substitute_unreviewed_source(self):
         target = self.target / "replaced"; target.mkdir()
         def git(*args, data=None):
             return subprocess.run(["git", "-C", str(target), *args], input=data,
                                   check=True, capture_output=True, text=True).stdout.strip()
+        self.package_layout(target)
         git("init", "-q")
         source = target / "source.py"; source.write_text("x = 1\n")
-        git("add", "source.py")
+        git("add", ".")
         git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Synthetic baseline")
         original = git("rev-parse", "HEAD:source.py")
         replacement = git("hash-object", "-w", "--stdin", data="x = 2\n")
@@ -521,7 +543,7 @@ class CodexReviewTests(unittest.TestCase):
         git("update-index", "--assume-unchanged", "source.py"); source.write_text("x = 2\n")
         self.assertEqual(git("status", "--porcelain=v1"), "")
         with self.assertRaisesRegex(GUARD.NotReady, "bytes differ from reviewed HEAD"):
-            GUARD.Live(30).source(target)
+            self.live(target).source(target)
 
     def test_cli_refuses_nonisolated_launch_before_shadowable_imports(self):
         for module in ("hashlib", "json"):
@@ -539,7 +561,7 @@ class CodexReviewTests(unittest.TestCase):
                 environment = {key: value for key, value in os.environ.items()
                                if key not in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE")}
                 result = subprocess.run([sys.executable, "-B", str(runner), "--repo", REPOSITORY,
-                                         "--pr", "10", "--head", HEAD, "--target", str(target), "--json"],
+                                         "--pr", "10", "--head", HEAD, "--target", str(target), "--git", str(self.git), "--gh", str(self.gh), "--json"],
                                         cwd=target, env=environment, capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(marker.exists(), result.stderr)
@@ -571,7 +593,7 @@ class CodexReviewTests(unittest.TestCase):
                   for path in target.rglob("*") if path.is_file() and ".git" not in path.parts}
         # A canonical, mismatched head reaches real source validation but no network.
         result = subprocess.run([sys.executable, "-I", "-B", str(runner), "--repo", REPOSITORY,
-                                 "--pr", "10", "--head", HEAD, "--target", str(target), "--json"],
+                                 "--pr", "10", "--head", HEAD, "--target", str(target), "--git", str(self.git), "--gh", str(self.gh), "--json"],
                                 cwd=target / "scripts", env=environment, capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stderr)
         value = json.loads(result.stdout)
@@ -592,7 +614,7 @@ class CodexReviewTests(unittest.TestCase):
         for path in (runner, alias):
             with self.subTest(runner=path):
                 result = subprocess.run([sys.executable, "-I", "-B", str(path), "--repo", REPOSITORY,
-                                         "--pr", "10", "--head", HEAD, "--target", str(target), "--json"],
+                                         "--pr", "10", "--head", HEAD, "--target", str(target), "--git", str(self.git), "--gh", str(self.gh), "--json"],
                                         cwd=target, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 1, result.stderr)
                 value = json.loads(result.stdout)
@@ -602,12 +624,139 @@ class CodexReviewTests(unittest.TestCase):
     def test_direct_source_capture_refuses_an_in_target_runner_before_commands(self):
         target = self.target / "direct-target"
         target.mkdir()
-        live = GUARD.Live(30)
+        live = self.live(target)
         with mock.patch.object(GUARD, "__file__", str(target / "scripts/check_codex_review.py")), \
                 mock.patch.object(live, "command") as command:
             with self.assertRaisesRegex(GUARD.NotReady, "outside|trusted external"):
                 live.source(target)
         command.assert_not_called()
+
+
+    def test_every_required_package_file_and_tree_must_survive_committed_deletion(self):
+        for index, relative in enumerate(PACKAGER.FILES + PACKAGER.TREES):
+            with self.subTest(required=relative):
+                target, git = self.packaged_checkout("missing-" + str(index))
+                path = target / relative
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
+                git("add", "-A")
+                git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Committed required input deletion")
+                self.assertEqual(git("status", "--porcelain=v1"), "")
+                with self.assertRaises((ValueError, FileNotFoundError)):
+                    PACKAGER.source_files(target)
+                live = self.completed_live(git("rev-parse", "HEAD"), target=target)
+                with self.assertRaisesRegex(GUARD.NotReady, "Missing required package"):
+                    GUARD.check(REPOSITORY, 10, git("rev-parse", "HEAD"), target, None, live)
+                self.assertEqual(live.snapshots, 0)
+
+    def test_candidate_tool_paths_and_aliases_reject_before_either_command(self):
+        target = self.target / "tool-candidate"
+        (target / "bin").mkdir(parents=True)
+        marker = self.target / "tool-executed.txt"
+        for name in ("git", "gh"):
+            canary = target / "bin" / name
+            canary.write_text("#!/bin/sh\nprintf touched > '" + str(marker) + "'\nexit 17\n")
+            canary.chmod(0o700)
+        for name in ("git", "gh"):
+            for route in ("direct", "file-alias", "parent-alias", "path", "dot-path"):
+                with self.subTest(tool=name, route=route):
+                    selected = target / "bin" / name
+                    explicit = {"git": self.git, "gh": self.gh}
+                    environment = {}
+                    if route == "file-alias":
+                        selected = Path(self.external.name) / (name + "-alias")
+                        selected.symlink_to(target / "bin" / name)
+                    elif route == "parent-alias":
+                        alias = Path(self.external.name) / (name + "-directory")
+                        alias.symlink_to(target / "bin", target_is_directory=True)
+                        selected = alias / name
+                    elif route in ("path", "dot-path"):
+                        explicit[name] = None
+                        environment["PATH"] = ("." if route == "dot-path" else str(target / "bin"))
+                    if route not in ("path", "dot-path"):
+                        explicit[name] = selected
+                    previous = Path.cwd()
+                    try:
+                        os.chdir(target / "bin")
+                        with mock.patch.dict(os.environ, environment), mock.patch.object(GUARD.subprocess, "run") as command:
+                            with self.assertRaisesRegex(GUARD.NotReady, "outside --target"):
+                                GUARD.Live(30, target, **explicit)
+                            command.assert_not_called()
+                    finally:
+                        os.chdir(previous)
+                    self.assertFalse(marker.exists())
+
+    def test_tool_preflight_rejects_missing_relative_nonexecutable_and_directory(self):
+        target = self.target / "tool-validation"; target.mkdir()
+        nonexecutable = Path(self.external.name) / "nonexecutable"
+        nonexecutable.write_text("plain data")
+        for invalid in (Path("relative-git"), Path(self.external.name) / "missing", nonexecutable, Path(self.external.name)):
+            with self.subTest(path=invalid), mock.patch.object(GUARD.subprocess, "run") as command:
+                with self.assertRaises((GUARD.NotReady, OSError)):
+                    GUARD.Live(30, target, git=invalid, gh=self.gh)
+                command.assert_not_called()
+
+    def test_bound_absolute_tools_ignore_later_path_poisoning_and_record_proof(self):
+        target, git = self.packaged_checkout("bound-tools")
+        live = self.live(target)
+        canary = target / "git"
+        marker = self.target / "late-path-executed.txt"
+        canary.write_text("#!/bin/sh\nprintf touched > '" + str(marker) + "'\nexit 17\n")
+        canary.chmod(0o700)
+        git("add", "git")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "Candidate tool remains data")
+        with mock.patch.dict(os.environ, {"PATH": str(target)}):
+            captured = live.source(target)
+        self.assertEqual(captured["head"], git("rev-parse", "HEAD"))
+        self.assertFalse(marker.exists())
+        proofs = live.verify_tools()
+        self.assertEqual(proofs["git"]["path"], str(self.git))
+        self.assertEqual(proofs["gh"]["sha256"], GUARD.digest(self.gh.read_bytes()))
+        self.assertNotIn(str(target), live.environment["PATH"].split(os.pathsep))
+        self.assertNotIn(".", live.environment["PATH"].split(os.pathsep))
+        with mock.patch.object(GUARD.subprocess, "run") as command:
+            with self.assertRaisesRegex(GUARD.NotReady, "Only bound absolute"):
+                live.command(["git", "status"])
+            command.assert_not_called()
+
+    def test_tool_changes_after_last_source_command_block_ready(self):
+        for mutation in ("bytes", "mode", "replacement", "candidate-alias"):
+            with self.subTest(mutation=mutation):
+                target, git = self.packaged_checkout("late-tool-" + mutation)
+                live = self.completed_live(git("rev-parse", "HEAD"), target=target)
+                original_source = live.source
+                calls = []
+                def change_after_final_source(path):
+                    result = original_source(path)
+                    calls.append(path)
+                    if len(calls) == 2:
+                        if mutation == "bytes":
+                            previous = self.gh.stat()
+                            self.gh.write_text("#!/bin/sh\nexit 1\n")
+                            os.utime(self.gh, ns=(previous.st_atime_ns, previous.st_mtime_ns))
+                        elif mutation == "mode":
+                            self.gh.chmod(0o500)
+                        elif mutation == "replacement":
+                            old = self.gh.read_bytes()
+                            self.gh.unlink()
+                            self.gh.write_bytes(old)
+                            self.gh.chmod(0o700)
+                        else:
+                            moved = target / "moved-gh"
+                            self.gh.rename(moved)
+                            self.gh.symlink_to(moved)
+                    return result
+                with mock.patch.object(live, "source", side_effect=change_after_final_source):
+                    with self.assertRaisesRegex(GUARD.NotReady, "Executable.*changed"):
+                        GUARD.check(REPOSITORY, 10, git("rev-parse", "HEAD"), target, None, live)
+                self.assertEqual(len(calls), 2)
+                if self.gh.is_symlink():
+                    self.gh.unlink()
+                    self.gh.write_text("#!/bin/sh\nexit 0\n")
+                self.gh.chmod(0o700)
+                self.gh.write_text("#!/bin/sh\nexit 0\n")
 
 
 if __name__ == "__main__":

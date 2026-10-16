@@ -2530,7 +2530,7 @@ def validate_adoption_records(root: Path, paths: dict[str, Any], errors: list[st
                             )
                             continue
                         for raw_path in evidence:
-                            evidence_path = safe_relative(root, raw_path)
+                            evidence_path = safe_relative(root, finding_evidence_path(finding, raw_path))
                             if evidence_path is None or not evidence_path.exists():
                                 errors.append(
                                     f"finding {finding.get('id')!r} has invalid or missing evidence"
@@ -3864,7 +3864,7 @@ def check_project(root: Path, config: Path | None = None) -> int:
                         errors.append(f"finding {finding.get('id')!r} evidence must be an array")
                         continue
                     for raw_path in evidence:
-                        path = safe_relative(root, raw_path)
+                        path = safe_relative(root, finding_evidence_path(finding, raw_path))
                         if path is None:
                             errors.append(f"finding {finding.get('id')!r} has invalid evidence path")
                         elif not path.exists():
@@ -5782,10 +5782,6 @@ def upgrade_project(
                 next_system["active_program"] = None
                 next_paths["program"] = None
 
-    replacements.extend(plan_finding_proof_migration(
-        root, original_system, snapshots, finding_proof_review
-    ))
-
     continuity_creates, continuity_replacements = plan_continuity_migration(
         root, original_system, next_system, snapshots
     )
@@ -5814,6 +5810,12 @@ def upgrade_project(
     serialized_system = json.dumps(next_system, indent=2, ensure_ascii=False) + "\n"
     if hashlib.sha256(serialized_system.encode("utf-8")).hexdigest() != original_digest:
         replacements.append((system_path, serialized_system, original_digest))
+    proof_creates, proof_replacements = plan_finding_proof_migration(
+        root, original_system, snapshots, finding_proof_review,
+        {path for path, *_ in [*creates, *replacements, *deletions]},
+    )
+    creates.extend(proof_creates)
+    replacements.extend(proof_replacements)
 
     print(f"upgrade schema: {schema} -> {SCHEMA_VERSION}")
     print(f"upgrade mode: {original_system.get('mode')} -> {next_system.get('mode')}")
@@ -5858,7 +5860,8 @@ def owned_finding_proof(finding: dict[str, Any], errors: list[str]) -> dict[str,
     ):
         return None
     if (
-        set(proof) != {"schema_version", "owner", "capture_input_sha256", "evidence_sha256"}
+        set(proof) - {"schema_version", "owner", "capture_input_sha256", "evidence_sha256", "evidence_snapshots"}
+        or not {"schema_version", "owner", "capture_input_sha256", "evidence_sha256"} <= set(proof)
     ):
         errors.append(f"{label} namespace collision or unsupported ownership/schema; preserve the existing data and review its owner")
         return None
@@ -5873,7 +5876,35 @@ def owned_finding_proof(finding: dict[str, Any], errors: list[str]) -> dict[str,
         or set(proofs) != set(evidence)
     ):
         errors.append(f"{label} evidence_sha256 must cover exactly its evidence paths")
+    historical = proof.get("evidence_snapshots", {})
+    if "evidence_snapshots" in proof and (
+        not isinstance(historical, dict) or not historical
+        or not isinstance(proofs, dict) or not set(historical) <= set(proofs)
+    ):
+        errors.append(f"{label} evidence_snapshots must be a non-empty subset of its evidence paths")
+    elif isinstance(historical, dict):
+        for raw_path, entry in historical.items():
+            if (
+                not isinstance(entry, dict)
+                or set(entry) != {"path", "source_release", "registry_sha256", "review_sha256"}
+                or not isinstance(entry.get("path"), str) or entry["path"] == raw_path
+                or not isinstance(entry.get("source_release"), str) or not entry["source_release"].strip()
+                or any(not isinstance(entry.get(key), str) or FULL_SHA256_PATTERN.fullmatch(entry[key]) is None
+                       for key in ("registry_sha256", "review_sha256"))
+            ):
+                errors.append(f"{label} has invalid historical snapshot metadata: {raw_path!r}")
     return proof
+
+
+def finding_evidence_path(finding: dict[str, Any], raw_path: str) -> str:
+    """An explicitly reviewed snapshot proves historical bytes, not the current source."""
+    errors: list[str] = []
+    proof = owned_finding_proof(finding, errors)
+    if proof is not None and not errors:
+        entry = proof.get("evidence_snapshots", {}).get(raw_path)
+        if entry is not None:
+            return entry["path"]
+    return raw_path
 
 
 def validate_finding_proofs(
@@ -5897,17 +5928,20 @@ def validate_finding_proofs(
         return
     label = f"finding {finding.get('id')!r}"
     for raw_path, expected in proof["evidence_sha256"].items():
-        path = safe_relative(root, raw_path)
-        if path is None or not isinstance(expected, str) or FULL_SHA256_PATTERN.fullmatch(expected) is None:
+        selected_path = finding_evidence_path(finding, raw_path)
+        path = safe_relative(root, selected_path)
+        if (safe_relative(root, raw_path) is None or path is None
+            or path.relative_to(root).as_posix() != selected_path
+            or not isinstance(expected, str) or FULL_SHA256_PATTERN.fullmatch(expected) is None):
             errors.append(f"{label} has invalid evidence_sha256 proof: {raw_path!r}")
             continue
         try:
             reject_symlink_path(root, path)
             content, _ = read_regular_at_path(path)
             if "sha256:" + hashlib.sha256(content).hexdigest() != expected:
-                errors.append(f"{label} evidence changed: {raw_path}")
+                errors.append(f"{label} evidence changed: {raw_path} (proof file: {selected_path})")
         except (ProjectOSError, OSError) as error:
-            errors.append(f"{label} evidence is unavailable: {raw_path}: {error}")
+            errors.append(f"{label} evidence is unavailable: {raw_path} (proof file: {selected_path}): {error}")
 
 
 def plan_finding_proof_migration(
@@ -5915,8 +5949,22 @@ def plan_finding_proof_migration(
     original_system: dict[str, Any],
     snapshots: dict[Path, str],
     review_path: Path | None,
-) -> list[tuple[Path, str, str]]:
-    """Classify unattributed 2.2.3 fields explicitly; never refresh their old hashes."""
+    changed_paths: set[Path],
+) -> tuple[list[tuple[Path, str | bytes]], list[tuple[Path, str, str]]]:
+    """Review ownership and preserve historical proof across prospective upgrades."""
+    try:
+        return _plan_finding_proof_migration(root, original_system, snapshots, review_path, changed_paths)
+    except OSError as error:
+        raise ProjectOSError(f"Finding proof migration could not safely read its inputs: {error}") from error
+
+
+def _plan_finding_proof_migration(
+    root: Path,
+    original_system: dict[str, Any],
+    snapshots: dict[Path, str],
+    review_path: Path | None,
+    changed_paths: set[Path],
+) -> tuple[list[tuple[Path, str | bytes]], list[tuple[Path, str, str]]]:
     registry_path = safe_relative(root, original_system["paths"].get("findings"))
     if registry_path is None:
         raise ProjectOSError("Finding proof migration requires a safe findings registry path")
@@ -5937,15 +5985,25 @@ def plan_finding_proof_migration(
         proof = owned_finding_proof(finding, [])
         if proof is not None and not errors:
             for raw_path, expected in proof["evidence_sha256"].items():
-                path = safe_relative(root, raw_path)
+                path = safe_relative(root, finding_evidence_path(finding, raw_path))
                 if path is None or path == registry_path:
                     raise ProjectOSError("Finding proof cannot own its findings registry")
                 retain_snapshot(snapshots, path, expected.removeprefix("sha256:"))
     if errors:
         raise ProjectOSError("Finding proof conflicts: " + "; ".join(errors))
-    if release_order(original_system.get("project_os_version")) >= release_order("2.2.4"):
+    required_owned = {
+        finding["id"]: {
+            raw_path: expected for raw_path, expected in proof["evidence_sha256"].items()
+            if raw_path not in proof.get("evidence_snapshots", {})
+            and safe_relative(root, raw_path) in changed_paths
+        }
+        for finding in findings
+        if (proof := owned_finding_proof(finding, [])) is not None
+    }
+    required_owned = {identifier: paths for identifier, paths in required_owned.items() if paths}
+    if release_order(original_system.get("project_os_version")) >= release_order("2.2.4") and not required_owned:
         # Repeating the reviewed upgrade is a no-op; old review digests are historical.
-        return []
+        return [], []
     source_223 = release_order(original_system.get("project_os_version"))[:3] == (2, 2, 3)
     ambiguous = {
         finding["id"]: finding for finding in findings
@@ -5959,7 +6017,12 @@ def plan_finding_proof_migration(
             "ownership decision for every listed ID (project_owned or helper_2_2_3)."
         )
     if review_path is None:
-        return []
+        if required_owned:
+            raise ProjectOSError(
+                "Upgrade rewrites finding evidence; review historical snapshots with --finding-proof-review "
+                "and exact snapshot_evidence: " + canonical_json(required_owned).strip()
+            )
+        return [], []
     review_path = review_path if review_path.is_absolute() else root / review_path
     if not review_path.is_relative_to(root) or ".." in review_path.parts or review_path == registry_path:
         raise ProjectOSError("Finding proof review must be a separate file inside the target repository")
@@ -5980,7 +6043,8 @@ def plan_finding_proof_migration(
         raise ProjectOSError(f"Could not read finding proof review: {error}") from error
     if (
         not isinstance(review, dict)
-        or set(review) != {"schema_version", "registry_sha256", "ownership"}
+        or set(review) - {"schema_version", "registry_sha256", "ownership", "snapshot_evidence"}
+        or not {"schema_version", "registry_sha256", "ownership"} <= set(review)
         or type(review.get("schema_version")) is not int or review["schema_version"] != 1
         or review.get("registry_sha256") != "sha256:" + digest
         or not isinstance(review.get("ownership"), dict)
@@ -5992,7 +6056,8 @@ def plan_finding_proof_migration(
             "Finding proof review must use schema_version 1, the exact registry_sha256 and "
             "complete ownership decisions (project_owned or helper_2_2_3) for the ambiguous IDs"
         )
-    retain_snapshot(snapshots, review_path, hashlib.sha256(review_bytes).hexdigest())
+    review_digest = hashlib.sha256(review_bytes).hexdigest()
+    retain_snapshot(snapshots, review_path, review_digest)
     next_registry = copy.deepcopy(registry)
     for finding in next_registry["findings"]:
         if review["ownership"].get(finding["id"]) != "helper_2_2_3":
@@ -6015,14 +6080,58 @@ def plan_finding_proof_migration(
                 "Legacy finding proof adoption cannot refresh or discard invalid proof: "
                 + "; ".join(proof_errors)
             )
-        for raw_path, expected in finding[FINDING_PROOF_KEY]["evidence_sha256"].items():
-            path = safe_relative(root, raw_path)
+    required_snapshots: dict[str, dict[str, str]] = {}
+    for finding in next_registry["findings"]:
+        proof = owned_finding_proof(finding, [])
+        if proof is None:
+            continue
+        for raw_path, expected in proof["evidence_sha256"].items():
+            path = safe_relative(root, finding_evidence_path(finding, raw_path))
             if path is None or path == registry_path or path == review_path:
-                raise ProjectOSError("Legacy finding proof cannot own the findings registry or review input")
+                raise ProjectOSError("Finding proof cannot own the findings registry or review input")
             retain_snapshot(snapshots, path, expected.removeprefix("sha256:"))
-    if next_registry == registry:
-        return []
-    return [(registry_path, canonical_json(next_registry), digest)]
+            if raw_path not in proof.get("evidence_snapshots", {}) and path in changed_paths:
+                required_snapshots.setdefault(finding["id"], {})[raw_path] = expected
+    if review.get("snapshot_evidence", {}) != required_snapshots:
+        raise ProjectOSError(
+            "Finding proof review snapshot_evidence must exactly consent to historical bytes for "
+            "the prospective rewritten/deleted evidence paths: " + canonical_json(required_snapshots).strip()
+        )
+    archive_root = safe_relative(root, original_system["paths"].get("evidence"))
+    if archive_root is None:
+        raise ProjectOSError("Finding proof snapshots require a safe evidence directory")
+    creates: dict[Path, bytes] = {}
+    for finding in next_registry["findings"]:
+        proof = owned_finding_proof(finding, [])
+        for raw_path, expected in required_snapshots.get(finding["id"], {}).items():
+            assert proof is not None
+            source_path = safe_relative(root, raw_path)
+            assert source_path is not None
+            reject_symlink_path(root, source_path)
+            content, _ = read_regular_at_path(source_path)
+            source_digest = hashlib.sha256(content).hexdigest()
+            if expected != "sha256:" + source_digest:
+                raise ProjectOSError(f"Finding evidence changed before historical snapshot: {raw_path}")
+            retain_snapshot(snapshots, source_path, source_digest)
+            archive_path = archive_root / "finding-proof-snapshots" / (source_digest + ".bin")
+            reject_symlink_path(root, archive_path)
+            if archive_path in changed_paths or archive_path in {registry_path, review_path}:
+                raise ProjectOSError("Historical finding snapshot collides with an upgrade destination")
+            if archive_path.exists():
+                existing, _ = read_regular_at_path(archive_path)
+                if existing != content:
+                    raise ProjectOSError(f"Historical finding snapshot collision: {archive_path.relative_to(root)}")
+                retain_snapshot(snapshots, archive_path, source_digest)
+            else:
+                creates[archive_path] = content
+            proof.setdefault("evidence_snapshots", {})[raw_path] = {
+                "path": archive_path.relative_to(root).as_posix(),
+                "source_release": original_system["project_os_version"],
+                "registry_sha256": "sha256:" + digest,
+                "review_sha256": "sha256:" + review_digest,
+            }
+    replacements = [] if next_registry == registry else [(registry_path, canonical_json(next_registry), digest)]
+    return list(creates.items()), replacements
 
 
 def record_finding(root: Path, input_path: Path, identifier: str | None, dry_run: bool) -> int:
@@ -6325,7 +6434,7 @@ def build_parser() -> argparse.ArgumentParser:
     upgrade_parser.add_argument("--dry-run", action="store_true")
     upgrade_parser.add_argument(
         "--finding-proof-review", type=Path,
-        help="inside-target JSON ownership review for unattributed 2.2.3 finding proof fields",
+        help="inside-target JSON ownership and historical-evidence snapshot review for finding proofs",
     )
 
     program_parser = subparsers.add_parser("program", help="Manage a multi-phase Program")

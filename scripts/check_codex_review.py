@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import time
@@ -222,10 +223,10 @@ def package_inputs(target):
     paths = set()
     for relative in PACKAGE_FILES:
         path = target / relative
-        if path.exists() or path.is_symlink():
-            evidence_file(target, relative)
-            require(stat.S_ISREG(path.lstat().st_mode), "Non-regular package input: " + relative)
-            paths.add(relative)
+        require(path.exists() or path.is_symlink(), "Missing required package file: " + relative)
+        evidence_file(target, relative)
+        require(stat.S_ISREG(path.lstat().st_mode), "Non-regular package input: " + relative)
+        paths.add(relative)
 
     def visit(directory):
         with os.scandir(directory) as entries:
@@ -244,9 +245,9 @@ def package_inputs(target):
 
     for relative in PACKAGE_TREES:
         directory = target / relative
-        if directory.exists() or directory.is_symlink():
-            require(stat.S_ISDIR(directory.lstat().st_mode), "Expected a real package directory: " + relative)
-            visit(directory)
+        require(directory.exists() or directory.is_symlink(), "Missing required package tree: " + relative)
+        require(stat.S_ISDIR(directory.lstat().st_mode), "Expected a real package directory: " + relative)
+        visit(directory)
     return paths
 
 
@@ -289,15 +290,56 @@ def inspect_dispositions(path, target, repository, number, head, findings):
     return inputs
 
 
+def tool_stat(path):
+    info = path.stat()
+    require(stat.S_ISREG(info.st_mode) and os.access(path, os.X_OK), "Expected a regular executable tool: " + str(path))
+    return {"device": info.st_dev, "inode": info.st_ino, "mode": info.st_mode,
+            "size": info.st_size, "mtime_ns": info.st_mtime_ns, "ctime_ns": info.st_ctime_ns}
+
+
 class Live:
-    def __init__(self, timeout):
+    def __init__(self, timeout, target, git=None, gh=None):
         self.deadline = time.monotonic() + timeout
+        self.target = target.resolve()
+        self.tools = {}
+        self.tool_proofs = {}
+        # Bind both before executing either: a rejected gh must not run a git canary.
+        for name, configured in (("git", git), ("gh", gh)):
+            located = str(configured) if configured is not None else shutil.which(name)
+            require(located, "Missing trusted executable: " + name)
+            candidate = Path(located)
+            require(configured is None or candidate.is_absolute(), "--" + name + " must be an absolute trusted executable path")
+            lexical = Path(os.path.abspath(str(candidate)))
+            resolved = lexical.resolve(strict=True)
+            for path in (lexical, resolved):
+                require(path != self.target and self.target not in path.parents,
+                        "Executable " + name + " must be outside --target: " + str(path))
+            self.tools[name] = str(resolved)
+            before = tool_stat(resolved)
+            proof = dict(before, path=str(resolved), sha256=digest(resolved.read_bytes()))
+            require(tool_stat(resolved) == before, "Executable changed during binding: " + name)
+            self.tool_proofs[name] = proof
+        directories = list(dict.fromkeys(str(Path(path).parent) for path in self.tools.values()))
+        self.environment = dict(os.environ, PATH=os.pathsep.join(directories + ["/usr/bin", "/bin"]))
+
+    def verify_tools(self, full=True):
+        for name, path in self.tools.items():
+            expected = self.tool_proofs[name]
+            require(Path(path).resolve(strict=True) == Path(path), "Executable path changed during validation: " + name)
+            actual = tool_stat(Path(path))
+            require(actual == {key: expected[key] for key in actual}, "Executable identity changed during validation: " + name)
+            if full:
+                require(digest(Path(path).read_bytes()) == expected["sha256"], "Executable bytes changed during validation: " + name)
+                require(tool_stat(Path(path)) == actual, "Executable changed during validation: " + name)
+        return self.tool_proofs
 
     def command(self, argv, binary=False):
         remaining = self.deadline - time.monotonic()
         require(remaining > 0, "Read-only review check timed out; retry without merging")
+        self.verify_tools(full=False)
+        require(argv and argv[0] in self.tools.values(), "Only bound absolute executables may run")
         try:
-            result = subprocess.run(argv, capture_output=True, text=not binary, timeout=remaining)
+            result = subprocess.run(argv, capture_output=True, text=not binary, timeout=remaining, env=self.environment)
         except subprocess.TimeoutExpired as error:
             raise NotReady("Read-only review check timed out; retry without merging") from error
         stderr = result.stderr.decode("utf-8", errors="replace") if isinstance(result.stderr, bytes) else result.stderr
@@ -305,18 +347,22 @@ class Live:
         return result.stdout
 
     def snapshot(self, repository, number):
+        self.verify_tools()
         owner, name = repository.split("/")
-        graph = strict_json(self.command(["gh", "api", "--hostname", "github.com", "graphql", "-f", "query=" + QUERY,
+        graph = strict_json(self.command([self.tools["gh"], "api", "--hostname", "github.com", "graphql", "-f", "query=" + QUERY,
                                          "-F", "owner=" + owner, "-F", "name=" + name, "-F", "number=" + str(number)]))
-        pages = strict_json(self.command(["gh", "api", "--hostname", "github.com", "--paginate", "--slurp",
+        pages = strict_json(self.command([self.tools["gh"], "api", "--hostname", "github.com", "--paginate", "--slurp",
                                          "repos/{}/issues/{}/comments?per_page=100".format(repository, number)]))
         require(isinstance(pages, list) and all(isinstance(page, list) for page in pages), "Unknown issue-comment pagination response")
+        self.verify_tools()
         return {"graphql": graph, "issue_comments": [comment for page in pages for comment in page]}
 
     def source(self, target):
         target = target.resolve()
+        require(target == self.target, "Live source target differs from bound tool target")
         require_external_runner(target)
-        git = ["git", "--no-optional-locks", "--no-replace-objects", "-C", str(target)]
+        self.verify_tools()
+        git = [self.tools["git"], "--no-optional-locks", "--no-replace-objects", "-C", str(target)]
         top = Path(self.command(git + ["rev-parse", "--show-toplevel"]).strip()).resolve()
         require(top == target, "--target must be the checkout root")
         head = self.command(git + ["rev-parse", "HEAD"]).strip()
@@ -339,10 +385,12 @@ class Live:
         packaged = package_inputs(target)
         unreviewed = sorted(packaged - set(hashes))
         require(not unreviewed, "Unreviewed package input is absent from reviewed HEAD: " + ", ".join(unreviewed))
+        self.verify_tools()
         return {"head": head, "files": hashes, "package_files": sorted(packaged)}
 
 
 def check(repository, number, head, target, dispositions, live):
+    live.verify_tools()
     before = live.source(target)
     require(before["head"] == head, "Local HEAD differs from --head; review the exact final source commit")
     snapshot = live.snapshot(repository, number)
@@ -360,9 +408,11 @@ def check(repository, number, head, target, dispositions, live):
             evidence_file(target, relative)
         require(path.is_file() and not path.is_symlink() and digest(path.read_bytes()) == expected,
                 "Disposition or evidence changed during validation; review the new bytes")
+    tools = live.verify_tools()
     return {"readiness": "READY", "repository": repository, "pr": number, "reviewed_head": head,
             "code_review": "completed", "security_review": "completed", "findings": len(result["findings"]),
             "unresolved_threads": 0, "summary_url": result["summary_url"],
+            "tools": tools,
             "scope": "Recorded exact-head Codex reviews, resolved threads and hash-bound dispositions; CI and semantic evidence assessment remain separate."}
 
 
@@ -372,6 +422,8 @@ def main(argv=None):
     parser.add_argument("--pr", required=True, type=int)
     parser.add_argument("--head", required=True, help="exact lowercase 40-digit commit SHA")
     parser.add_argument("--target", type=Path, default=Path.cwd())
+    parser.add_argument("--git", type=Path, help="owner-trusted absolute git executable; otherwise resolve PATH outside target")
+    parser.add_argument("--gh", type=Path, help="owner-trusted absolute gh executable; otherwise resolve PATH outside target")
     parser.add_argument("--dispositions", type=Path, help="private JSON; never commit the working review register")
     parser.add_argument("--timeout-seconds", type=float, default=30)
     parser.add_argument("--json", action="store_true")
@@ -382,7 +434,8 @@ def main(argv=None):
         require(0 < args.timeout_seconds <= 300, "--timeout-seconds must be in (0, 300]")
         target = args.target.resolve()
         require_external_runner(target)
-        result = check(args.repo, args.pr, args.head, target, args.dispositions, Live(args.timeout_seconds))
+        result = check(args.repo, args.pr, args.head, target, args.dispositions,
+                       Live(args.timeout_seconds, target, args.git, args.gh))
         code = 0
     except (NotReady, OSError, ValueError, TypeError, KeyError, AttributeError) as error:
         result = {"readiness": "NOT_READY", "repository": args.repo, "pr": args.pr,

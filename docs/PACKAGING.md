@@ -94,17 +94,22 @@ CI completion and Codex Review completion are separate prerequisites. Before mer
 
 Run an independently trusted copy of the read-only guard outside the candidate checkout with Python isolated mode (`-I`). The PR checkout is data only: never execute its guard, packaging code or helper to establish review readiness. Choose the guard's immutable source commit and literal SHA-256 through an owner-approved trusted channel, independently of the candidate PR; a hash supplied by that PR is not a trust anchor. A previously reviewed guard can verify a newer candidate. If no trusted guard is available, stop with NOT_READY and obtain or independently review one before proceeding.
 
-Use trusted Python, Git and `gh` executables and a locally prepared checkout whose Git metadata and configuration are trusted. Replace every placeholder below with the reviewed values; this recipe extracts bytes from the separately trusted source, verifies them before execution and retains the external copy for the final checks:
+Use owner-trusted absolute paths for Python, Git and `gh` and a locally prepared checkout whose Git metadata, configuration and execution environment are trusted. Replace every placeholder below with the reviewed values; this recipe restricts bootstrap command lookup, extracts bytes from the separately trusted source, verifies them before execution and retains the external copy for the final checks:
 
 ~~~shell
 (
 set -eu
+PATH='/usr/bin:/bin'
+export PATH
+trusted_python='/absolute/path/to/trusted/python3'
+trusted_git='/absolute/path/to/trusted/git'
+trusted_gh='/absolute/path/to/trusted/gh'
 trusted_source='/path/to/owner-trusted/source-repository'
 trusted_commit='<owner-trusted-immutable-commit-sha>'
 trusted_sha256='<independently-trusted-64-digit-guard-sha256>'
 guard_dir=$(mktemp -d "${TMPDIR:-/tmp}/project-os-review-guard.XXXXXXXX")
-git --no-replace-objects -C "$trusted_source" show "${trusted_commit}:scripts/check_codex_review.py" > "$guard_dir/check_codex_review.py"
-python3 -I -B - "$guard_dir/check_codex_review.py" "$trusted_sha256" <<'PY'
+"$trusted_git" --no-replace-objects -C "$trusted_source" show "${trusted_commit}:scripts/check_codex_review.py" > "$guard_dir/check_codex_review.py"
+"$trusted_python" -I -B - "$guard_dir/check_codex_review.py" "$trusted_sha256" <<'PY'
 import hashlib
 import pathlib
 import sys
@@ -116,15 +121,17 @@ PY
 chmod 400 "$guard_dir/check_codex_review.py"
 chmod 500 "$guard_dir"
 printf 'Retain trusted guard: %s\n' "$guard_dir/check_codex_review.py"
-python3 -I -B "$guard_dir/check_codex_review.py" --repo innrvoice/engineering-project-os --pr <number> --head <full-final-commit-sha> --target /path/to/clean/reviewed-checkout --dispositions /path/to/private/dispositions.json --json
+"$trusted_python" -I -B "$guard_dir/check_codex_review.py" --git "$trusted_git" --gh "$trusted_gh" --repo innrvoice/engineering-project-os --pr <number> --head <full-final-commit-sha> --target /path/to/clean/reviewed-checkout --dispositions /path/to/private/dispositions.json --json
 )
 ~~~
 
 The external directory must be outside `--target` and protected from untrusted writers. Read-only permissions prevent accidental edits; they do not establish provenance or protect against the file owner replacing it. Recheck the independently trusted hash before every invocation, retain the path and verified hash with the result and never refresh the guard from candidate bytes. The guard rejects non-isolated CLI launches before its own ordinary imports and rejects a runner whose resolved path is inside `--target`, including symlink aliases. These checks do not make an untrusted script trustworthy or prevent Python startup hooks that ran before an unsafe non-isolated launch. Programmatic imports are for trusted callers such as the unit suite, not candidate-provided launchers.
 
+Before any subprocess, the guard binds both Git and `gh` to resolved absolute executable files outside `--target`; candidate paths and aliases into the checkout are rejected. Explicit `--git` and `--gh` paths are recommended. If omitted, both tools are resolved once from `PATH` and checked by the same rules. Commands use only the bound absolute paths and a child `PATH` containing their trusted directories plus `/usr/bin` and `/bin`. The result records tool byte hashes, identity and modes; changes during the operation block READY, including changes after the last source command. Absolute paths outside the checkout do not establish trust by themselves: the owner must select trusted tools and protect them from untrusted writers.
+
 The guard requires the canonical bot's completed final-head code/security status, no unresolved findings or review threads and a disposition for every marked bot finding across the PR history. With no findings, the disposition file is optional. It fails closed on missing API access, timeout, incomplete pagination, changed source, changed proof or concurrent review state. It does not merge, resolve threads or publish. Run it immediately before merge and again before publication using the retained reviewed checkout; verify the squash-merged tree matches that reviewed source.
 
-Every actual package input must belong to the reviewed HEAD, including files hidden by Git ignore rules. The guard independently inventories the package's fixed files and directory trees before and after review validation, rejects unreviewed inputs, symlinks and included non-regular entries and preserves the packager's regular cache exclusions. Ignored private working records outside package inputs remain allowed.
+Every required package file and directory tree must exist and every actual package input must belong to the reviewed HEAD, including files hidden by Git ignore rules. The guard independently inventories the package's fixed files and directory trees before and after review validation, rejects missing or unreviewed inputs, symlinks and included non-regular entries and preserves the packager's regular cache exclusions. Ignored private working records outside package inputs remain allowed.
 
 Dispositions stay private and bind the repository, PR, reviewed head, exact comment body and local verification evidence. Each finding uses its real comment URL, `decision: fixed` or `decision: rejected`, a reason, `comment_sha256: sha256:<actual-comment-body-digest>` and `evidence: [{path: <repository-relative-proof>, sha256: sha256:<actual-file-digest>}]`. The top-level fields are `schema_version: 1`, `repository`, `pr`, `reviewed_head` and `findings`. An accepted-risk declaration or a resolved thread alone is insufficient. Refresh review after fixes, address every remark and preserve the actual guard result as the separate acceptance evidence.
 

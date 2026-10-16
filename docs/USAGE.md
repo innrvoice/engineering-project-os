@@ -136,6 +136,8 @@ python3 /absolute/path/to/project-os/scripts/project_os.py finding record --targ
 python3 /absolute/path/to/project-os/scripts/project_os.py finding record --target /path/to/repository --input /private/tmp/finding.json
 ~~~
 
+If upgrade must rewrite a file used by an existing proof, Codex reviews an exact snapshot_evidence map with --finding-proof-review and preserves the old bytes atomically. The original finding then proves historical bytes through evidence_snapshots, not the upgraded file. Repeating the old finding input cannot silently approve current changed bytes; a separately reviewed --id update captures fresh evidence while retaining raw legacy values and archive files. See [Historical evidence snapshots](REFERENCE.md#historical-evidence-snapshots-during-upgrade).
+
 Save a reconciled compact checkpoint with `checkpoint --target /path/to/repository --draft /private/tmp/checkpoint.md`, previewing first with `--dry-run`. Run `checkpoint --target /path/to/repository --check --json` afterward and during fresh recovery. CURRENT verifies the saved body and referenced record hashes; it does not independently prove that the narrative or acceptance claims are complete. See [Maintenance](../skills/project-os/references/maintenance.md) for the draft fields and compatibility boundaries.
 
 Start with an observation, not an invented mechanism:
