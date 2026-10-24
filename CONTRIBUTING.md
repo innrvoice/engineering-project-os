@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome when they improve portability, deterministic validation, documentation or safe repository adoption without turning Project OS into an application framework.
+Contributions are welcome when they make work easier to resume, lessons safer to reuse or repository changes easier to trust. This page is for people changing the plugin. To use it in a project, start with [Setup](docs/SETUP.md) and [everyday usage](docs/USAGE.md).
 
 ## Development setup
 
@@ -83,11 +83,13 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 
 - Explain whether a request belongs in Codex chat, Terminal or the ChatGPT companion.
 - Keep each Markdown prose paragraph and each list item on one physical line. Do not hard-wrap prose. Preserve separate lines only for headings, tables, code fences and intentional nested blocks.
-- Make canonical short requests primary and describe them as natural language, not a parser.
+- Start reader guides with the person's task and an ordinary request. Explain what Codex will do, what it saves and when a human decision is needed. Link parameters and individual operations to [Reference](docs/REFERENCE.md).
 - `$project-os help` stays read-only and lists every supported shortcut, purpose, required argument and examples.
 - For workflow recipes, state result, possible files, proof and when the workflow is unnecessary.
 - Use `$project-os` only for explicit skill invocation. Ordinary application prompts omit it.
-- Keep setup, mental model, usage and technical reference in their dedicated documents.
+- Keep setup, everyday usage, the mental model and technical reference in their dedicated documents. Link an explanation rather than repeating it on every page.
+- Use a practical, conversational voice: begin with a concrete difficulty, explain the mechanism through its consequence for the person and keep sentences connected. Preserve warmth and useful self-irony when they fit; do not invent personal stories or add a joke to every section.
+- Prefer ordinary words to corporate polish. Preserve good existing passages and the author's rhythm without turning instructions into slogans. Use straight quotes and plain hyphens.
 - Keep examples stack-agnostic and free of private project material.
 - Do not use the Oxford comma in English prose, documentation or public plugin metadata.
 - Preserve `allow_implicit_invocation: true` so ChatGPT can expose the selected plugin skill.
@@ -108,7 +110,7 @@ Project OS 2.2.4 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/con
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 
-Build and validate the exact working-tree ZIP using [GitHub distribution and release packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh Codex and supplied-material ChatGPT evaluation, native marketplace installation, tagged installation, hosted URL verification or publication authorization. Directory submission is a separate channel with its own availability and review requirements.
+Build and validate the exact working-tree ZIP using [release packaging](docs/PACKAGING.md). The suite includes extracted-package fixtures, Markdown layout checks and runtime checks. Local checks do not replace fresh Codex and supplied-material ChatGPT evaluation, native marketplace installation, tagged installation, hosted URL verification or publication authorization. Directory is the primary installation channel; each Directory submission still has its own review and availability checks. Repository-only documentation updates leave published tags and packages unchanged.
 
 ## Pull requests
 

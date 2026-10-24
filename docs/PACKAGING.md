@@ -1,14 +1,18 @@
-# GitHub distribution and release packaging
+# Distribution and release packaging
 
-Project OS 2.2.4 corrects finding proof refresh and legacy ownership, retaining compact checkpoints and atomic completion. Completed final-commit Codex Review is a separate mandatory release gate. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built. GitHub distribution is the primary release path; Directory submission remains a separate channel.
+This is the maintainer's route for checking and publishing a package. For installation, start with [Setup](SETUP.md). Directory is the primary installation channel for Project OS 2.2.4; GitHub marketplace and a pinned standalone Codex skill remain alternatives. Directory publication and GitHub release verification each need their own evidence.
+
+Project OS 2.2.4 corrects finding proof refresh and legacy ownership, retaining compact checkpoints and atomic completion. Completed final-commit Codex Review is a separate mandatory release gate. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built.
 
 The 2.2.4 validation scope includes isolated native Codex persistence and recovery and actual ChatGPT companion snapshot reconstruction, record hashes and checkpoint receipts. Strict isolation of ChatGPT Work context from account Memory has not been established. Account Memory settings remain unchanged, and this is an open validation limitation for this release. Do not describe the companion checks as proof of Memory-isolated recovery; retain this disclosure in the GitHub Release notes.
 
 Retain the exact reviewed ZIP for the GitHub Release and verify its SHA-256 after download. Public documentation is part of that ZIP, so changing packaged copy before publication requires a new reproducible build and artifact checks. All selected skill files must match the behaviorally tested copy exactly. Preserve existing published artifacts unchanged.
 
+The current reader-documentation revision updates the repository only. The published 2.2.4 tag, ZIP and assets retain their original bytes. The commands below describe package verification and release work; they are not instructions to replace that published package with a build of the updated documentation.
+
 Ordinary repairs must save actual findings and companion transfers must save their current checkpoint before returning project files. Verify the actual exported bytes by reconstructing the returned snapshot and running structural and checkpoint checks there. Passing runtime tests or a successful knowledge import does not establish that result. Preserve failed observations when revising and retesting the candidate.
 
-The primary installation route registers the GitHub marketplace from `main` and installs `engineering-project-os@engineering-project-os` from its pinned `v2.2.4` source. The tagged standalone Codex skill is the secondary route. [Setup](SETUP.md) contains the exact Terminal commands and skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
+The [Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) is the first installation choice. The GitHub alternative registers the marketplace from `main` and installs `engineering-project-os@engineering-project-os` from its pinned `v2.2.4` source. [Setup](SETUP.md) contains both alternatives, including the standalone skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
 
 ## Verify before building the release package
 
@@ -32,13 +36,13 @@ The package must not contain a release-managed failure knowledge database. Capab
 
 ## Version and schema contract
 
-Release version must be `2.2.4` in the helper, both plugin manifests, marketplace plugin-source ref, knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while its plugin source pins `v2.2.4`. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1. A dated legacy-channel status may name its own older version only inside an explicit Legacy Directory section.
+Release version must be `2.2.4` in the helper, both plugin manifests, marketplace plugin-source ref, knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while its plugin source pins `v2.2.4`. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1. Preserve older release descriptions as history in the changelog.
 
-The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata without rewriting Markdown plans, context, state, findings, evidence or application code. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
+The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata while preserving project-owned data and application code. Reviewed finding-proof migrations can add proof metadata to the registry and preserve evidence for rewritten managed files in historical snapshots; this is not a promise that every record stays byte-identical. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Follow the [proof ownership and snapshot review](REFERENCE.md#legacy-finding-proof-ownership), then test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
 ## Selected metadata
 
-Use these values in both manifests. They describe the current GitHub package independently of the legacy Directory listing:
+Use these values in both manifests. The Directory package and GitHub release use the same 2.2.4 metadata; source validation and the host's visible presentation remain separate checks:
 
 - Name: `Engineering Project OS`
 - Descriptor: `Built for Codex.`
@@ -145,18 +149,20 @@ Dispositions stay private and bind the repository, PR, reviewed head, exact comm
 6. Complete the authorized source pull request and wait separately for CI and completed Codex code/security reviews of the final commit. Record every finding disposition, resolve its thread and pass the final-head guard above. A new source commit requires a matching new review and affected acceptance checks.
 7. With all mandatory host results and final-commit review recorded, pass the pre-publication acceptance guard against the exact final ZIP. Only then recommend publication or request scoped owner authorization for merge, tag and GitHub Release. After authorization, merge and verify the merged tree, create tag `v2.2.4` on the accepted commit and attach the exact reviewed ZIP to the GitHub Release.
 8. Verify the remote tag, Release metadata and downloaded asset SHA-256. Test the documented GitHub marketplace and tagged standalone routes in isolated profiles, then inspect the selected installation in a fresh Codex task. Check the installed version, exact skill bytes, bootstrap or upgrade, actual finding/checkpoint persistence and files-only recovery.
-9. Report GitHub source, Release, artifact and installation results with their evidence. Report the legacy Directory status separately; a GitHub release does not require a new Portal submission or establish ChatGPT availability.
+9. Report GitHub source, Release, artifact and installation results with their evidence. Report Directory status separately; a GitHub release does not establish Directory publication or ChatGPT availability. Follow the Directory checks below for an owner-authorized submission.
 
 Do not replace package contents under an existing version. Any content change after publication requires another version.
 
 ## Release notes
 
-Use these release notes after the release gates pass:
+The release behavior is summarized below. Keep actual release notes tied to their verified scope; the later repository documentation revision does not rewrite the published release:
 
-`2.2.4 rejects implicit refresh of changed finding proof, separates helper-owned proof data from legacy project fields and adds reviewed proof migration. Final-commit Codex Review and disposition of every remark are mandatory before merge or publication, independently of CI. GitHub marketplace installation remains primary with a tagged standalone skill alternative. Existing checkpoints, Standard, Program and schema compatibility remain supported.`
+`2.2.4 rejects implicit refresh of changed finding proof, separates helper-owned proof data from legacy project fields and adds reviewed proof migration. Final-commit Codex Review and disposition of every remark are mandatory before merge or publication, independently of CI. Existing checkpoints, Standard, Program and schema compatibility remain supported.`
 
-## Legacy Directory
+<a id="legacy-directory"></a>
 
-The existing [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) remains on 2.2.2. On 2026-10-16, the maintainer reported that the Portal would not accept an updated skills-only submission for Engineering Project OS. This observation concerns this plugin's submission and does not change the GitHub release gates.
+## Directory publication
 
-If a future owner-authorized submission is accepted, follow the then-current official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines). Verify the Portal form, images, capabilities, prompts, policies and exact package version. Declare the GitHub Issues support URL in both manifests, then verify actual Portal ingestion and public display separately. Record review approval, publication and fresh-host availability as distinct results. Preserve the existing published Directory artifact; GitHub release documentation does not replace it.
+On 2026-10-24, the maintainer confirmed that the [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) offers the exact published 2.2.4 package. Directory is the primary installation channel again. This is the date of confirmation, not a claim about the publication day. Earlier submission restrictions remain historical observations in the changelog.
+
+For a future owner-authorized submission, follow the then-current official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines). Verify the Portal form, images, capabilities, prompts, policies and exact package version. Declare the GitHub Issues support URL in both manifests, then verify actual Portal ingestion and public display separately. Record review approval, publication and fresh-host availability as distinct results. Preserve the existing published Directory artifact; repository documentation does not replace it.

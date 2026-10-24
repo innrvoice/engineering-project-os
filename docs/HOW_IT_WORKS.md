@@ -1,135 +1,70 @@
 # How Project OS works
 
-Engineering Project OS was built for Codex because the most useful engineering context is already inside the repository, except for the part that usually disappears when a conversation ends.
+The plugin supplies instructions and a Python helper. The repository owns its working records. A later Codex task reads and checks those files instead of depending on the old conversation.
 
-The code survives. The working state often does not. A new task can see the implementation, but it may not know which decision is current, why the obvious approach failed, which acceptance gate remains open or where the previous task intended to continue. Reconstructing that state from old chats works until the work becomes complicated enough to need the state in the first place.
+<a id="scene-one-resume-tomorrow"></a>
 
-Project OS gives the repository a small, visible control plane. Codex reads only the records relevant to the current job and keeps durable engineering truth beside the code. The plugin provides the workflow and deterministic helper. The repository owns the context, plans, findings, evidence and knowledge.
+## From a request to the next task
 
-This is not a second issue tracker or a ceremonial folder of Markdown. It is a handoff that the next Codex task can verify.
+Source changes pass their checks, but a remote migration is pending. Codex saves both facts and the next action. The next task checks that blocker before continuing.
 
-## Scene one: resume tomorrow
+The records have different jobs:
 
-Imagine a task that outlives one conversation. The first task has traced a data-loss bug, rejected one tempting fix and reached a point where the next useful action is a focused device reproduction. Without durable state, the next task sees the code and starts investigating again.
+| Record | What it keeps |
+| --- | --- |
+| Context | Verified facts and commands |
+| Checkpoint | Progress, blockers and next action |
+| Plan and contract | Outcome and required evidence |
+| Requests | Additions, decisions and routing |
+| Findings and evidence | Failures and actual check results |
+| Knowledge | Confirmed lessons |
 
-With Project OS, the active plan owns the intended outcome and acceptance conditions. `STATE.md` holds the current checkpoint and exact next action. Findings preserve what was observed without promoting a hypothesis into fact. Evidence records which commands or external checks actually ran.
+`AGENTS.md` routes Codex to relevant files under `.agents/`. Codex reads the records needed for the task. The checkpoint is a compact handoff, separate from the plan.
 
-The next Codex task starts from those files. It does not need the old conversation to be available, current or even trustworthy.
+<a id="scene-two-track-the-proof-that-is-still-missing"></a>
+<a id="readiness-before-delivery"></a>
 
-That is the basic loop:
+## Evidence keeps completion honest
 
-`inspect repository truth -> do the work -> reconcile the checkpoint -> preserve proof -> resume from the repository`
+Passing local tests cannot satisfy a required remote migration or device check. Codex records what each check established. The helper refuses closure while required recorded conditions or scoped requests remain unresolved.
 
-## Scene two: track the proof that is still missing
+Evidence hashes detect changed proof. Checkpoint freshness shows that captured records still match. Neither proves the narrative is complete or production works. The agent assesses the actual evidence and reports its limits.
 
-A frontend change passes lint, types and unit tests. CI is green. The bug, however, only appeared on a physical iPhone after returning from a native camera screen.
-
-Green CI proves that CI passed. It does not prove that the physical failure is fixed. Project OS keeps those gates separate. The plan can record source verification as complete while physical acceptance remains open. A later task does not need to guess whether "done" meant merged, deployed or observed on the affected device.
-
-The helper validates structure and internal consistency. It cannot decide that a screenshot proves the product outcome or that a source build is equivalent to production. Codex and the user make those judgments from current evidence. Project OS preserves the distinction so the judgment survives the session.
+Successful closure saves the completed plan and idle checkpoint together. A following independent plan stays planned without acquiring new permission.
 
 ## Preserve a requirement before the conversation forgets it
 
-Halfway through a task, the user adds an offline case or corrects an audience rule. Codex saves that material instruction while processing the message, without requiring a separate request to write it down. The requests registry retains the source formulation, interpretation and route. Compatible additions join the active contract. Independent outcomes get a planned slice; conflicts stay visible until a decision resolves them.
+Codex saves material additions while processing your message. Compatible work joins the current outcome; independent work gets a following plan. Conflicts stay visible until you decide. After compaction, Codex reads unresolved additions alongside the checkpoint.
 
-After context compaction, Codex reads unresolved requests with the plan and checkpoint. Integrated means assigned, not delivered. Implemented requires linked verified gates. This is an agent workflow over files, not a background chat recorder, so the agent must perform the capture on each material turn.
+The agent must do this writeback; there is no background chat recorder. Discussing an option does not automatically make it a work order.
 
-A feature may pass local tests while its remote schema is still old. The active contract keeps that required migration pending and plan complete refuses closure. A separate planned slice cannot hide a prerequisite of the original outcome. Source-only preparation may close only when it was the actual agreed result.
+<a id="scene-four-reuse-a-failure-without-importing-the-old-product"></a>
 
-## Scene three: coordinate a real multi-phase migration
+## A lesson can leave the project; its private history does not
 
-Most work belongs in Standard mode. One bug fix may not need a plan at all. A long implementation may need one resumable plan, but length alone does not make it a Program.
+A finding starts with an observation and the next check. A confirmed mechanism can become a project lesson with local paths and evidence.
 
-A Program is useful when one initiative genuinely contains several outcome-sized phases. Consider an authentication migration across an API, workers, web and mobile. Each phase can have its own plan and evidence while one temporary Program contract owns the shared outcome, authority, sequence, cost boundary, exclusions and exit conditions.
+For reuse, Codex preserves the trigger, mechanism, prevention, decisive check and limits while removing private context. You review and approve the proposal. The destination receives the selection, explains skips and preserves conflicting local changes. Repeating the import does not duplicate lessons.
 
-Starting a Program does not silently create work. Codex first defines the complete contract, previews the transition and runs the helper only after the boundary is clear. Closing requires no active plan and either verified completion evidence or an explicit stopped reason. The exact Program contract is archived with a SHA-256 digest, then the repository returns to Standard.
+The source stays unchanged. Portable bundles serve another machine or ChatGPT. The publisher receives no lessons and nothing synchronizes automatically. See [Usage](USAGE.md).
 
-The archive is tamper-evident repository content. It is not immutable storage, a signature or a remote audit service. Git remains the review and distribution mechanism.
+<a id="scene-three-coordinate-a-real-multi-phase-migration"></a>
+<a id="the-repository-model"></a>
 
-## Scene four: reuse a failure without importing the old product
+## Use only the structure the work needs
 
-As Codex develops, investigates and verifies work in a connected repository, it should record the findings it discovers without waiting for a separate `finding add` request. Findings retain observations, evidence, hypotheses and the next decisive check. Confirmed mechanisms can become project lessons; unresolved candidates remain findings. This depends on the agent following the repository workflow during the task, not on a background collector.
-
-Now imagine a React Native repository that has accumulated two months of confirmed failures: lifecycle races, image-memory problems and native handoff mistakes. A new repository begins. Ask Codex to reuse the useful lessons from the old repository and bring over only what fits the new project. Codex inspects both sides, prepares missing lessons and shows the proposed lesson changes for review. After approval, it applies the selection and validates the result. You do not need to issue every intermediate command. See the [simple recipes](../skills/project-os/references/knowledge.md).
-
-Project OS separates the local story from the reusable mechanism. A project lesson may mention private paths, product names and exact evidence. A reusable lesson must stand on its own: what triggers the failure, why it happens, how to prevent it, how to verify the prevention and where the lesson does not apply.
-
-The transfer has deliberate gates:
-
-1. A finding records the observed failure and the next decisive check.
-2. After the mechanism is confirmed, Codex captures project-specific failure knowledge.
-3. Codex prepares a sanitized proposal that preserves the mechanism and applicability boundaries.
-4. A person reviews the proposal and explicitly approves the lessons that remain safe and accurate without project history.
-5. Codex reads an approved library or prepares missing lessons from the read-only source and approves the reviewed matching proposals in the destination. A portable bundle supports another machine.
-6. The destination previews applicable lessons, explains skips and imports only after confirmation.
-
-`failure -> finding -> project lesson -> sanitized proposal -> approval -> user-owned reusable library -> explicit import`
-
-There is no Project OS-owned shared database. The plugin author does not receive or curate these lessons. Nothing uploads or synchronizes in the background. "Shared" means shared by the user between repositories they control, not globally published.
-
-For two repositories visible to Codex on the same machine, the destination can import directly from the source repository. For another machine or the ChatGPT companion, the user can export a deterministic JSON bundle and supply it explicitly. Destination-owned changes win, lifecycle tombstones remain explicit and repeated imports are idempotent.
-
-The first repository records the lesson. The next one does not need to repeat that failure. Software will kindly provide different failures for future research.
-
-## The repository model
-
-Project OS uses ordinary files with narrow ownership:
-
-- `AGENTS.md` owns startup routing, authority and working rules.
-- `.agents/SYSTEM.json` owns the Project OS release, schema, mode, paths and managed guidance baselines.
-- `.agents/WORKFLOW.md` owns managed intake, recovery and closure rules.
-- `.agents/requests.json` owns material user additions and their routes.
-- `.agents/CONTEXT.md` owns durable verified facts and exact commands.
-- `.agents/STATE.md` owns the current checkpoint and exact next action.
-- `.agents/plans/` contains the status registry, Markdown implementation narratives and adjacent JSON acceptance contracts. Completion receipts bind the contract, proof and scoped requests without making later independent slices part of the old result.
-- `.agents/findings/` owns concrete defects, candidates and accepted risks.
-- `.agents/evidence/` stores sanitized proof referenced by an owning record.
-- `.agents/knowledge/project/` owns repository-specific lessons.
-- `.agents/knowledge/reusable/` owns sanitized, reviewed and user-controlled portable lessons.
-- `.agents/packs/` contains managed capability and ecosystem guidance.
-- `.agents/PROGRAM.md` exists only while one Program is active.
-- `.agents/history/` contains closed Program snapshots and their index when they exist.
-
-One fact should have one owner. `STATE.md` is a compact handoff, not a diary. `CONTEXT.md` is durable context, not an active task list. The full `.agents` tree is not inserted into every prompt. `AGENTS.md` routes Codex to the smallest relevant records.
+Standard is the normal setup. A bounded repair can stay plan-free while saving findings and a checkpoint. Longer work can have one active plan. Program adds a temporary shared contract for several plans with one sequence and exit condition.
 
 ## Installation and repository connection
 
-The primary GitHub marketplace route installs the Codex plugin. A pinned standalone Codex skill is the secondary route. Either makes the reusable skill available without creating repository records, attaching a repository or turning Project OS into a permanent mode. ChatGPT companion access belongs to its separate distribution channel; see [Setup](SETUP.md).
-
-In Codex, open the repository and run `$project-os inspect`. Project OS reads Git state, instructions and engineering configuration without writing. It then recommends a clean bootstrap, a bootstrap that preserves existing authority or adoption of compatible records. Every mutating route follows the same sequence:
-
-`inspect -> preview or helper dry-run -> review -> apply -> check`
-
-After setup, ordinary engineering requests remain ordinary. Applicable `AGENTS.md` files enter the instruction chain when a new Codex task starts. Use `$project-os` again when the request is about the control plane itself.
-
-Bootstrap always creates Standard mode. It never creates a Program. Adoption maps compatible existing records without quietly replacing project-owned authority.
-
-## What the helper can and cannot do
-
-The Python helper performs deterministic operations such as `detect`, `init`, `adopt`, `check`, `upgrade`, Program transitions and reusable knowledge transfer. It validates paths, registries, state invariants, archive hashes, version alignment and managed guidance baselines. Mutating commands support previews where appropriate and refuse stale or conflicting state.
-
-The helper does not infer product requirements, write application code, confirm a failure mechanism, decide whether evidence proves an outcome or grant authority for Git, deployment, publication, dependency installation or external communication.
-
-Project OS 2.2.4 retains schema 5 and the existing knowledge bundle formats. It retains transactional finding capture, verifiable checkpoint writes and atomic completion with a current idle checkpoint. Finding proof uses an explicit versioned namespace; unchanged repeated input also requires unchanged proof. Legacy project fields survive validation and updates, while earlier unnamespaced helper proofs require reviewed ownership migration. Updating the selected plugin or standalone skill does not update connected repositories. `$project-os upgrade` previews managed changes, preserves project-owned records and knowledge, applies only a clean result and runs the checker.
-
-An upgrade can itself change a file that was valid evidence for an earlier finding. In that case, an exact reviewed path/hash map authorizes preserving the old bytes and proof in the same transaction. The resulting historical snapshot still has the original hash and provenance; it does not verify the upgraded file. Ordinary unsnapshotted evidence still fails when its bytes change, and a deliberate fresh finding capture requires a reviewed explicit ID update. See [Historical evidence snapshots](REFERENCE.md#historical-evidence-snapshots-during-upgrade).
+Install Project OS 2.2.4 primarily through the [Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9). Connecting a repository separately creates or adopts records after a preview. Existing instructions remain authoritative. [Setup](SETUP.md) covers alternatives and upgrades.
 
 ## ChatGPT is the companion surface
 
-ChatGPT can explain Project OS, reason about supplied project files and work with portable knowledge bundles. It does not see a live local checkout merely because the plugin is installed. An overview needs no files, but a claim about an existing repository needs the relevant files or a supplied snapshot.
+ChatGPT uses supplied files and bundles, without live repository access from installation. Check actual returned file bytes before applying them. Codex works directly with the repository and its current Git state.
 
-This makes ChatGPT useful for understanding the model, preparing setup artifacts from supplied material and carrying a reviewed bundle across machines. The full repository-native benefit appears in Codex, where the agent can read current Git state, follow `AGENTS.md`, run the helper and keep the control plane reconciled with the code.
-
-Returned project files need their own verification. The agent rereads actual bytes, preserves the complete checkpoint receipt, reconstructs the exact serialized snapshot in a separate directory and runs structural and checkpoint checks there. Fresh-session acceptance reads that returned file set. Successful checks in the original workspace cannot validate an export assembled from different bytes.
+<a id="what-the-helper-can-and-cannot-do"></a>
 
 ## Safety boundary
 
-Project OS narrows where engineering state lives. It does not broaden what Codex or ChatGPT may do. There is no daemon, watcher, MCP server, hidden database, automatic upload, automatic Git operation or automatic cross-project synchronization.
-
-Application edits, deletion, dependency installation, Git operations, deployment, publication and external communication still require user authority and must follow repository instructions.
-
-For exact request syntax, record schemas and helper commands, continue with [Reference](REFERENCE.md). For installation and upgrades, use [Setup](SETUP.md). For job-based examples, use [Usage](USAGE.md).
-
-## Readiness before delivery
-
-The agent checks recorded outcome readiness before each final checkpoint or publication recommendation. plan status --require-ready returns NOT_READY and a failing exit status until required gates and requests are resolved. A valid record layout, passing source tests or a ZIP cannot substitute for host acceptance. Ordinary intake and cancellation use canonical examples delivered in managed WORKFLOW and are checked immediately, so fresh sessions can detect invalid records rather than trust only their narrative.
+The helper runs when invoked and initiates no network request. Project OS grants no new authority for application changes, Git operations or publication. Exact commands, ownership and file-safety guarantees belong in the [advanced Reference](REFERENCE.md).

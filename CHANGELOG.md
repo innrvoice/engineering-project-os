@@ -4,6 +4,13 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased documentation
+
+- On 2026-10-24, the maintainer confirmed that Directory offers the published 2.2.4 plugin. Make Directory the primary installation route again, with GitHub marketplace and the pinned standalone skill as alternatives.
+- Reorganize the reader guides around ordinary requests, saved results and human decisions. Keep detailed commands and formats in Reference and release procedures in the maintainer guide.
+- Clarify that a reviewed upgrade can add finding proof metadata and historical evidence snapshots while preserving project-owned data.
+- These repository documentation changes do not replace the published 2.2.4 tag, ZIP or release assets and do not introduce a new release.
+
 ## [2.2.4] - 2026-10-16
 
 ### Fixed

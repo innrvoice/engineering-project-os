@@ -1,6 +1,17 @@
 # Reference
 
-This is the technical contract for Project OS 2.2.4. Start with the [README](../README.md) if installation, plugin invocation or repository connection is still new.
+Use this reference when you need an exact command, field or rule for Project OS 2.2.4. Start with [Setup](SETUP.md) to connect a repository or [Usage](USAGE.md) for everyday requests to Codex.
+
+## Find a topic
+
+- [Finding records and checkpoint receipts](#interfaces)
+- [Chat requests and their arguments](#project-os-requests)
+- [Plans, user additions and guarded completion](#contracts-intake-and-guarded-completion)
+- [Files and what each one owns](#record-ownership)
+- [Reusable failure knowledge](#user-owned-reusable-knowledge)
+- [Standard and Program](#standard-and-program)
+- [Python helper commands and options](#helper-summary)
+- [Legacy finding proof ownership](#legacy-finding-proof-ownership) and [historical evidence snapshots](#historical-evidence-snapshots-during-upgrade)
 
 ## Interfaces
 
@@ -17,7 +28,7 @@ The owned namespace can also contain evidence_snapshots after a reviewed upgrade
 | Python helper | Deterministic setup, validation, upgrade, Program transitions and reusable knowledge operations | `project_os.py ...` in Terminal |
 | ChatGPT companion | Explanations and workflows over project files or portable bundles supplied in the conversation | `@Engineering Project OS ...` with the needed material |
 
-Engineering Project OS was built for Codex. `$project-os` selects the bundled skill for one Codex message while `@Engineering Project OS` selects the ChatGPT companion where that companion is available. Text after either selector is natural language, not a helper command line or rigid parser. Implicit invocation lets the selected plugin expose the skill for a clear Project OS request. The primary installation route is the GitHub Codex marketplace; [Setup](SETUP.md) separates it from the standalone skill and legacy Directory channel.
+Engineering Project OS was built for Codex. `$project-os` selects the bundled skill for one Codex message while `@Engineering Project OS` selects the ChatGPT companion where that companion is available. Text after either selector is natural language, not a helper command line or rigid parser. Implicit invocation lets the selected plugin expose the skill for a clear Project OS request. Install the current plugin through the Plugin Directory. [Setup](SETUP.md) also covers the GitHub marketplace and standalone Codex skill alternatives.
 
 Installation and repository access are separate. Codex can use only the local workspace selected for the task. ChatGPT can use only the project description, files and portable bundles available in the chat. Choosing a setup can begin from a description while reviewing an existing setup requires its actual Project OS files. Neither surface gains repository access from installation alone.
 
