@@ -6,167 +6,114 @@
 
 Resume engineering work with durable state and reusable failure knowledge.
 
-[Install in Codex from GitHub](docs/SETUP.md#1-install-in-codex-from-github)
+<a id="legacy-directory"></a>
 
-Project OS 2.2.4 protects finding proof updates and preserves legacy field ownership. GitHub is the primary distribution channel for this Codex developer tool. See the [changelog](CHANGELOG.md) for release history.
+[Install Engineering Project OS from the Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
+
+Project OS 2.2.4 is available in the Universal Plugin Directory, the primary installation route. GitHub marketplace and standalone Codex installations are [alternatives](docs/SETUP.md).
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
 Tomorrow the code is still there, but the working state is not. Which decision was current? Which failure was confirmed? Did green CI prove the change worked or did the result still need a physical device, deployment or human check? A long chat may contain the answer, but chat history is a poor project database.
 
-Engineering Project OS keeps that working truth in visible repository files. Codex can resume from the current plan, checkpoint, findings and evidence instead of reconstructing them from conversation fragments. The repository owns the state. The plugin knows how to inspect, create, validate and maintain it safely.
+Project OS keeps that working state in visible repository files. Codex can resume from the current plan, checkpoint, findings and evidence instead of reconstructing them from conversation fragments.
 
 ## What it gives a developer
 
-- **Resumable work:** return in a new Codex task and continue from an exact checkpoint instead of retelling the project.
-- **Visible plans and decisions:** keep the current route, constraints and next action beside the code that depends on them.
-- **Guarded completion:** required gates and proof are checked before a plan can close, including remote prerequisites when the outcome needs them.
-- **Durable additions:** corrections and new requirements are recorded during work, routed into the current or a following slice and recovered after context compaction.
-- **Reusable failure knowledge:** turn a confirmed mechanism into a reviewed lesson that you can carry into another repository you own.
-
-Project OS is useful when work spans sessions, has several acceptance boundaries or produces lessons worth preserving. It is not a generic project manager, an automatic global knowledge service or a requirement for an ordinary one-session code fix.
-
-## What that looks like in practice
-
-### Continue a long Codex task
-
-A migration is halfway through. The current plan records what has changed, why one approach was rejected, which phase is active and the exact next check. A fresh Codex task reads those records and continues from repository truth rather than a summary remembered by a previous conversation.
-
-### Keep "green" honest
-
-A React Native fix passes TypeScript and unit tests. That is useful evidence, but it does not prove a native modal behaves correctly on the affected device. Project OS can preserve both facts: the source checks passed and physical acceptance remains open. "Done" stops being a mood.
-
-### Reuse a failure without copying the old project
-
-One repository confirms a recurring React Native lifecycle failure and records the trigger, mechanism, prevention and decisive verification. You review and sanitize that lesson, then import it into a new repository. The second project receives the reusable mechanism, not the first project's names, paths or private history.
+- **Continue without retelling the project.** Keep progress and the next action.
+- **Keep additions during work.** Corrections survive context compaction.
+- **See what "done" still needs.** Separate passing tests from production acceptance.
+- **Carry useful lessons forward.** Reuse lessons from confirmed failures across your own projects.
 
 ## Start in Codex
 
-1. [Install Engineering Project OS in Codex from GitHub](docs/SETUP.md#1-install-in-codex-from-github).
-2. Open the repository in Codex and start a new task.
-3. Inspect the repository without changing it:
+1. Install from the [Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9).
+2. Open the target repository in Codex and start a new task.
+3. Ask for a safe connection:
 
 ~~~text
-$project-os inspect
+$project-os Help me connect this repository. Preserve its existing instructions and show me the changes first.
 ~~~
 
-Project OS will recommend one connection path: a clean bootstrap, a bootstrap that preserves an existing `AGENTS.md` or adoption of compatible records already in the repository. Review the preview before any write, then run the matching workflow and validate the result.
+Codex inspects existing records and previews the proposed changes. You review the proposal before it writes. After the approved setup and checks, start a new task to load the repository instructions.
+
+Installation makes the workflow available; connecting a repository creates or adopts its working records. See [Setup](docs/SETUP.md) for upgrades and alternative installation routes.
+
+<a id="knowledge-that-compounds"></a>
+<a id="reuse-a-failure-without-copying-the-old-project"></a>
+
+## Carry useful lessons into the next project
+
+One React Native repository confirms a lifecycle failure. The next project can use its trigger, mechanism, prevention and decisive check without receiving the first project's private history.
+
+Open the destination repository and ask:
 
 ~~~text
-$project-os bootstrap
-$project-os check
+$project-os Reuse the useful failure lessons from /path/to/earlier-repository here. Prepare only lessons that fit this project, keep the source unchanged and show me one batch to review.
 ~~~
 
-Use `$project-os adopt` instead of bootstrap when the inspection finds compatible existing state. Installing the plugin and connecting a repository are separate actions: installation makes the skill available while bootstrap or adoption creates the visible repository-local control plane.
+Give Codex the real source path. It checks both projects, prepares missing lessons and removes private context. You review what fits and why. After approval, Codex transfers the selection and checks the destination. The source stays unchanged.
 
-After setup, ordinary development does not need a Project OS prefix. Ask Codex to implement, investigate or verify work normally. Use `$project-os` when the subject is the operating system itself: inspection, plans, checkpoints, findings, knowledge, upgrades or Program lifecycle.
-
-~~~text
-$project-os overview
-$project-os check
-$project-os plan open: ship offline retry without duplicate writes
-$project-os plan checkpoint
-~~~
-
-Every mutating Project OS workflow follows the same boundary:
-
-`inspect -> preview or dry-run -> review -> apply -> check`
-
-The exact Codex requests and helper commands are documented in [Usage](docs/USAGE.md) and [Reference](docs/REFERENCE.md).
-
-## Knowledge that compounds
-
-As you work in a connected repository, Codex should record the findings it discovers with evidence and the next check. You do not need to manually add each finding. Confirmed mechanisms can become project lessons; unresolved hypotheses stay in the findings register.
-
-To reuse those accumulated lessons, open the next repository in Codex and ask:
-
-~~~text
-$project-os Reuse the useful failure lessons from /path/to/earlier-repository here. Set up Project OS if needed, prepare anything that is missing and bring over only lessons that fit this project.
-~~~
-
-Codex handles setup, preparation and applicability checks, then shows a batch of proposed lesson changes for your review. After approval, it transfers the selected lessons, explains skips and validates the destination. You do not need to orchestrate every knowledge command yourself. The source stays unchanged during transfer.
-
-Project OS separates two kinds of knowledge:
-
-- **Project knowledge** stays with its repository and may include local names, paths, evidence and history.
-- **Reusable knowledge** contains only reviewed, sanitized failure mechanisms that the user has deliberately approved for transfer.
-
-The transfer is explicit: capture a confirmed finding, prepare a sanitized lesson, approve it, export it or read it directly from another repository, preview it against the destination and import it. Nothing synchronizes in the background. There is no Project OS-owned shared database and no author-managed lesson service.
-
-For repositories available on the same machine, Codex can transfer reviewed lessons directly from the source repository. Portable JSON bundles support cross-machine work and the ChatGPT companion. Destination-owned changes win, skipped lessons are explained and repeated imports are idempotent.
+Codex should record findings during ordinary work, without a separate save request for every bug. Unconfirmed explanations stay labelled as hypotheses. Lessons require review and do not synchronize automatically.
 
 The first repository records the lesson. The next repository does not need to repeat the failure. Software will still invent new ones, but at least it has to be creative.
 
-See [simple recipes](skills/project-os/references/knowledge.md) for everyday use and advanced controls, [How it works](docs/HOW_IT_WORKS.md) for the knowledge model and [Usage](docs/USAGE.md) for the transfer workflows.
+See [Usage](docs/USAGE.md) for same-machine transfer, portable bundles and working with the ChatGPT companion.
 
-## Standard and Program
+<a id="what-that-looks-like-in-practice"></a>
 
-Every connected repository starts in **Standard**. Standard is the complete everyday system: repository routing, durable context, checkpoint state, just-in-time plans, findings, evidence and knowledge.
+## Continue a long Codex task
 
-A **Program** is an optional temporary contract for one genuinely multi-phase initiative. Use it when several separate plans need one shared outcome, authority boundary, phase sequence, evidence policy and exit condition. A long task does not automatically need a Program.
+A migration is halfway through. Its plan records changes, rejected approaches and the next check. Open a new task in the same repository:
 
-For example, one pagination fix belongs in Standard. An authentication migration across an API, workers, web and mobile may justify a Program. Closing a Program archives its exact contract with a SHA-256 digest, then returns the repository to Standard.
+~~~text
+Continue the migration from the repository records. Check the recorded blocker before changing code.
+~~~
+
+Codex checks the saved state and continues from the next action. It saves a compact checkpoint after meaningful work. The agent must follow the workflow; Project OS does not secretly record the chat.
+
+## Keep "green" honest
+
+A React Native fix passes TypeScript and unit tests. That is useful evidence, but it does not prove a native modal behaves correctly on the affected device. Project OS preserves both facts: source checks passed and physical acceptance remains open. "Done" stops being a mood.
+
+Ask what remains whenever the result is unclear:
+
+~~~text
+$project-os What is still missing before we can call this done?
+~~~
+
+The answer names what changed, what was checked and where, what remains and the next action. A required remote migration stays open despite passing local tests. The helper checks records; it cannot independently verify production.
+
+## Add a thought while work is running
+
+Send the instruction normally:
+
+~~~text
+Also handle reconnecting after the app has been offline. Keep the existing retry behavior.
+~~~
+
+Codex saves the addition while handling your message. Compatible work joins the current outcome; independent work gets a following plan. Conflicts stay recorded until you decide.
 
 ## ChatGPT companion
 
-ChatGPT is a companion for explanations, supplied project files and portable knowledge bundles. It does not gain access to a live local repository merely because the plugin is installed.
+Select `@Engineering Project OS` to ask for explanations or work with supplied files and lesson bundles. ChatGPT cannot see your local checkout through installation alone. Apply returned files deliberately and validate the real repository in Codex.
 
-Where the companion is available, use these prompts to understand the system, prepare a setup from supplied material or work with a reviewed knowledge bundle:
+<a id="install-in-codex-from-github"></a>
+<a id="standalone-codex-skill"></a>
+<a id="standard-and-program"></a>
+<a id="what-is-installed"></a>
 
-~~~text
-@Engineering Project OS Tell me how Project OS helps Codex resume real engineering work across sessions.
-@Engineering Project OS Help me set up Project OS for this repository and start with a safe preview.
-@Engineering Project OS Help me reuse verified failure knowledge from an earlier project in this one.
-~~~
+## When you want more control
 
-An overview needs no files. Advice about an existing setup requires the relevant Project OS files. If they are missing, ChatGPT must ask for them instead of pretending that an empty host workspace is your repository. Any changed files returned by ChatGPT remain artifacts until you deliberately apply them. Codex marketplace installation does not install the companion in ChatGPT Web; see the [legacy Directory status](#legacy-directory).
+Ordinary development needs ordinary requests after setup. Use `$project-os` to select the skill explicitly when asking about plans, findings, lessons or maintenance. These requests are natural language, not a command parser.
 
-## Install in Codex from GitHub
-
-Run these commands in Terminal using a Codex CLI with plugin support:
-
-~~~shell
-codex plugin marketplace add innrvoice/engineering-project-os --ref main
-codex plugin add engineering-project-os@engineering-project-os
-~~~
-
-The marketplace catalog follows `main`; its plugin source is pinned to `v2.2.4`. Open the target repository in Codex and start a new task after installation. See [Setup](docs/SETUP.md) for verification, upgrades and resolving duplicate installations.
-
-## Standalone Codex skill
-
-For a standalone Codex installation, use the built-in `$skill-installer` in Codex chat with the versioned release tag:
-
-~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.4/skills/project-os
-~~~
-
-Start a new Codex task after installation. The versioned URL does not follow `main` automatically. Keep one intended Project OS installation active.
-
-## Legacy Directory
-
-The existing [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) remains on 2.2.2. On 2026-10-16, the maintainer reported that the Portal would not accept an updated skills-only submission for Engineering Project OS. This observation concerns this plugin's submission; GitHub carries the current Codex release independently.
-
-Directory installation, including ChatGPT companion availability, remains a separate channel. Updating from GitHub does not update that listing or its installed copies.
-
-## What is installed
-
-The plugin contains a skill with focused instructions, references, templates, capability guidance and a deterministic Python helper. A connected repository contains visible records under `AGENTS.md` and `.agents/`.
-
-There is no daemon, watcher, MCP server, hidden database, automatic upload, automatic Git operation or background cross-project synchronization. The helper runs only when explicitly invoked and never grants authority to change application code, install dependencies, commit, push, deploy or publish.
-
-Requirements are Python 3.9 or newer on macOS or Linux when the deterministic helper runs locally.
+Direct helper commands, record formats and migration details live in the [advanced Reference](docs/REFERENCE.md).
 
 ## Continue reading
 
-- [Setup](docs/SETUP.md)
-- [How it works](docs/HOW_IT_WORKS.md)
-- [Usage](docs/USAGE.md)
-- [Reference](docs/REFERENCE.md)
-- [GitHub distribution and release packaging](docs/PACKAGING.md)
-- [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-- [Privacy policy](docs/PRIVACY.md)
-- [Terms of use](docs/TERMS.md)
-- [Support](https://github.com/innrvoice/engineering-project-os/issues)
-- [MIT License](LICENSE)
+- [Setup](docs/SETUP.md): install, connect or upgrade a repository.
+- [Usage](docs/USAGE.md): ask for the result you need.
+- [How it works](docs/HOW_IT_WORKS.md): understand what gets saved and why.
+- [Reference](docs/REFERENCE.md): use the helper and inspect exact formats.
+
+For maintainers: [Contributing](CONTRIBUTING.md), [release packaging](docs/PACKAGING.md) and [changelog](CHANGELOG.md). Policies: [security](SECURITY.md), [privacy](docs/PRIVACY.md), [terms](docs/TERMS.md) and [MIT License](LICENSE). For help, use [GitHub Issues](https://github.com/innrvoice/engineering-project-os/issues).

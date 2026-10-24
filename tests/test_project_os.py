@@ -327,40 +327,48 @@ class KnowledgeAssetTest(unittest.TestCase):
 
         markdown_paths = [
             ROOT / "README.md",
+            ROOT / "CONTRIBUTING.md",
             ROOT / "SECURITY.md",
+            ROOT / "evals/README.md",
             *(ROOT / "docs").glob("*.md"),
         ]
-        legacy_paths = {ROOT / "README.md", ROOT / "docs/SETUP.md", ROOT / "docs/PACKAGING.md"}
-        legacy_section = re.compile(r"^## Legacy Directory\n.*?(?=^## |\Z)", re.MULTILINE | re.DOTALL)
         proof_legacy_paths = {ROOT / "docs/SETUP.md", ROOT / "docs/REFERENCE.md"}
         proof_legacy_section = re.compile(r"^## Legacy finding proof ownership\n.*?(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+        retired_channel_claims = (
+            r"(?i)\bGitHub(?:\s+(?:Codex\s+)?(?:marketplace|distribution))?\s+(?:is|remains)\s+(?:the\s+)?primary\b",
+            r"(?i)\bprimary\s+(?:installation|distribution|release)\s+(?:route|channel|path)\s+(?:is|remains)\s+(?:the\s+)?GitHub\b",
+            r"(?i)\bDirectory(?:\s+(?:submission|installation|publication|updates?))?\s+(?:is|are|remains?|stays?)\s+(?:blocked|unavailable|paused)\b",
+            r"(?i)\bPortal\s+(?:(?:would|does)\s+not|won't|cannot|can't)\s+accept\b",
+        )
+        for statement in (
+            "GitHub distribution is the primary release path.",
+            "The primary installation route is the GitHub Codex marketplace.",
+            "Directory submission is blocked.",
+            "The Portal would not accept an updated skills-only submission.",
+        ):
+            self.assertTrue(any(re.search(pattern, statement) for pattern in retired_channel_claims), statement)
+        for statement in (
+            "Directory is the primary installation channel; GitHub is an alternative.",
+            "Directory submission requires a separate review.",
+            "GitHub release verification and Portal ingestion need their own evidence.",
+        ):
+            self.assertFalse(any(re.search(pattern, statement) for pattern in retired_channel_claims), statement)
         active_release_versions: set[str] = set()
         for path in markdown_paths:
             text = path.read_text(encoding="utf-8")
-            sections = legacy_section.findall(text)
-            self.assertEqual(len(sections), 1 if path in legacy_paths else 0, path)
-            if sections:
-                self.assertEqual(set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", sections[0])), {"2.2.2"}, path)
-                self.assertIn("2026-10-16", sections[0], path)
-                self.assertIn("skills-only", sections[0], path)
-                self.assertIn("the maintainer reported", sections[0], path)
-                self.assertIn("This observation concerns this plugin's submission", sections[0], path)
             proof_sections = proof_legacy_section.findall(text)
             self.assertEqual(len(proof_sections), 1 if path in proof_legacy_paths else 0, path)
             for proof_section in proof_sections:
                 self.assertEqual(set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", proof_section)), {"2.2.3"}, path)
                 self.assertIn("ownership", proof_section)
                 self.assertIn("--finding-proof-review", proof_section)
-            active_text = proof_legacy_section.sub("", legacy_section.sub("", text))
+            active_text = proof_legacy_section.sub("", text)
+            for pattern in retired_channel_claims:
+                self.assertNotRegex(active_text, pattern, path)
             current_versions = set(re.findall(r"\bv?(\d+\.\d+\.\d+)\b", active_text))
             self.assertLessEqual(current_versions, {PROJECT_OS.VERSION}, path)
             active_release_versions.update(current_versions)
         self.assertEqual(active_release_versions, {PROJECT_OS.VERSION})
-        packaging = (ROOT / "docs/PACKAGING.md").read_text(encoding="utf-8")
-        self.assertIn(f"Project OS {PROJECT_OS.VERSION} corrects finding proof refresh and legacy ownership", packaging)
-        self.assertIn("Retain the exact reviewed ZIP for the GitHub Release", packaging)
-        self.assertIn("GitHub distribution is the primary release path; Directory submission remains a separate channel.", packaging)
-        self.assertIn("Preserve existing published artifacts unchanged.", packaging)
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn("## [2.1.1] - 2026-09-15", changelog)
         self.assertIn("## [2.1.0] - 2026-09-15", changelog)
@@ -387,41 +395,73 @@ class KnowledgeAssetTest(unittest.TestCase):
         )
         self.assertNotIn("GitHub 2.0.3 release line", changelog)
 
-    def test_github_installation_is_primary_and_standalone_remains_secondary(self) -> None:
-        commands = (
-            "codex plugin marketplace add innrvoice/engineering-project-os --ref main\n"
-            "codex plugin add engineering-project-os@engineering-project-os"
-        )
-        standalone = (
-            "$skill-installer Install project-os from "
-            f"https://github.com/innrvoice/engineering-project-os/tree/v{PROJECT_OS.VERSION}/skills/project-os"
-        )
-        for relative, title in (
-            ("README.md", "Install in Codex from GitHub"),
-            ("docs/SETUP.md", "1. Install in Codex from GitHub"),
-        ):
-            text = (ROOT / relative).read_text(encoding="utf-8")
-
-            def section(heading: str) -> str:
-                match = re.search(r"^## " + re.escape(heading) + r"\n(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
-                self.assertIsNotNone(match, (relative, heading))
-                return match.group(1)
-
-            primary = section(title)
-            self.assertIn("Run these commands in Terminal", primary, relative)
-            self.assertIn("~~~shell\n" + commands + "\n~~~", primary, relative)
-            self.assertEqual(primary.count("codex plugin marketplace add "), 1, relative)
-            self.assertEqual(primary.count("codex plugin add "), 1, relative)
-            self.assertIn("`main`", primary, relative)
-            self.assertIn(f"`v{PROJECT_OS.VERSION}`", primary, relative)
-            secondary = section("Standalone Codex skill")
-            self.assertIn("~~~text\n" + standalone + "\n~~~", secondary, relative)
-            self.assertLess(text.index("## " + title), text.index("## Standalone Codex skill"), relative)
-            self.assertLess(text.index("## Standalone Codex skill"), text.index("## Legacy Directory"), relative)
-            self.assertIn("Codex marketplace", text, relative)
-            self.assertIn("ChatGPT Web", text, relative)
+    def test_directory_installation_is_primary_with_github_and_standalone_alternatives(self) -> None:
+        directory_url = "https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9"
+        commands = [
+            "codex plugin marketplace add innrvoice/engineering-project-os --ref main",
+            "codex plugin add engineering-project-os@engineering-project-os",
+        ]
+        refresh_commands = [
+            "codex plugin marketplace upgrade engineering-project-os",
+            "codex plugin add engineering-project-os@engineering-project-os",
+        ]
+        standalone_url = f"https://github.com/innrvoice/engineering-project-os/tree/v{PROJECT_OS.VERSION}/skills/project-os"
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("[Install in Codex from GitHub](docs/SETUP.md#1-install-in-codex-from-github)", readme)
+        setup = (ROOT / "docs/SETUP.md").read_text(encoding="utf-8")
+        readme_links = re.findall(r"(?<!!)\[([^\]\n]+)\]\(([^\s)]+)\)", readme)
+        install_ctas = [target for label, target in readme_links if re.search(r"\binstall(?:ation)?\b", label, re.IGNORECASE)]
+        self.assertTrue(install_ctas, "README must offer an installation link")
+        self.assertEqual(install_ctas[0], directory_url, "The first README installation CTA must use Directory")
+        for relative, text in (("README.md", readme), ("docs/SETUP.md", setup)):
+            links = re.findall(r"\[[^\]\n]+\]\(([^\s)]+)\)", text)
+            self.assertIn(directory_url, links, relative)
+            self.assertIn(PROJECT_OS.VERSION, text, relative)
+            self.assertRegex(text, r"\bGitHub\b", relative)
+            self.assertNotRegex(text, r"(?im)^## Legacy Directory\s*$", relative)
+            self.assertLess(text.index(directory_url), text.lower().index("standalone"), relative)
+        shell_blocks = re.findall(r"(?:~~~|```)shell\n(.*?)(?:~~~|```)", setup, re.DOTALL)
+        shell_commands = [[line.strip() for line in block.splitlines() if line.strip()] for block in shell_blocks]
+        self.assertIn(commands, shell_commands, "Setup must retain the reviewed GitHub marketplace registration pair")
+        self.assertIn(refresh_commands, shell_commands, "Setup must retain the reviewed GitHub marketplace refresh pair")
+        self.assertLess(setup.index(directory_url), setup.index(commands[0]))
+        self.assertLess(setup.index(commands[0]), setup.index(refresh_commands[0]))
+        text_blocks = re.findall(r"(?:~~~|```)text\n(.*?)(?:~~~|```)", setup, re.DOTALL)
+        self.assertTrue(any(
+            "$skill-installer" in block and standalone_url in block for block in text_blocks
+        ), "Setup must retain the pinned standalone skill-installer alternative")
+        self.assertLess(setup.index(commands[0]), setup.index(standalone_url))
+        self.assertLess(setup.index(refresh_commands[0]), setup.index(standalone_url))
+        sections = list(re.finditer(r"^## [^\n]+\n(.*?)(?=^## |\Z)", setup, re.MULTILINE | re.DOTALL))
+        method_sections = []
+        for marker in (directory_url, commands[0], standalone_url):
+            matching = [section for section in sections if marker in section.group(1)]
+            self.assertTrue(matching, marker)
+            method_sections.append(matching[0].start())
+        self.assertLess(method_sections[0], method_sections[1], "Setup must present Directory before the GitHub alternative")
+        self.assertLess(method_sections[1], method_sections[2], "Setup must present the standalone alternative after GitHub")
+        self.assertTrue(any(link.split("#", 1)[0] == "docs/SETUP.md" for _, link in readme_links))
+
+    def test_reference_navigation_exposes_existing_advanced_topics(self) -> None:
+        text = (ROOT / "docs/REFERENCE.md").read_text(encoding="utf-8")
+        introduction = text.split("## Interfaces\n", 1)[0]
+        links = re.findall(r"\[([^\]\n]+)\]\(([^\s)]+)\)", introduction)
+        targets = {target for _, target in links}
+        self.assertTrue({
+            "SETUP.md", "USAGE.md", "#interfaces", "#project-os-requests",
+            "#contracts-intake-and-guarded-completion", "#record-ownership",
+            "#user-owned-reusable-knowledge", "#standard-and-program", "#helper-summary",
+            "#legacy-finding-proof-ownership", "#historical-evidence-snapshots-during-upgrade",
+        }.issubset(targets))
+        interface_labels = " ".join(label.lower() for label, target in links if target == "#interfaces")
+        self.assertIn("finding", interface_labels)
+        self.assertIn("checkpoint", interface_labels)
+        headings = {
+            re.sub(r"[^a-z0-9 -]", "", heading.lower()).replace(" ", "-")
+            for heading in re.findall(r"^#{1,6} (.+)$", text, re.MULTILINE)
+        }
+        for target in targets:
+            if target.startswith("#"):
+                self.assertIn(target[1:], headings, target)
 
 
 class DetectionTest(unittest.TestCase):

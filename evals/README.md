@@ -1,8 +1,8 @@
 # Persistence acceptance before packaging
 
-Run [persistence.json](persistence.json) against the exact frozen corrective skill before building a release ZIP. These repository-level cases supplement the bundled discovery, submission and continuity cases under `skills/project-os/evals/`. The files here describe acceptance procedures; their presence does not prove a host pass and they are not part of the plugin package allowlist.
+Run [persistence.json](persistence.json) against the exact frozen candidate skill before building a release ZIP. These repository-level cases supplement the bundled discovery, submission and continuity cases under `skills/project-os/evals/`. The files here describe acceptance procedures; their presence does not prove a host pass and they are not part of the plugin package allowlist.
 
-Use isolated synthetic repositories and actual Codex and ChatGPT sessions. Record the candidate file manifest, helper SHA-256, host, commands, responses and resulting file snapshots. A locally installed older release or a fresh session given the old conversation does not evaluate the corrective candidate or files-only recovery.
+Use isolated synthetic repositories and actual Codex and ChatGPT sessions. Record the candidate file manifest, helper SHA-256, host, commands, responses and resulting file snapshots. A locally installed older release or a fresh session given the old conversation does not evaluate the candidate or files-only recovery.
 
 The first ordinary repair case starts with the user's own defect report. The finding must still be persisted: the agent did not need to discover the symptom itself. The second case starts with a bounded contract review and requires a reproduced mismatch before a confirmed finding. Neither user prompt asks to invoke Project OS or to save a finding. Existing repository guidance supplies the workflow.
 
