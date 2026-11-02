@@ -106,7 +106,7 @@ This keeps an unfinished candidate from silently changing the rules used to deve
 - portable bundle metadata;
 - CI assertions, fixtures, documentation and release notes.
 
-Project OS 2.2.4 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. Change the schema only when the manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
+Project OS 2.3.0 uses `SYSTEM.schema_version: 5`, plans schema 2 and request/contract schema 1. The compact `brief` report and byte-snapshot inventory each have their own `schema_version: 1`; neither changes repository record formats. Change the repository schema only when its manifest format changes. The version in `plugin.json`'s external `$schema` URL belongs to that external schema and is not a Project OS release version.
 
 The lockstep test must pass before release. Do not add silent coercion or project-specific migration branches.
 

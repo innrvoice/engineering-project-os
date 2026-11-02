@@ -187,7 +187,7 @@ class KnowledgeAssetTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(PROJECT_OS.VERSION, "2.2.4")
+        self.assertEqual(PROJECT_OS.VERSION, "2.3.0")
         self.assertEqual(PROJECT_OS.SCHEMA_VERSION, 5)
         self.assertEqual(portable["version"], PROJECT_OS.VERSION)
         self.assertEqual(compatibility["version"], PROJECT_OS.VERSION)

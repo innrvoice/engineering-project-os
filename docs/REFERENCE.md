@@ -1,6 +1,6 @@
 # Reference
 
-Use this reference when you need an exact command, field or rule for Project OS 2.2.4. Start with [Setup](SETUP.md) to connect a repository or [Usage](USAGE.md) for everyday requests to Codex.
+Use this reference when you need an exact command, field or rule for Project OS 2.3.0 source. Verify the selected installation and actual release availability separately. Start with [Setup](SETUP.md) to connect a repository or [Usage](USAGE.md) for everyday requests to Codex.
 
 ## Find a topic
 
@@ -21,6 +21,8 @@ The owned namespace can also contain evidence_snapshots after a reviewed upgrade
 
 `checkpoint --target <repository> --draft <markdown> [--dry-run]` writes only the configured STATE owner and appends a receipt. Required nonempty lines are Updated, Execution state, Active plan, Outcome, Verified, Remaining and Next action. Execution/active values must match the index. The draft is at most 78 lines and the final checkpoint at most 80. The receipt binds body and current SYSTEM, plans, requests, findings, reusable/project knowledge, active plan/contract and active Program when applicable; it does not hash all historical plans. `checkpoint --target <repository> --check [--json]` is read-only and exits nonzero for absent, malformed or stale proof. The schema remains 5 and generic check remains structurally backward compatible. A current receipt proves captured file identity, not semantic completeness or host acceptance.
 
+`brief --target <repository> [--json]` returns a read-only overview of record integrity, checkpoint freshness, the active plan's readiness and pending gates, complete unresolved request objects and planned or blocked slices. Request source text, decisions and extension fields remain intact. `read_next` routes CONTEXT, STATE, the active Program contract when present and the active plan with its configured contract; `record_paths` names original owners separately so recovery need not reload full historical registries. Program authority remains relevant without an active plan. Read originals before editing them or when history, omitted details or errors require it. `counts` gives total plans, total requests and unresolved requests; `gate_counts` gives each gate status count. Historical plan bodies, resolved request objects and non-pending gate details are omitted. Exit zero requires structural integrity and a current checkpoint, not completion of the active outcome. A structural failure returns nonzero with `records_available: false`; its empty arrays must not be interpreted as no unfinished work. A stale checkpoint returns nonzero while retaining validated work summaries. The JSON report has its own `schema_version: 1`; it does not change the repository schema or replace the final readiness guard.
+
 | Interface | Used for | Invocation |
 | --- | --- | --- |
 | Codex plugin or standalone skill | Repository-native workflows in the selected local workspace | `$project-os ...` in Codex chat |
@@ -31,6 +33,10 @@ The owned namespace can also contain evidence_snapshots after a reviewed upgrade
 Engineering Project OS was built for Codex. `$project-os` selects the bundled skill for one Codex message while `@Engineering Project OS` selects the ChatGPT companion where that companion is available. Text after either selector is natural language, not a helper command line or rigid parser. Implicit invocation lets the selected plugin expose the skill for a clear Project OS request. Install the current plugin through the Plugin Directory. [Setup](SETUP.md) also covers the GitHub marketplace and standalone Codex skill alternatives.
 
 Installation and repository access are separate. Codex can use only the local workspace selected for the task. ChatGPT can use only the project description, files and portable bundles available in the chat. Choosing a setup can begin from a description while reviewing an existing setup requires its actual Project OS files. Neither surface gains repository access from installation alone.
+
+Recovery also depends on available and permitted helper execution. With an executable selected helper, use `brief` and distinguish record integrity from outcome readiness. If an older selected helper lacks `brief`, keep it selected, run supported `check` and `checkpoint --check` commands and read configured owners; disclose unsupported checks. A missing required validation or writeback command leaves that operation incomplete. A failing integrity check is not a compatibility fallback. If execution is unavailable or forbidden, or the selected helper is missing, inspect readable supplied files only, preserve bytes and pending gates and report integrity, freshness and readiness checks as unverified. Do not mutate records, create receipts, close plans or claim a validated export through that fallback. Request the specific missing capability or material; never invent PASS/CURRENT, command output or a download link.
+
+When generic file operations are permitted, an unchanged input or byte-preserving transport copy may include factual file hashes and the full STATE receipt. Label helper checks and Project OS export validation unperformed. Those byte checks do not establish record integrity or checkpoint freshness. Explicit selection of supplied candidate files also does not establish installed plugin-loader discovery; verify the selected helper's actual bytes rather than relying on version text alone.
 
 The package retains three outcome-focused companion starter prompts. They apply where the companion is available; Codex marketplace installation does not install into ChatGPT Web:
 
@@ -86,6 +92,7 @@ Reusing the original finding input without --id still refuses when current files
 | `bootstrap` | None | Create Standard after a clean dry run |
 | `adopt` | None | Map compatible existing records after a clean dry run |
 | `check` | None | Read-only deterministic validation |
+| `brief` | None | Read-only compact integrity, checkpoint and unresolved-work report |
 | `repair` | Error or scope if not already known | Repair only verified Project OS inconsistency |
 | `upgrade` | None | Upgrade to the installed release with conflict checks |
 | `program start: <initiative>` | Initiative | Start one complete multi-phase contract |
@@ -203,6 +210,8 @@ A proof has path, sha256, checked_on, target and revision. path is a safe reposi
 
 The requests registry has schema_version 1, positive next_id and requests. Every entry has id in R-NNN form, recorded_on in YYYY-MM-DD form, source_text, interpretation, origin_plan, target_plan, relation, status, gate_ids and decision. The counter exceeds all assigned numeric IDs. origin_plan and target_plan may be null during intake; non-null references identify existing plans. gate_ids contains unique IDs within the target contract. decision is text and explains routing or the user's cancellation or replacement.
 
+Copy the complete relevant user wording verbatim into source_text, including applicable shared conditions. Keep summaries and reasoning in interpretation; do not shorten, translate or replace the source with that interpretation. On withdrawal, retain the original source_text and quote the exact cancellation wording in decision before explaining the disposition. Preserve unrelated private material outside this scoped record. The helper can validate stored records but cannot compare them with a conversation it cannot access.
+
 Request statuses are captured, needs_clarification, integrated, implemented and withdrawn. Relations are same_outcome, prerequisite and independent. Routed entries require target_plan and linked gates. same_outcome and prerequisite remain in their origin plan; moving either to a successor fails validation. Implemented requires verified linked gates and their valid proof. Withdrawn requires a non-empty record of the user's explicit cancellation or replacement. An unresolved scoped request prevents closure even when the source checks pass. A routed independent successor does not block or later invalidate its predecessor's completion receipt.
 
 The managed WORKFLOW includes canonical request and evidence examples for ordinary turns without loading the skill. The agent validates and repairs records immediately after every intake, routing, cancellation or contract revision and checks recovered files before trusting their meaning.
@@ -237,6 +246,22 @@ The new completion receipt contains closed_on, revision, contract_sha256, eviden
 
 When returning supplied project files, the agent rereads the actual file bytes after all writes, preserves the complete STATE receipt and computes hashes from those bytes. It reconstructs the exact serialized snapshot in a new temporary directory and runs both check and checkpoint --check there, then compares the original source hashes again. A CURRENT result in the source workspace does not prove that a different returned file set is current.
 
+### Complete byte snapshots
+
+The bundled scripts/snapshot.py utility creates and checks a byte-preserving ZIP without running Project OS checks, application code or tests. With permission to run this utility, select the actual authorized source tree containing all intended projects, reports and proposal files. Its recursive inventory includes hidden files and nested directories without implicit exclusions. Do not inventory only a staging copy: a file omitted before that copy would already be invisible.
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json --dry-run
+python3 /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
+python3 /absolute/path/to/project-os/scripts/snapshot.py check --root /path/to/source-tree --archive /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
+~~~
+
+Use repeated --require arguments for every promised record, proposal or directory. Review the dry-run inventory before applying the identical command. The output must be new and outside the source tree. The utility preserves existing MANIFEST.json and AUDIT.json and reserves PROJECT-OS-SNAPSHOT.json for its own inventory, refusing a source collision. It refuses unsafe paths, symlinks, special files, missing required paths and source changes detected during capture. It compares the actual serialized archive with the source inventory rather than trusting the archive's own manifest.
+
+The utility preserves file bytes and directory paths, not original permissions, ownership, timestamps or extended attributes. Limits are 50,000 source entries, 512 MiB of source content, a 16 MiB internal inventory and a 576 MiB archive. Dry-run returns the complete inventory without creating an archive; capture large JSON output outside the source tree. If creation fails after the output path was exclusively created, an unverified file may remain. The utility does not delete that pathname on failure because another owner may have replaced it. A failed create is not a deliverable; inspect it and use the read-only check before making any byte-preservation claim.
+
+A successful snapshot check establishes the reported byte identity, not record integrity, checkpoint freshness, approval or readiness. Run permitted project checks separately on the reconstructed artifact. A helper-execution prohibition also applies to this utility unless the user explicitly permits it; allowed generic file operations remain an alternative with the same complete-inventory checks. Nothing here authorizes broader collection or inclusion of secrets.
+
 For material changes, raise revision and record the reason and controlling request in the Markdown plan. Reassess evidence for the new revision. Revalidate evidence made stale by code or external changes as well. Once closed, preserve the historical receipt and use a new corrective slice for later requirements rather than rewriting the completed outcome.
 
 ## User-owned reusable knowledge
@@ -266,7 +291,7 @@ The portable bundle has this top-level shape:
 {
   "format": "project-os-reusable-knowledge",
   "schema_version": 1,
-  "created_with": "2.2.4",
+  "created_with": "2.3.0",
   "entries": []
 }
 ~~~
@@ -301,6 +326,7 @@ Languages and frameworks are detection signals, not behavioral profiles. Any jus
 | `init` | Unless `--dry-run` | Create Standard |
 | `adopt` | Unless `--dry-run` | Attach to compatible existing owners |
 | `check` | No | Validate structure, lifecycle, proof, receipts, requests and release alignment |
+| `brief` | No | Aggregate integrity, checkpoint, active pending gates, unresolved requests and source paths |
 | `plan status` | No | Report gates, requests and remaining closure blockers |
 | `plan complete` | Unless `--dry-run` | Guarded atomic closure of an active plan |
 | `sync-knowledge` | No | Explain the migration from deprecated synchronization language to explicit user-owned import |
@@ -387,6 +413,18 @@ python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/
 ~~~
 
 The command is read-only. Success prints `Project OS check: PASS` and exits zero. Use `--config /path/to/proposed-SYSTEM.json` to validate an adoption manifest before installing it.
+
+### Brief
+
+**Run this in Terminal when helper execution is available and permitted:**
+
+~~~bash
+python3 /absolute/path/to/project-os/scripts/project_os.py brief --target /path/to/repository --json
+~~~
+
+This is the normal first inspection for a fresh or resumed session. `mode` identifies `standard` or `program` when records are available. `read_next` names the context, checkpoint, any active Program contract and active plan with its contract. `record_paths` identifies the original context, state, plan-index and request owners plus `program` when active; read an owner before changing it or when history, omitted detail or errors require it. The complete unresolved request objects retain source text, decisions and extensions. Resolved requests and historical plan bodies are omitted from the summary.
+
+Exit zero means integrity PASS with checkpoint CURRENT. An active outcome can still be NOT_READY because required acceptance or an unresolved request remains. A stale checkpoint fails inspection while retaining validated work summaries. If `records_available` is false, empty work arrays mean data was unavailable, not that the backlog is empty. Keep the error and inspect its actual owner; do not manufacture a clean report or treat a supported command's failure as an older-helper fallback. See [Interfaces](#interfaces) for compatibility and unavailable-execution routes.
 
 ### List knowledge
 
@@ -555,9 +593,10 @@ Knowledge import derives default applicability from the destination's selections
 
 Release and file-format versions are separate:
 
-- Release 2.2.4 identifies the installed skill, helper, package metadata and connected `project_os_version`.
+- Release 2.3.0 identifies this source and its package metadata. Verify the actually selected installed skill/helper separately; a connected `project_os_version` must match that helper for validation.
 - `SYSTEM.schema_version` is 5.
 - Knowledge registries retain their own `schema_version: 1`.
+- The read-only `brief` JSON report has its own `schema_version: 1` and does not replace repository records.
 - Portable bundles use `format: project-os-reusable-knowledge` and `schema_version: 1`.
 - The version in the external `$schema` URL inside `plugin.json` belongs to that external schema, not to the Project OS release.
 

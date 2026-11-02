@@ -2,6 +2,8 @@
 
 Install Engineering Project OS, then ask Codex to connect the repository you want to work in. Installation makes the skill available; connection creates or adopts that repository's working records.
 
+This guide targets Project OS 2.3.0 source. Verify release availability and the version resolved by the chosen channel separately. Versioned URLs below require the matching published tag; a candidate checkout does not make those URLs available. Before publication, evaluate a frozen supplied candidate in isolation without replacing the installed stable copy.
+
 ## Requirements
 
 - A local repository opened in Codex.
@@ -14,9 +16,9 @@ Codex inspects existing instructions and configuration. You do not need to choos
 
 ## Install from the Plugin Directory
 
-1. Open the [Engineering Project OS card in the Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) and check that it shows 2.2.4.
+1. Open the [Engineering Project OS card in the Plugin Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) and check the version offered. It must match 2.3.0 when validating this source version.
 2. Use the plus button to install, as described in [OpenAI's plugin guide](https://learn.chatgpt.com/docs/plugins).
-3. Start a new Codex chat in your repository. Ask Codex to verify the selected Directory source and installed helper version 2.2.4, then [connect the repository](#connect-a-repository).
+3. Start a new Codex chat in your repository. Ask Codex to verify the selected Directory source and actual installed helper version, then [connect the repository](#connect-a-repository). An earlier installed release does not test this candidate.
 
 In ChatGPT, select `@Engineering Project OS` for the companion workflow over supplied files. Installation alone does not give ChatGPT access to your local checkout.
 
@@ -42,7 +44,9 @@ After setup, Codex checks and reports the changed files. Start a new chat to loa
 
 For a read-only assessment, ask `$project-os inspect`. Exact operations are in [Reference](REFERENCE.md#project-os-requests).
 
-## Upgrade to 2.2.4
+<a id="upgrade-to-224"></a>
+
+## Upgrade to 2.3.0
 
 Update your installation first using the Directory host controls or the [GitHub](#github-marketplace-alternative) or [standalone](#standalone-codex-skill) route below. Then open the connected repository in a new Codex chat and send:
 
@@ -54,6 +58,8 @@ Codex previews the upgrade and applies the reviewed operation after authorizatio
 
 Updating the installed copy does not upgrade repository records by itself. The transaction can update managed instructions, routing and migration metadata. A reviewed proof migration can add helper-owned metadata or historical evidence archives while preserving original values and hashes. It does not authorize application changes or turn historical acceptance into newly verified behavior.
 
+The upgrade delivers the compact recovery instructions to existing repositories while preserving project-owned records. A helper that genuinely lacks `brief` uses its own supported checks and targeted record reads; a stale or invalid checkpoint is an error to inspect, not evidence that the helper is old. See [Reference](REFERENCE.md#interfaces).
+
 ## Legacy finding proof ownership
 
 Some repositories using 2.2.3 need an explicit review to distinguish earlier helper proofs from project-owned fields. Codex prepares that review and preserves the original data. If upgrade changes a file used as evidence, it also identifies the exact historical bytes that need archival consent. Missing proof or unclear ownership blocks the operation.
@@ -64,7 +70,7 @@ The [technical ownership contract](REFERENCE.md#legacy-finding-proof-ownership) 
 
 Select `@Engineering Project OS` in ChatGPT. Explanations need no files; setup advice can start from a description. Inspecting or updating an existing setup requires its instructions and records. ChatGPT must ask for missing material.
 
-Changed files remain supplied-copy artifacts until you deliberately apply them to the real repository and validate them in Codex. Use [Usage](USAGE.md#chatgpt-companion-boundaries) for that boundary.
+Changed files remain supplied-copy artifacts until you deliberately apply them to the real repository and validate them in Codex. File reading, helper execution and downloadable output depend on the current host and permissions. If a required capability is absent, ChatGPT must name it and leave the affected operation unverified rather than inventing a successful check or file. Use [Usage](USAGE.md#chatgpt-companion-boundaries) for that boundary.
 
 <a id="1-install-in-codex-from-github"></a>
 
@@ -77,7 +83,7 @@ codex plugin marketplace add innrvoice/engineering-project-os --ref main
 codex plugin add engineering-project-os@engineering-project-os
 ~~~
 
-The catalog comes from `main`; its plugin entry pins the source to `v2.2.4`. For an existing marketplace registration, refresh it in Terminal:
+The catalog comes from `main`; this checkout's plugin entry pins the source to `v2.3.0`. The published catalog can still name an earlier release, so verify the resolved source and actual helper bytes. Registering `main` does not select an uncommitted candidate checkout. For an existing marketplace registration, refresh it in Terminal:
 
 ~~~shell
 codex plugin marketplace upgrade engineering-project-os
@@ -88,17 +94,17 @@ Start a new Codex chat afterward. Codex must verify the selected installation an
 
 ## Standalone Codex skill
 
-For a skill-only installation, send this message in Codex chat, not Terminal:
+After the matching tag is published, send this message in Codex chat for a skill-only installation, not Terminal:
 
 ~~~text
-$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.2.4/skills/project-os
+$skill-installer Install project-os from https://github.com/innrvoice/engineering-project-os/tree/v2.3.0/skills/project-os
 ~~~
 
-Start a new chat afterward. This pinned skill does not follow future releases or provide the ChatGPT companion. Continue with [connection](#connect-a-repository) or [repository upgrade](#upgrade-to-224).
+Start a new chat afterward. This pinned skill does not follow future releases or provide the ChatGPT companion. Continue with [connection](#connect-a-repository) or [repository upgrade](#upgrade-to-230).
 
 ## Resolve duplicate installations
 
-To move from GitHub to Directory, install the Directory copy first. In a new chat, have Codex verify its source, path and helper version 2.2.4. Then disable the GitHub copy, leave one installation active and start a new chat. Preserve `AGENTS.md` and `.agents/`; connecting again is unnecessary. Run `$project-os upgrade` separately if the repository needs it.
+To move from GitHub to Directory, install the intended Directory release first. In a new chat, have Codex verify its source, path and actual helper version. Then disable the GitHub copy, leave one installation active and start a new chat. Preserve `AGENTS.md` and `.agents/`; connecting again is unnecessary. Run `$project-os upgrade` separately if the repository needs it.
 
 For a standalone duplicate, confirm its path and removal permission first. After switching, verify the selected copy again.
 

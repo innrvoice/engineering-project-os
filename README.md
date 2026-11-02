@@ -10,7 +10,7 @@ Resume engineering work with durable state and reusable failure knowledge.
 
 [Install Engineering Project OS from the Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9)
 
-Project OS 2.2.4 is available in the Universal Plugin Directory, the primary installation route. GitHub marketplace and standalone Codex installations are [alternatives](docs/SETUP.md).
+This guide describes Project OS 2.3.0 source. Directory is the primary installation route; check the version actually offered before installing. A candidate checkout or ZIP does not establish publication. GitHub marketplace and standalone Codex installations are [alternatives](docs/SETUP.md).
 
 The problem usually appears after the first productive session. Codex has explored the repository, ruled out two plausible causes, made a decision and found one check that passes. Then the task ends.
 
@@ -70,7 +70,7 @@ A migration is halfway through. Its plan records changes, rejected approaches an
 Continue the migration from the repository records. Check the recorded blocker before changing code.
 ~~~
 
-Codex checks the saved state and continues from the next action. It saves a compact checkpoint after meaningful work. The agent must follow the workflow; Project OS does not secretly record the chat.
+When helper execution is available and permitted, Codex starts with a read-only `brief` of record integrity, checkpoint freshness and unfinished work, then reads the relevant records and continues from the next action. It saves a compact checkpoint after meaningful work. The agent must follow the workflow; Project OS does not secretly record the chat.
 
 ## Keep "green" honest
 
@@ -96,7 +96,7 @@ Codex saves the addition while handling your message. Compatible work joins the 
 
 ## ChatGPT companion
 
-Select `@Engineering Project OS` to ask for explanations or work with supplied files and lesson bundles. ChatGPT cannot see your local checkout through installation alone. Apply returned files deliberately and validate the real repository in Codex.
+Select `@Engineering Project OS` to ask for explanations or work with supplied files and lesson bundles. ChatGPT cannot see your local checkout through installation alone. If it cannot run the helper, it can explain readable records while preserving the files and leaving checks unverified. Apply returned files deliberately and validate the real repository in Codex. [Usage](docs/USAGE.md#chatgpt-companion-boundaries) explains the distinction between a validated snapshot and a copy for transport.
 
 <a id="install-in-codex-from-github"></a>
 <a id="standalone-codex-skill"></a>
