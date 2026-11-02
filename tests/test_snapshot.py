@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import runpy
 import shutil
 import stat
 import subprocess
@@ -52,6 +53,63 @@ class SnapshotTests(unittest.TestCase):
     def command(self, *args):
         return subprocess.run([sys.executable, "-B", str(SCRIPT), *map(str, args)],
                               capture_output=True, text=True)
+
+    def copied_package(self, name):
+        source = self.base / name
+        candidate = source / "candidate"
+        package = runpy.run_path(str(ROOT / "scripts/package_plugin.py"))
+        for path in package["source_files"](ROOT):
+            copied = candidate / path.relative_to(ROOT)
+            copied.parent.mkdir(parents=True, exist_ok=True)
+            copied.write_bytes(path.read_bytes())
+        return source, candidate / "skills/project-os/scripts/snapshot.py"
+
+    def plain_command(self, script, *args):
+        environment = os.environ.copy()
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)
+        environment.pop("PYTHONPYCACHEPREFIX", None)
+        # Apple Python otherwise relocates caches to Library/Caches. An empty
+        # prefix enables ordinary in-tree caching without suppressing bytecode.
+        return subprocess.run([sys.executable, "-X", "pycache_prefix=", str(script),
+                               *map(str, args)], env=environment, capture_output=True, text=True)
+
+    def test_plain_python_create_and_check_preserve_complete_in_source_package(self):
+        source, script = self.copied_package("plain-create")
+        before = file_bytes(source)
+        original_directories = {path.relative_to(source) for path in source.rglob("*") if path.is_dir()}
+        result = self.plain_command(script, "create", "--root", source, "--output", self.output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["transport_integrity"], "VERIFIED")
+        self.assertEqual(file_bytes(source), before)
+        self.assertEqual({path.relative_to(source) for path in source.rglob("*") if path.is_dir()},
+                         original_directories)
+        result = self.plain_command(script, "check", "--root", source, "--archive", self.output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(file_bytes(source), before)
+        with zipfile.ZipFile(self.output) as archive:
+            self.assertFalse(any("__pycache__" in name or name.endswith(".pyc") for name in archive.namelist()))
+
+    def test_plain_python_check_preserves_complete_pristine_package(self):
+        source, script = self.copied_package("plain-check")
+        prepared = subprocess.run([sys.executable, "-B", str(script), "create", "--root", str(source),
+                                   "--output", str(self.output)], capture_output=True, text=True)
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        before = file_bytes(source)
+        result = self.plain_command(script, "check", "--root", source, "--archive", self.output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(file_bytes(source), before)
+        self.assertFalse(list(source.rglob("__pycache__")))
+
+    def test_runpy_load_preserves_callers_bytecode_policy_and_source_tree(self):
+        source, script = self.copied_package("runpy-load")
+        before = file_bytes(source)
+        for policy in [False, True]:
+            with self.subTest(policy=policy), mock.patch.object(sys, "dont_write_bytecode", policy), \
+                    mock.patch.object(sys, "pycache_prefix", None):
+                runpy.run_path(str(script))
+                self.assertIs(sys.dont_write_bytecode, policy)
+                self.assertEqual(file_bytes(source), before)
+                self.assertFalse(list(source.rglob("__pycache__")))
 
     def forged_zip(self, snapshot, manifest=None):
         if manifest is None:

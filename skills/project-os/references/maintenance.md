@@ -133,12 +133,14 @@ After all writes and checks, collect each exported file with a fresh `read_bytes
 
 Build the inventory from the actual authorized source tree, not a staging subset. Include every promised project, hidden owner, full STATE receipt and nested proposal or report, including files prepared outside a project directory. A manifest can accurately describe an incomplete staging copy, so compare the source path set as well as hashes. Do not retroactively repair a historical snapshot after its omission is discovered; retain that first observation separately from a corrected current artifact.
 
+Run read-only Python checks with `python3 -B` or `PYTHONDONTWRITEBYTECODE=1`, including inline imports of the selected helper. Compare the complete protected path set and hashes before and after execution, including newly added cache files or directories. Do not delete pre-existing caches or exclude required input files to make that comparison pass. The bundled snapshot utility suppresses bytecode for its own runtime import, but other Python imports still need this protection.
+
 When execution of this bundled utility is permitted, preview and apply a byte snapshot with explicit required paths:
 
 ~~~shell
-python3 /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/actual-source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json --dry-run
-python3 /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/actual-source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
-python3 /absolute/path/to/project-os/scripts/snapshot.py check --root /path/to/actual-source-tree --archive /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
+python3 -B /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/actual-source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json --dry-run
+python3 -B /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/actual-source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
+python3 -B /absolute/path/to/project-os/scripts/snapshot.py check --root /path/to/actual-source-tree --archive /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
 ~~~
 
 Repeat --require for all promised files or nonempty directories. The output must be new and outside the source tree. The utility recursively includes every regular file without implicit exclusions, preserves existing MANIFEST.json/AUDIT.json and reserves PROJECT-OS-SNAPSHOT.json for its own inventory. Missing required paths, symlinks, special files, unsafe paths, a reserved-name collision or detected source drift refuse the snapshot. It verifies the actual serialized ZIP against the original inventory and never runs project helpers, application code or tests. A successful transport-byte result does not establish record integrity, freshness or readiness: reconstruct that ZIP and run only the project checks actually permitted. An execution prohibition remains controlling; if the utility is unavailable or forbidden, report that limit and use only permitted file tools with equivalent inventory checks.

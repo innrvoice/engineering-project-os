@@ -10,6 +10,7 @@ import io
 import json
 import os
 import stat
+import sys
 import unicodedata
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -19,7 +20,13 @@ _SPEC = importlib.util.spec_from_file_location(
     "project_os_snapshot_runtime", Path(__file__).with_name("project_os.py")
 )
 _RUNTIME = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(_RUNTIME)
+_BYTECODE_POLICY = sys.dont_write_bytecode
+try:
+    sys.dont_write_bytecode = True
+    _SPEC.loader.exec_module(_RUNTIME)
+finally:
+    sys.dont_write_bytecode = _BYTECODE_POLICY
+del _BYTECODE_POLICY
 SnapshotError = _RUNTIME.ProjectOSError
 MANIFEST = "PROJECT-OS-SNAPSHOT.json"
 MAX_ENTRIES = 50000
