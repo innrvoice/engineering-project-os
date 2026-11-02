@@ -85,12 +85,20 @@ def collect_tree(filesystem) -> dict:
             before = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
             if stat.S_ISDIR(before.st_mode):
                 directories.append(relative)
-                nested = filesystem.parent(child / ".snapshot-directory-probe")
-                opened = os.fstat(nested)
-                if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
-                    raise SnapshotError(f"Source directory changed during read: {relative}")
-                identities[relative + "/"] = (opened.st_dev, opened.st_ino)
-                visit(child, nested)
+                nested = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                 dir_fd=descriptor)
+                try:
+                    opened = os.fstat(nested)
+                    if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                        raise SnapshotError(f"Source directory changed during read: {relative}")
+                    identities[relative + "/"] = (opened.st_dev, opened.st_ino)
+                    visit(child, nested)
+                    after = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+                    if (not stat.S_ISDIR(after.st_mode)
+                            or (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)):
+                        raise SnapshotError(f"Source directory changed during read: {relative}")
+                finally:
+                    os.close(nested)
             elif stat.S_ISREG(before.st_mode):
                 if before.st_size > MAX_BYTES - total:
                     raise SnapshotError("Snapshot exceeds the byte limit")

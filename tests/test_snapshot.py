@@ -100,6 +100,73 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(checked.returncode, 0, checked.stderr)
         self.assertEqual(file_bytes(self.base), before)
 
+    def test_wide_tree_create_dry_run_and_check_with_256_descriptor_limit(self):
+        for number in range(300):
+            directory = self.root / f"sibling-{number:03d}"
+            directory.mkdir()
+            (directory / "payload.txt").write_bytes(b"complete source bytes\n")
+        before = file_bytes(self.root)
+        runner = (
+            "import resource, runpy, sys; "
+            "soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE); "
+            "limit = 256 if hard == resource.RLIM_INFINITY else min(256, hard); "
+            "resource.setrlimit(resource.RLIMIT_NOFILE, (limit, hard)); "
+            "sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')"
+        )
+        for args in [
+            ["create", "--root", self.root, "--output", self.output, "--dry-run"],
+            ["create", "--root", self.root, "--output", self.output],
+            ["check", "--root", self.root, "--archive", self.output],
+        ]:
+            with self.subTest(operation=args[0], dry_run="--dry-run" in args):
+                result = subprocess.run(
+                    [sys.executable, "-B", "-c", runner, str(SCRIPT), *map(str, args)],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                report = json.loads(result.stdout)
+                self.assertEqual(report["files"], len(before))
+                self.assertEqual(report["project_os_validation"], "NOT_PERFORMED")
+                if "--dry-run" in args:
+                    self.assertFalse(self.output.exists())
+                else:
+                    self.assertEqual(report["transport_integrity"], "VERIFIED")
+                self.assertEqual(file_bytes(self.root), before)
+
+    def test_same_byte_directory_replacement_after_traversal_is_rejected(self):
+        original_write = SNAPSHOT.write_zip
+        proposals = self.root / "campaign-output/proposals"
+        moved = self.base / "original-proposals"
+
+        def replace_after_write(*args):
+            original_write(*args)
+            proposals.rename(moved)
+            shutil.copytree(moved, proposals)
+
+        with mock.patch.object(SNAPSHOT, "write_zip", side_effect=replace_after_write):
+            with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "changed"):
+                SNAPSHOT.create(self.root, self.output, [PROPOSAL])
+        self.assertFalse(self.output.exists())
+        self.assertEqual(file_bytes(proposals), file_bytes(moved))
+
+    def test_directory_replacement_during_traversal_is_rejected(self):
+        original_read = SNAPSHOT.bounded_read_at
+        proposals = self.root / "campaign-output/proposals"
+        moved = self.base / "original-proposals"
+
+        def replace_after_read(directory_fd, name, limit):
+            result = original_read(directory_fd, name, limit)
+            if name == "ownership.json" and not moved.exists():
+                proposals.rename(moved)
+                shutil.copytree(moved, proposals)
+            return result
+
+        with mock.patch.object(SNAPSHOT, "bounded_read_at", side_effect=replace_after_read):
+            with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "directory changed"):
+                SNAPSHOT.create(self.root, self.output, [PROPOSAL])
+        self.assertFalse(self.output.exists())
+        self.assertEqual(file_bytes(proposals), file_bytes(moved))
+
     def test_missing_required_or_empty_directory_refuses_without_output(self):
         before = file_bytes(self.base)
         for name in ["campaign-output/proposals/missing.json", "empty"]:
