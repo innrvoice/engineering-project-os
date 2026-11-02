@@ -16,6 +16,7 @@ if __name__ == "__main__" and not sys.flags.isolated:
     raise SystemExit(1)
 
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -30,6 +31,32 @@ BOT = "chatgpt-codex-connector[bot]"
 BOT_GRAPHQL = "chatgpt-codex-connector"
 SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
 STATE_PATTERN = re.compile(r"<!-- codex-review-state:v1 (.*?) -->", re.DOTALL)
+RECEIPT_MARKER = "<!-- codex-review-receipt:v1 -->"
+# Accept only the observed affirmative Security receipt, not generic review text.
+# An unknown provider template fails closed until independently reviewed.
+SECURITY_RECEIPT_PATTERN = re.compile(re.escape(RECEIPT_MARKER + """
+
+### 🛡️ Codex Security Review · _Automatically triggered_
+
+Security review completed. No security issues were found in this pull request.
+
+**Reviewed commit:** `""") + r"(?P<head>[0-9a-f]{10,40})" + re.escape("""`
+
+[View security finding report](https://chatgpt.com/codex/cloud/tasks/task_e_""") + r"[0-9a-f]{32}" + re.escape(""")
+
+_Only the user who started this review can view the report in Codex._
+
+<details> <summary>ℹ️ About Codex security reviews in GitHub</summary>
+<br/>
+
+This is an experimental Codex feature. Security reviews are triggered when:
+- You comment "@codex security review"
+- A regular code review gets triggered (for example, "@codex review" or when a PR is opened), and you’re opted in so security review runs alongside code review
+
+Once complete, Codex will leave suggestions, or a comment if no findings are found.
+
+
+</details>"""))
 FINDING_MARKERS = {
     "<!-- codex-code-review-finding:v1 -->": "code_review",
     "<!-- codex-security-review-finding:v1 -->": "security_review",
@@ -48,7 +75,7 @@ QUERY = """query($owner:String!,$name:String!,$number:Int!) {
       comments { totalCount }
       reviews(first:100) {
         totalCount pageInfo { hasNextPage hasPreviousPage }
-        nodes { id state submittedAt author { __typename login } commit { oid } }
+        nodes { id state body submittedAt lastEditedAt author { __typename login } commit { oid } }
       }
       reviewThreads(first:100) {
         totalCount pageInfo { hasNextPage hasPreviousPage }
@@ -112,6 +139,67 @@ def graphql_bot(author):
             and author.get("login") in (BOT_GRAPHQL, BOT))
 
 
+def rest_bot(comment):
+    return (isinstance(comment, dict) and isinstance(comment.get("user"), dict)
+            and comment["user"].get("login") == BOT and comment["user"].get("type") == "Bot")
+
+
+def api_time(value, label):
+    require(isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", value),
+            label + ": unknown timestamp")
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as error:
+        raise NotReady(label + ": invalid timestamp") from error
+
+
+def latest_security_receipt(comments):
+    receipts = []
+    for comment in comments:
+        body = comment.get("body")
+        if not (rest_bot(comment) and isinstance(body, str)) or SUMMARY_MARKER in body:
+            continue
+        # Classify Security activity before checking its receipt format. A newer
+        # dirty/running result with a changed or absent marker must supersede the
+        # old clean receipt and fail the exact-template check, never disappear.
+        if re.search(r"\bsecurity\b", body, re.IGNORECASE):
+            receipts.append((api_time(comment.get("updated_at"), "Security receipt"), comment))
+        elif "<!-- codex-review-receipt" in body:
+            require(re.search(r"(?m)^Codex Review:", body), "Unknown canonical review receipt; inspect the provider format")
+    require(receipts, "Missing canonical clean Security receipt for unknown summary finding flags")
+    latest = max(item[0] for item in receipts)
+    selected = [comment for timestamp, comment in receipts if timestamp == latest]
+    require(len(selected) == 1, "Latest Security receipt is ambiguous")
+    return selected[0]
+
+
+def explicit_null_security(state):
+    return (isinstance(state, dict) and "has_any_findings" in state and "has_unresolved_findings" in state
+            and state["has_any_findings"] is None and state["has_unresolved_findings"] is None)
+
+
+def clean_security_evidence(snapshot, comments, summary, pr, canonical, head):
+    receipt = latest_security_receipt(comments)
+    require(receipt.get("html_url") == pr["url"] + "#issuecomment-" + str(receipt["id"]),
+            "Noncanonical Security receipt URL")
+    created = api_time(receipt.get("created_at"), "Security receipt creation")
+    completed = api_time(receipt.get("updated_at"), "Security receipt update")
+    require(created == completed <= api_time(summary.get("updated_at"), "Summary update")
+            <= api_time(pr.get("updatedAt"), "PR update"), "Security receipt was edited or is newer than the summary/PR")
+    match = SECURITY_RECEIPT_PATTERN.fullmatch(receipt["body"])
+    require(match is not None, "Latest Security receipt is not a supported affirmative clean completion")
+    reference = match.group("head")
+    commits = snapshot.get("receipt_commits")
+    require(isinstance(commits, dict) and set(commits) == {reference}, "Missing or ambiguous Security receipt commit resolution")
+    commit = commits[reference]
+    require(isinstance(commit, dict) and commit.get("sha") == head and head.startswith(reference)
+            and commit.get("html_url") == "https://github.com/{}/commit/{}".format(canonical, head),
+            "Security receipt commit does not resolve to the exact final head")
+    return {"source": "canonical_clean_receipt", "url": receipt["html_url"],
+            "body_sha256": digest(receipt["body"].encode("utf-8")), "reviewed_head": head,
+            "completed_at": receipt["updated_at"], "has_any_findings": None, "has_unresolved_findings": None}
+
+
 def inspect_review(snapshot, repository, number, head):
     """Validate complete API data; this function performs no network or writes."""
     require(isinstance(snapshot, dict), "Missing API snapshot")
@@ -138,8 +226,7 @@ def inspect_review(snapshot, repository, number, head):
             and len(set(ids)) == len(ids), "Issue comments: missing or duplicate IDs")
     summaries = [comment for comment in comments
                  if isinstance(comment.get("body"), str) and SUMMARY_MARKER in comment["body"]
-                 and comment.get("user", {}).get("login") == BOT
-                 and comment.get("user", {}).get("type") == "Bot"]
+                 and rest_bot(comment)]
     require(summaries, "Missing trusted Codex bot summary; wait for the exact-head code and security reviews")
     require(all(isinstance(item.get("updated_at"), str) for item in summaries), "Unknown summary timestamp")
     summary = max(summaries, key=lambda item: (item["updated_at"], item["id"]))
@@ -149,14 +236,21 @@ def inspect_review(snapshot, repository, number, head):
     require(len(markers) == 1, "Missing, duplicate or unknown Codex summary state marker")
     states = strict_json(markers[0])
     require(isinstance(states, dict), "Unknown Codex summary state")
+    review_evidence = {}
     for kind in ("code_review", "security_review"):
         state = states.get(kind)
         require(isinstance(state, dict) and state.get("commit_sha") == head,
                 kind + ": missing or wrong reviewed head; request review of the final SHA")
         require(state.get("status") == "completed", kind + ": not completed; wait for review")
-        require(type(state.get("has_any_findings")) is bool
-                and state.get("has_unresolved_findings") is False,
-                kind + ": unknown or unresolved findings; triage and refresh the final-head review")
+        if kind == "security_review" and explicit_null_security(state):
+            review_evidence[kind] = clean_security_evidence(snapshot, comments, summary, pr, canonical, head)
+        else:
+            require(type(state.get("has_any_findings")) is bool
+                    and state.get("has_unresolved_findings") is False,
+                    kind + ": unknown or unresolved findings; triage and refresh the final-head review")
+            review_evidence[kind] = {"source": "summary_flags", "url": summary["html_url"],
+                                     "reviewed_head": head, "has_any_findings": state["has_any_findings"],
+                                     "has_unresolved_findings": state["has_unresolved_findings"]}
     for review in connection(pr.get("reviews"), "Reviews"):
         if graphql_bot(review.get("author")):
             require(review.get("state") in ("APPROVED", "COMMENTED", "DISMISSED", "CHANGES_REQUESTED"),
@@ -165,6 +259,20 @@ def inspect_review(snapshot, repository, number, head):
             require(not (review.get("commit", {}).get("oid") == head
                          and review.get("state") == "CHANGES_REQUESTED"),
                     "Final-head Codex review still requests changes")
+            security = review_evidence["security_review"]
+            if security["source"] == "canonical_clean_receipt":
+                body = review.get("body")
+                require(isinstance(body, str), "Receipt fallback needs complete canonical review-submission bodies")
+                submitted = api_time(review.get("submittedAt"), "Codex review submission")
+                require("lastEditedAt" in review, "Receipt fallback needs the canonical review body edit timestamp")
+                edited = review["lastEditedAt"]
+                activity = max(submitted, api_time(edited, "Codex review body edit")) if edited is not None else submitted
+                require(activity <= api_time(pr.get("updatedAt"), "PR update"), "Codex review activity is newer than the PR")
+                known_code = (body.startswith(RECEIPT_MARKER) and body.count(RECEIPT_MARKER) == 1
+                              and re.search(r"(?m)^### 💡 Codex Review$|^Codex Review:", body)
+                              and not re.search(r"\bsecurity\b", body, re.IGNORECASE))
+                require(activity <= api_time(security["completed_at"], "Security receipt update") or known_code,
+                        "Newer Security or unclassified review submission supersedes the clean receipt; refresh review")
     findings = {}
     current_kinds = set()
     for thread in connection(pr.get("reviewThreads"), "Review threads"):
@@ -196,12 +304,17 @@ def inspect_review(snapshot, repository, number, head):
                 re.escape(pr["url"]) + r"#discussion_r[0-9]+", url), "Noncanonical finding URL")
             require(url not in findings, "Duplicate finding URL")
             findings[url] = comment
+            if kinds[0] == "security_review" and review_evidence["security_review"]["source"] == "canonical_clean_receipt":
+                require(api_time(comment.get("updatedAt"), "Security finding update")
+                        <= api_time(review_evidence["security_review"]["completed_at"], "Security receipt update"),
+                        "Security finding changed after the clean receipt; refresh the final-head review")
             if comment.get("commit", {}).get("oid") == head:
                 current_kinds.add(kinds[0])
     for kind in ("code_review", "security_review"):
-        require(not states[kind]["has_any_findings"] or kind in current_kinds,
+        require(states[kind]["has_any_findings"] is not True or kind in current_kinds,
                 kind + ": summary findings are absent from the complete thread data")
-    return {"findings": findings, "summary_url": summary.get("html_url"), "states": states}
+    return {"findings": findings, "summary_url": summary.get("html_url"), "states": states,
+            "review_evidence": review_evidence}
 
 
 def evidence_file(target, relative):
@@ -353,8 +466,26 @@ class Live:
         pages = strict_json(self.command([self.tools["gh"], "api", "--hostname", "github.com", "--paginate", "--slurp",
                                          "repos/{}/issues/{}/comments?per_page=100".format(repository, number)]))
         require(isinstance(pages, list) and all(isinstance(page, list) for page in pages), "Unknown issue-comment pagination response")
+        comments = [comment for page in pages for comment in page]
+        snapshot = {"graphql": graph, "issue_comments": comments}
+        summaries = [comment for comment in comments if rest_bot(comment)
+                     and isinstance(comment.get("body"), str) and SUMMARY_MARKER in comment["body"]]
+        if summaries and all(isinstance(comment.get("updated_at"), str) for comment in summaries):
+            summary = max(summaries, key=lambda item: (item["updated_at"], item["id"]))
+            markers = STATE_PATTERN.findall(summary["body"])
+            states = strict_json(markers[0]) if len(markers) == 1 else None
+            security = states.get("security_review") if isinstance(states, dict) else None
+            if explicit_null_security(security):
+                receipt = latest_security_receipt(comments)
+                match = SECURITY_RECEIPT_PATTERN.fullmatch(receipt["body"])
+                require(match is not None, "Latest Security receipt is not a supported affirmative clean completion")
+                reference = match.group("head")
+                commit = strict_json(self.command([self.tools["gh"], "api", "--hostname", "github.com",
+                    "repos/{}/commits/{}".format(repository, reference)]))
+                require(isinstance(commit, dict), "Unknown receipt commit resolution response")
+                snapshot["receipt_commits"] = {reference: {key: commit.get(key) for key in ("sha", "html_url")}}
         self.verify_tools()
-        return {"graphql": graph, "issue_comments": [comment for page in pages for comment in page]}
+        return snapshot
 
     def source(self, target):
         target = target.resolve()
@@ -411,6 +542,7 @@ def check(repository, number, head, target, dispositions, live):
     return {"readiness": "READY", "repository": repository, "pr": number, "reviewed_head": head,
             "code_review": "completed", "security_review": "completed", "findings": len(result["findings"]),
             "unresolved_threads": 0, "summary_url": result["summary_url"],
+            "review_evidence": result["review_evidence"],
             "tools": tools,
             "scope": "Recorded exact-head Codex reviews, resolved threads and hash-bound dispositions; CI and semantic evidence assessment remain separate."}
 
