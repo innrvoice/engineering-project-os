@@ -10,7 +10,7 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add the read-only `brief` command for record integrity, checkpoint freshness, active-plan readiness and complete unresolved requests. Route recovery to the context, checkpoint and active plan while keeping original registry paths available before edits or deeper inspection.
 - Add behavioral cases for compact recovery, forbidden or unavailable helper execution and older selected helpers, with a synthetic current-checkpoint fixture and exact snapshot roundtrip checks.
-- Add a separate recursive byte-snapshot utility with required-path checks and source-to-archive inventory verification, including hidden records and nested proposal files without automatic project execution.
+- Add a separate recursive byte-snapshot utility with required-path checks and source-to-archive inventory verification, including hidden records and nested proposal files without automatic project execution. Traversal bounds descriptors by depth and rejects case or canonically equivalent path collisions.
 
 ### Changed
 

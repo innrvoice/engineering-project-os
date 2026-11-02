@@ -1,6 +1,8 @@
 """Exercise complete supplied-tree snapshots and refusal before publication."""
 
 import importlib.util
+import hashlib
+import io
 import json
 import os
 import shutil
@@ -50,6 +52,113 @@ class SnapshotTests(unittest.TestCase):
     def command(self, *args):
         return subprocess.run([sys.executable, "-B", str(SCRIPT), *map(str, args)],
                               capture_output=True, text=True)
+
+    def forged_zip(self, snapshot, manifest=None):
+        if manifest is None:
+            manifest = {"format": "project-os-byte-snapshot", "schema_version": 1,
+                        "algorithm": "sha256", "required_paths": [],
+                        "directories": snapshot["directories"], "files": [
+                            {"path": name, "size": len(content),
+                             "sha256": hashlib.sha256(content).hexdigest()}
+                            for name, content in sorted(snapshot["files"].items())]}
+        with io.BytesIO() as handle:
+            with zipfile.ZipFile(handle, "w") as archive:
+                entries = dict(snapshot["files"])
+                entries.update({name + "/": b"" for name in snapshot["directories"]})
+                entries[SNAPSHOT.MANIFEST] = json.dumps(manifest).encode()
+                for name, content in entries.items():
+                    entry = zipfile.ZipInfo(name)
+                    entry.external_attr = ((stat.S_IFDIR | 0o755) if name.endswith("/")
+                                           else (stat.S_IFREG | 0o600)) << 16
+                    archive.writestr(entry, content)
+            return handle.getvalue()
+
+    def colliding_snapshots(self):
+        for names, directories in [
+            (["AGENTS.md", "agents.md"], []),
+            (["caf\u00e9.md", "cafe\u0301.md"], []),
+            (["Stra\u00dfe.md", "STRASSE.md"], []),
+            (["Docs/a", "docs/b"], ["Docs", "docs"]),
+            (["caf\u00e9/a", "cafe\u0301/b"], ["caf\u00e9", "cafe\u0301"]),
+            (["Folder/a", "folder/b"], []),
+            (["Docs", "docs/file"], []),
+            (["bundle"], ["Bundle"]),
+            (["same"], ["same"]),
+        ]:
+            yield {"files": {name: name.encode() for name in names},
+                   "directories": directories, "identities": {}}
+
+    def test_colliding_names_refuse_serialization_before_writing(self):
+        for snapshot in self.colliding_snapshots():
+            with self.subTest(paths=list(snapshot["files"])), io.BytesIO() as handle:
+                with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "collision"):
+                    SNAPSHOT.write_zip(handle, snapshot, [])
+                self.assertEqual(handle.getvalue(), b"")
+
+    def test_forged_case_unicode_directory_and_prefix_alias_archives_are_rejected(self):
+        for snapshot in self.colliding_snapshots():
+            data = self.forged_zip(snapshot)
+            with self.subTest(paths=list(snapshot["files"])):
+                with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "collision"):
+                    SNAPSHOT.verify_zip(data, snapshot, [])
+
+    def test_portable_source_case_collision_refuses_on_case_sensitive_filesystem(self):
+        source = self.base / "case-source"
+        source.mkdir()
+        (source / "AGENTS.md").write_bytes(b"owner instructions")
+        (source / "agents.md").write_bytes(b"different instructions")
+        if len(list(source.iterdir())) != 2:
+            self.skipTest("Source filesystem aliases case; Linux CI exercises distinct source entries")
+        before = file_bytes(source)
+        for dry_run in [True, False]:
+            with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "collision"):
+                SNAPSHOT.create(source, self.output, dry_run=dry_run)
+            self.assertFalse(self.output.exists())
+        snapshot = {"files": before, "directories": [], "identities": {}}
+        self.output.write_bytes(self.forged_zip(snapshot))
+        with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "collision"):
+            SNAPSHOT.check(source, self.output)
+        self.assertEqual(file_bytes(source), before)
+
+    def test_portable_source_unicode_collision_refuses_on_normalization_sensitive_filesystem(self):
+        source = self.base / "unicode-source"
+        source.mkdir()
+        (source / "caf\u00e9.md").write_bytes(b"first bytes")
+        (source / "cafe\u0301.md").write_bytes(b"second bytes")
+        if len(list(source.iterdir())) != 2:
+            self.skipTest("Source filesystem aliases canonical forms; Linux CI exercises distinct entries")
+        before = file_bytes(source)
+        for dry_run in [True, False]:
+            with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "collision"):
+                SNAPSHOT.create(source, self.output, dry_run=dry_run)
+            self.assertFalse(self.output.exists())
+        self.assertEqual(file_bytes(source), before)
+
+    def test_manifest_alias_paths_are_rejected_even_with_distinct_archive_entries(self):
+        snapshot = {"files": {"AGENTS.md": b"instructions"}, "directories": [], "identities": {}}
+        manifest = SNAPSHOT.inventory(snapshot, [])
+        for changed in [
+            dict(manifest, files=manifest["files"] + [dict(manifest["files"][0], path="agents.md")]),
+            dict(manifest, directories=["Docs", "docs"]),
+            dict(manifest, directories=["agents.md"]),
+            dict(manifest, directories=["caf\u00e9", "cafe\u0301"]),
+        ]:
+            with self.subTest(manifest=changed):
+                with self.assertRaisesRegex(SNAPSHOT.SnapshotError, "collision"):
+                    SNAPSHOT.verify_zip(self.forged_zip(snapshot, changed), snapshot, [])
+
+    def test_distinct_unicode_paths_retain_original_spellings_and_bytes(self):
+        snapshot = {"files": {"Caf\u00e9.md": b"original accent bytes\r\n",
+                              "other/Stra\u00dfe.txt": b"original sharp-s bytes\x00\xff"},
+                    "directories": ["other"], "identities": {}}
+        with io.BytesIO() as handle:
+            SNAPSHOT.write_zip(handle, snapshot, [])
+            data = handle.getvalue()
+        SNAPSHOT.verify_zip(data, snapshot, [])
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            for name, content in snapshot["files"].items():
+                self.assertIn(name, archive.namelist())
+                self.assertEqual(archive.read(name), content)
 
     def test_nested_proposal_hidden_receipt_binary_and_original_manifests_roundtrip(self):
         before = file_bytes(self.root)

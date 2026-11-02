@@ -10,6 +10,7 @@ import io
 import json
 import os
 import stat
+import unicodedata
 import zipfile
 from pathlib import Path, PurePosixPath
 
@@ -34,6 +35,46 @@ def safe_relative(value: str) -> str:
             or path.as_posix() != value or ":" in path.parts[0]):
         raise SnapshotError(f"Unsafe snapshot path: {value!r}")
     return value
+
+
+def portable_key(component: str) -> str:
+    return unicodedata.normalize("NFD", unicodedata.normalize("NFD", component).casefold())
+
+
+class PortablePaths:
+    """Reject aliases without rewriting spellings, in linear path-segment work."""
+
+    def __init__(self):
+        self.children = {}
+
+    def add(self, value: str, directory: bool = False) -> None:
+        parts = PurePosixPath(safe_relative(value)).parts
+        children = self.children
+        for index, component in enumerate(parts):
+            final = index == len(parts) - 1
+            expected_directory = directory or not final
+            key = portable_key(component)
+            current = children.get(key)
+            if current is None:
+                current = {"name": component, "directory": expected_directory,
+                           "explicit": final, "children": {}}
+                children[key] = current
+            else:
+                if current["name"] != component or current["directory"] != expected_directory:
+                    raise SnapshotError(f"Portable snapshot path collision: {value!r} aliases {current['name']!r}")
+                if final and current["explicit"]:
+                    raise SnapshotError(f"Duplicate snapshot path: {value}")
+                current["explicit"] = current["explicit"] or final
+            children = current["children"]
+
+
+def validate_namespace(files, directories) -> None:
+    paths = PortablePaths()
+    paths.add(MANIFEST)
+    for name in directories:
+        paths.add(name, directory=True)
+    for name in files:
+        paths.add(name)
 
 
 def absolute_path(value: Path) -> Path:
@@ -71,6 +112,8 @@ def bounded_read_at(directory_fd: int, name: str, limit: int) -> tuple[bytes, os
 def collect_tree(filesystem) -> dict:
     """Read the actual tree through anchored descriptors, including hidden files."""
     files, directories, identities = {}, [], {}
+    paths = PortablePaths()
+    paths.add(MANIFEST)
     total = 0
 
     def visit(path: Path, descriptor: int) -> None:
@@ -78,12 +121,13 @@ def collect_tree(filesystem) -> dict:
         for name in sorted(os.listdir(descriptor)):
             child = path / name
             relative = safe_relative(child.relative_to(filesystem.root).as_posix())
-            if relative.casefold() == MANIFEST.casefold():
+            if portable_key(relative) == portable_key(MANIFEST):
                 raise SnapshotError(f"Source collides with reserved inventory: {MANIFEST}")
             if len(files) + len(directories) >= MAX_ENTRIES:
                 raise SnapshotError("Snapshot exceeds the entry limit")
             before = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
             if stat.S_ISDIR(before.st_mode):
+                paths.add(relative, directory=True)
                 directories.append(relative)
                 nested = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                                  dir_fd=descriptor)
@@ -100,6 +144,7 @@ def collect_tree(filesystem) -> dict:
                 finally:
                     os.close(nested)
             elif stat.S_ISREG(before.st_mode):
+                paths.add(relative)
                 if before.st_size > MAX_BYTES - total:
                     raise SnapshotError("Snapshot exceeds the byte limit")
                 content, opened = bounded_read_at(descriptor, name, MAX_BYTES - total)
@@ -134,6 +179,7 @@ def required_paths(snapshot: dict, values) -> list[str]:
 
 
 def inventory(snapshot: dict, required: list[str]) -> dict:
+    validate_namespace(snapshot["files"], snapshot["directories"])
     return {
         "format": "project-os-byte-snapshot",
         "schema_version": 1,
@@ -169,6 +215,12 @@ def verify_zip(data: bytes, snapshot: dict, required: list[str]) -> None:
     """Compare the serialized artifact with the source, not just its own manifest."""
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         entries = archive.infolist()
+        if len(entries) > MAX_ENTRIES + 1:
+            raise SnapshotError("Snapshot exceeds the entry limit")
+        paths = PortablePaths()
+        for entry in entries:
+            directory = entry.filename.endswith("/")
+            paths.add(entry.filename[:-1] if directory else entry.filename, directory)
         names = [entry.filename for entry in entries]
         expected = set(snapshot["files"]) | {name + "/" for name in snapshot["directories"]} | {MANIFEST}
         if len(names) != len(set(names)) or set(names) != expected:
@@ -184,6 +236,15 @@ def verify_zip(data: bytes, snapshot: dict, required: list[str]) -> None:
             if entry.file_size > expected_size or (entry.filename != MANIFEST and entry.file_size != expected_size):
                 raise SnapshotError(f"Snapshot size differs from source: {entry.filename}")
         manifest = json.loads(archive.read(MANIFEST).decode("utf-8"))
+        if (not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list)
+                or not isinstance(manifest.get("directories"), list)
+                or not all(isinstance(name, str) for name in manifest["directories"])
+                or not all(isinstance(row, dict) and isinstance(row.get("path"), str)
+                           for row in manifest["files"])):
+            raise SnapshotError("Invalid snapshot inventory paths")
+        if len(manifest["files"]) + len(manifest["directories"]) > MAX_ENTRIES:
+            raise SnapshotError("Snapshot inventory exceeds the entry limit")
+        validate_namespace([row["path"] for row in manifest["files"]], manifest["directories"])
         stored_required = manifest.get("required_paths") if isinstance(manifest, dict) else None
         if not isinstance(stored_required, list) or not all(isinstance(name, str) for name in stored_required):
             raise SnapshotError("Invalid snapshot required paths")
