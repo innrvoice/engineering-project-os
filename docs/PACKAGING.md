@@ -1,32 +1,38 @@
 # Distribution and release packaging
 
-This is the maintainer's route for checking and publishing a package. For installation, start with [Setup](SETUP.md). Directory is the primary installation channel for Project OS 2.2.4; GitHub marketplace and a pinned standalone Codex skill remain alternatives. Directory publication and GitHub release verification each need their own evidence.
+This is the maintainer's route for checking and publishing Project OS 2.3.0 source. For installation, start with [Setup](SETUP.md). Directory is the primary installation channel; GitHub marketplace and a pinned standalone Codex skill remain alternatives. Source version, Directory publication and GitHub release availability each need their own evidence.
 
-Project OS 2.2.4 corrects finding proof refresh and legacy ownership, retaining compact checkpoints and atomic completion. Completed final-commit Codex Review is a separate mandatory release gate. Schema remains 5. Fresh Codex and supplied-material ChatGPT execution must prove actual persistence and files-only recovery before the release ZIP is built.
+Project OS 2.3.0 adds the read-only `brief` recovery report, a separate recursive byte-snapshot utility and explicit current, older-helper and unavailable-execution routes. It retains finding-proof ownership, compact checkpoints and atomic completion. Schema remains 5. Local candidate preparation, actual host acceptance and completed final-commit Codex Review are distinct gates.
 
-The 2.2.4 validation scope includes isolated native Codex persistence and recovery and actual ChatGPT companion snapshot reconstruction, record hashes and checkpoint receipts. Strict isolation of ChatGPT Work context from account Memory has not been established. Account Memory settings remain unchanged, and this is an open validation limitation for this release. Do not describe the companion checks as proof of Memory-isolated recovery; retain this disclosure in the GitHub Release notes.
+Project OS is Codex-first. Core source-preparation acceptance requires isolated native Codex persistence and files-only recovery plus actual ChatGPT companion checks over supplied project material: overview and setup boundaries, missing-input handling, request fidelity, findings, reviewed knowledge transfer, reconstructed snapshot bytes, record hashes, complete checkpoint receipts and files-only recovery. ChatGPT is a companion over supplied files and portable bundles; it does not need repository access or to act as the development host.
 
-Retain the exact reviewed ZIP for the GitHub Release and verify its SHA-256 after download. Public documentation is part of that ZIP, so changing packaged copy before publication requires a new reproducible build and artifact checks. All selected skill files must match the behaviorally tested copy exactly. Preserve existing published artifacts unchanged.
+ChatGPT plugin-loader discovery, selected-version and starter click-through checks belong to distribution acceptance. A genuinely execution-free ChatGPT host and strict isolation of ChatGPT Work context from account Memory are separate portability observations. Keep unobserved results unverified; they do not block core source preparation and must never be reported as passed. Keep account Memory settings unchanged and retain the isolation limitation in the release evidence and notes. A fresh chat or a returned archive alone is not proof of Memory-isolated recovery.
 
-The current reader-documentation revision updates the repository only. The published 2.2.4 tag, ZIP and assets retain their original bytes. The commands below describe package verification and release work; they are not instructions to replace that published package with a build of the updated documentation.
+Retain the exact reviewed ZIP for the GitHub Release and verify its SHA-256 after download. Public documentation is part of that ZIP, so changing packaged copy before publication requires a new reproducible build and artifact checks. Record the tested skill/helper manifest and compare it with the final package manifest. Reuse completed behavioral checks when runtime and workflow instructions are unchanged; release-policy or evaluation-documentation edits alone require artifact revalidation, not another manual host campaign. Record that documentation delta rather than claiming the final ZIP was the earlier tested artifact. Preserve existing published artifacts unchanged.
 
-Ordinary repairs must save actual findings and companion transfers must save their current checkpoint before returning project files. Verify the actual exported bytes by reconstructing the returned snapshot and running structural and checkpoint checks there. Passing runtime tests or a successful knowledge import does not establish that result. Preserve failed observations when revising and retesting the candidate.
+Existing published tags, ZIPs and assets retain their original bytes. A candidate archive prepares a new version; neither its version label nor passing local checks proves publication or authorizes replacement of a published artifact.
 
-The [Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) is the first installation choice. The GitHub alternative registers the marketplace from `main` and installs `engineering-project-os@engineering-project-os` from its pinned `v2.2.4` source. [Setup](SETUP.md) contains both alternatives, including the standalone skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
+With required execution available and permitted, ordinary repairs must save actual findings and companion transfers must save their current checkpoint before returning project files. Verify actual exported bytes by reconstructing the returned snapshot and running structural and checkpoint checks there. Without required execution, preserve input and report checks and writeback unperformed; a permitted transport copy with factual hashes is not a validated Project OS export. Passing runtime tests or a successful knowledge import does not establish host acceptance. Preserve failed observations when revising and retesting the candidate.
 
-## Verify before building the release package
+Check intake against the actual original messages, not a semantically similar summary: source_text retains complete relevant wording and conditions, interpretation is separate and withdrawal preserves the exact cancellation. For snapshots, compare the original source inventory with the serialized archive and require promised nested proposal paths. The bundled snapshot utility proves byte preservation only; it never runs mixed-project checks or overrides execution prohibitions. See [complete byte snapshots](REFERENCE.md#complete-byte-snapshots).
 
-Freeze the exact candidate skill files, install that frozen copy in isolated local sessions and run the ordinary finding, checkpoint and knowledge scenarios first. End the original sessions and repeat recovery in separate sessions that receive only the actual project files. Run the same exact candidate in the ChatGPT companion with supplied synthetic material before publication. Inspect actual findings, evidence hashes, current checkpoint receipts, material request routing and next actions. Preserve every initial failure and rerun affected cases after changes. An installed copy of an older release does not test candidate instructions.
+The [Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) is the first installation choice. The GitHub alternative registers the marketplace from `main`; this candidate's entry targets `v2.3.0`. Verify the version actually resolved by the published catalog or Directory. [Setup](SETUP.md) contains both alternatives, including the standalone skill-installer request. GitHub installation applies to Codex; it does not publish or install the companion in ChatGPT Web.
 
-Only after those behavioral checks pass, run the complete suite including extracted-package checks, then build the release ZIP to a new path outside the checkout:
+## Prepare a candidate and verify it before release
+
+Finish source, skill and documentation changes, then freeze the exact candidate files. A clearly unaccepted inspection/test ZIP may be built before final host acceptance so those exact bytes can be tested. Establish the ordinary finding, checkpoint and knowledge scenarios in isolated Codex sessions and actual ChatGPT with supplied synthetic material. End the original sessions and repeat recovery in separate sessions that receive only actual saved files. Inspect findings, evidence hashes, current checkpoint receipts, request routing and next actions. Reuse completed observations after comparing their tested manifests and scope with the candidate; preserve initial failures and rerun only cases affected by behavior changes or defects. An installed older release does not test candidate instructions.
+
+Run the complete local suite including extracted-package checks and build the candidate ZIP to a new path outside the checkout:
 
 ~~~shell
 python3 -B -m unittest discover -s tests -v
-python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.2.4-plugin.zip
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.4-plugin.zip
+python3 -B scripts/package_plugin.py --output /private/tmp/engineering-project-os-2.3.0-plugin.zip
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.3.0-plugin.zip
 ~~~
 
 The output path must not exist. The builder reads the current working tree, including intentional uncommitted changes. Stable entry ordering, timestamps and permissions make repeated builds reproducible in the same Python and zlib environment. Record the SHA-256, entry count, compressed bytes and extracted bytes for the exact reviewed ZIP.
+
+Package consistency reports NOT_EVALUATED for release acceptance. Bind the inspected candidate to the required core host evidence, then endorse that same unchanged ZIP only after core acceptance and the final review guards pass. A rebuild must be byte-identical or receive affected revalidation, including an explicit manifest comparison for documentation-only changes. The locally prepared candidate is ready for the named tests, not for publication.
 
 The package allowlist includes both manifests, the complete skill and its assets, public documentation, README, license, security policy, changelog, contributing guide and the packaging tool. It excludes the repository's local `.agents` control plane, Git metadata, tests and bytecode caches. Hidden `.agents` paths inside skill templates are public product assets and remain included.
 
@@ -36,13 +42,13 @@ The package must not contain a release-managed failure knowledge database. Capab
 
 ## Version and schema contract
 
-Release version must be `2.2.4` in the helper, both plugin manifests, marketplace plugin-source ref, knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while its plugin source pins `v2.2.4`. `SCHEMA_VERSION` is `5`; plans use schema 2 and requests/contracts use schema 1. Preserve older release descriptions as history in the changelog.
+Release version must be `2.3.0` in the helper, both plugin manifests, marketplace plugin-source ref, newly generated knowledge provenance, tests and active documentation. The marketplace catalog is read from `main` while this candidate's plugin source pins `v2.3.0`. `SCHEMA_VERSION` is `5`; plans use schema 2, requests/contracts use schema 1 and the separate brief report uses schema 1. Preserve older release descriptions as history in the changelog and existing user-owned provenance during supported migrations.
 
 The repository upgrade accepts schemas 2, 3 and 4, preserves existing legacy Program and knowledge migrations and adds the schema-5 continuity records in one transaction. It updates managed workflow, minimal AGENTS routing and plan-index metadata while preserving project-owned data and application code. Reviewed finding-proof migrations can add proof metadata to the registry and preserve evidence for rewritten managed files in historical snapshots; this is not a promise that every record stays byte-identical. Historical dispositions remain legacy; uncontracted unfinished work requires review on resume. Follow the [proof ownership and snapshot review](REFERENCE.md#legacy-finding-proof-ownership), then test the exact transaction with dry-run, apply, `check`, `git diff --check` and path review.
 
 ## Selected metadata
 
-Use these values in both manifests. The Directory package and GitHub release use the same 2.2.4 metadata; source validation and the host's visible presentation remain separate checks:
+Use these values in both manifests. The Directory package and GitHub release target the same 2.3.0 metadata; source validation and the host's visible presentation remain separate checks:
 
 - Name: `Engineering Project OS`
 - Descriptor: `Built for Codex.`
@@ -70,19 +76,21 @@ The social preview is versionless. It uses the eyebrow `BUILT FOR CODEX`, the ti
 
 ## Continuity and host checks
 
-Replay the multi-message cases in `skills/project-os/evals/continuity.json` and the ordinary repair and transfer cases in `evals/persistence.json` using a frozen exact candidate skill installation. Verify actual record files and plan status after each message. End the initial session, start a fresh session with only the repository files and verify recovery, routing and the exact next action. Repeat relevant checks through the extracted release package after packaging. A passing deterministic fixture test is not a host workflow pass. Keep inaccessible Codex or ChatGPT acceptance pending with the exact required action.
+Use the multi-message cases in `skills/project-os/evals/continuity.json` and the setup, scope and knowledge cases in `skills/project-os/evals/prompts.json` and `skills/project-os/evals/submission.json` with a frozen exact candidate. Core acceptance includes an ordinary bounded repair in a connected synthetic project with its genuine finding, verification evidence and current checkpoint. Verify record files and plan status after each message. End the initial session, start a fresh session with only the repository files and verify recovery, routing and the exact next action. For ChatGPT, inspect the actual supplied and returned files, not a claimed connected repository. Reuse completed unaffected checks and verify their tested bytes against the extracted release package. A passing deterministic fixture test is not a host workflow pass. Keep missing required core acceptance pending with the exact required action; record optional host and distribution observations separately.
+
+If required core observations remain, consolidate only those missing or affected checks into one counted runbook. Preserve separate messages or sessions where acceptance requires them. Keep current-helper brief, selected older-helper compatibility and execution prohibited by the user distinct from genuinely unavailable execution; reuse the existing missing-material case. A prohibition or local simulation does not prove a host lacks execution tools. Retain an inaccessible execution-free host as an unverified portability observation without reopening passed core workflows.
 
 ## Required pre-publication acceptance guard
 
-Run the fresh-host persistence and files-only recovery scenarios against a frozen local skill copy before building the release ZIP. Package consistency alone reports NOT_EVALUATED and never proves release readiness. Before recommending publication or asking for release authorization, run the read-only guard against the exact tested ZIP and the connected repository that owns its acceptance:
+Retain actual fresh-host persistence and files-only recovery evidence for the frozen runtime and workflow instructions, accounting for documentation-only deltas as described above. Package consistency alone reports NOT_EVALUATED and never proves release readiness. Before recommending publication or asking for release authorization, run the read-only guard against the exact final ZIP and the connected repository that owns its acceptance:
 
 ~~~shell
-python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.2.4-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
+python3 -B scripts/package_plugin.py --check /private/tmp/engineering-project-os-2.3.0-plugin.zip --acceptance-target /path/to/repository --plan-id <release-acceptance-plan-id>
 ~~~
 
-This guard rejects a ZIP differing from the candidate checkout and fails with NOT_READY when the selected plan has invalid records, stale proof, open requirements or pending acceptance. A successful result includes the exact ZIP SHA-256 and the named recorded outcome. It checks recorded proof consistency, not the semantic truth of evidence. The agent must verify that this is the release-preparation outcome and that it covers actual fresh Codex and ChatGPT behavior, not a narrower source-only plan. Acceptance files remain private and are never packaged.
+This guard rejects a ZIP differing from the candidate checkout and fails with NOT_READY when the selected plan has invalid records, stale proof, open requirements or pending acceptance. A successful result includes the exact ZIP SHA-256 and the named recorded outcome. It checks recorded proof consistency, not the semantic truth of evidence. The agent must verify that this is the release-preparation outcome and that it covers actual native Codex and supplied-file ChatGPT core behavior, exact package identity, CI and final-commit review, not a narrower source-only plan. Keep optional portability observations and later publication acceptance explicit without making them prerequisites for source preparation. Acceptance files remain private and are never packaged.
 
-If candidate host access is unavailable, report NOT_READY with the exact blocker and keep the plan open. Do not recommend publishing to unlock testing. Changed candidate bytes require rebuilding and repeating affected acceptance. Owner-directed publication with a known blocker does not verify it or close the preparation plan.
+If required core host evidence is missing, report NOT_READY with the exact blocker and keep the plan open. Do not recommend publishing to unlock required core testing. Changed candidate bytes require rebuilding and repeating affected acceptance. Owner-directed publication with a known required blocker does not verify it or close the preparation plan. Missing optional portability or distribution observations remain unverified within their own scope.
 
 ## Discovery checks
 
@@ -90,7 +98,7 @@ Replay `skills/project-os/evals/discovery.json` in a fresh Codex task. The set c
 
 The listing copy leads with Codex developer workflows, then states when to use the plugin and its boundaries. Discovery checks adapt the direct, indirect and negative prompt categories in the official [metadata optimization guide](https://developers.openai.com/plugins/guides/optimize-metadata). Change one metadata field at a time during later tuning and keep experiment notes only in ignored local `.agents` records.
 
-Test all three public starter prompts in a fresh ChatGPT chat. The overview must describe Project OS as built for Codex and ChatGPT as the companion. Existing-repository requests without supplied files must ask for them rather than inspecting an empty host workspace.
+Core companion entry checks cover the meaning of all three public starter prompts through actual supplied-file or description-based interactions. The overview must describe Project OS as built for Codex and ChatGPT as the companion. Existing-repository requests without supplied files must ask for them rather than inspecting an empty host workspace. Reuse unchanged prompt evidence. Separately, distribution acceptance checks starter click-through with the selected installed version in a fresh ChatGPT chat; an unavailable exact-candidate loader does not invalidate supplied-file behavior evidence or block core source preparation.
 
 ## Required final-commit Codex Review
 
@@ -141,28 +149,28 @@ Dispositions stay private and bind the repository, PR, reviewed head, exact comm
 
 ## Release sequence
 
-1. Finish runtime/source checks and review the complete diff. Freeze exact candidate skill files for isolated installation; keep existing published artifacts unchanged.
-2. Run ordinary repair/discovery, knowledge review/approval, discovery and continuity scenarios in fresh Codex and ChatGPT sessions. Inspect actual findings, requests and current checkpoints; repeat recovery in separate sessions from files alone.
-3. After all mandatory behavioral acceptance passes, run the full suite including extracted-package checks, build the release ZIP, verify reproducibility and compare every packaged file to the tested candidate.
-4. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit. Test the three starter prompts and supplied-material companion boundaries.
+1. Finish runtime, source and documentation changes and review the complete diff. Freeze exact candidate skill files; keep existing installed stable and published artifacts unchanged.
+2. Run the full local suite including extracted-package checks, build an inspection/test candidate ZIP and verify reproducibility, privacy and every packaged byte. Keep required core host and release acceptance pending until their actual evidence is recorded.
+3. Bind ordinary repair, knowledge review/approval, discovery, continuity and files-only recovery evidence from native Codex and the actual supplied-file ChatGPT companion to the candidate. Inspect actual findings, requests and current checkpoints. Reuse passed unaffected observations, record documentation-only manifest deltas and repeat only checks affected by real behavior changes or defects. Keep optional portability and installed ChatGPT discovery observations separate.
+4. Run `python3 -B scripts/check_public_tree.py` against the staged file list and run `git diff --cached --check` before any release commit. Retain actual core starter-meaning and supplied-material companion boundary evidence; stage installed starter click-through with distribution acceptance.
 5. After the candidate changes and available checks are concrete and reviewable, obtain scoped owner authorization for commit, push and a source pull request. Report every pending acceptance gate. Creating the PR enables review and does not authorize merge or publication; do not require an already completed PR review before creating that PR.
 6. Complete the authorized source pull request and wait separately for CI and completed Codex code/security reviews of the final commit. Record every finding disposition, resolve its thread and pass the final-head guard above. A new source commit requires a matching new review and affected acceptance checks.
-7. With all mandatory host results and final-commit review recorded, pass the pre-publication acceptance guard against the exact final ZIP. Only then recommend publication or request scoped owner authorization for merge, tag and GitHub Release. After authorization, merge and verify the merged tree, create tag `v2.2.4` on the accepted commit and attach the exact reviewed ZIP to the GitHub Release.
+7. With all required core results, CI and final-commit review recorded, revalidate the exact unchanged ZIP and pass the pre-publication acceptance guard. Only then recommend publication or request scoped owner authorization for merge, tag and GitHub Release. After authorization, merge and verify the merged tree, create tag `v2.3.0` on the accepted commit and attach the exact reviewed ZIP to the GitHub Release.
 8. Verify the remote tag, Release metadata and downloaded asset SHA-256. Test the documented GitHub marketplace and tagged standalone routes in isolated profiles, then inspect the selected installation in a fresh Codex task. Check the installed version, exact skill bytes, bootstrap or upgrade, actual finding/checkpoint persistence and files-only recovery.
-9. Report GitHub source, Release, artifact and installation results with their evidence. Report Directory status separately; a GitHub release does not establish Directory publication or ChatGPT availability. Follow the Directory checks below for an owner-authorized submission.
+9. Report GitHub source, Release, artifact and installation results with their evidence. Report Directory status, selected ChatGPT version, starter click-through and fresh-host availability separately; a GitHub release does not establish those results. Follow the Directory checks below for an owner-authorized submission and retain unavailable observations as unverified.
 
 Do not replace package contents under an existing version. Any content change after publication requires another version.
 
 ## Release notes
 
-The release behavior is summarized below. Keep actual release notes tied to their verified scope; the later repository documentation revision does not rewrite the published release:
+The source behavior is summarized below. Actual release notes must state the verified host, artifact and publication scope rather than claiming a planned acceptance result:
 
-`2.2.4 rejects implicit refresh of changed finding proof, separates helper-owned proof data from legacy project fields and adds reviewed proof migration. Final-commit Codex Review and disposition of every remark are mandatory before merge or publication, independently of CI. Existing checkpoints, Standard, Program and schema compatibility remain supported.`
+`2.3.0 adds a compact read-only brief for session recovery, retaining complete unresolved requests and distinguishing record integrity from outcome readiness. Recovery guidance covers current helpers, selected older helpers and unavailable or forbidden execution without invented verification. Existing finding proofs, checkpoints, Standard, Program and schema compatibility remain supported. Core Codex and supplied-file ChatGPT acceptance, exact package validation, CI and exact-final-commit Code/Security reviews remain prerequisites for publication. ChatGPT loading, selected-version and Directory observations remain separate from source preparation; unobserved execution-free hosting and account Memory isolation remain unverified.`
 
 <a id="legacy-directory"></a>
 
 ## Directory publication
 
-On 2026-10-24, the maintainer confirmed that the [Universal Plugin Directory listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9) offers the exact published 2.2.4 package. Directory is the primary installation channel again. This is the date of confirmation, not a claim about the publication day. Earlier submission restrictions remain historical observations in the changelog.
+Directory is the primary installation channel. Check the actual offered version and selected files through the [listing](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9); neither this source version nor a GitHub release proves Directory availability. Earlier publication and submission observations remain history in the changelog.
 
 For a future owner-authorized submission, follow the then-current official [submission guide](https://developers.openai.com/plugins/deploy/submission) and [plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines). Verify the Portal form, images, capabilities, prompts, policies and exact package version. Declare the GitHub Issues support URL in both manifests, then verify actual Portal ingestion and public display separately. Record review approval, publication and fresh-host availability as distinct results. Preserve the existing published Directory artifact; repository documentation does not replace it.

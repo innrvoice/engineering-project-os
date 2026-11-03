@@ -100,6 +100,37 @@ class DistributionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'differs from the candidate'):
             PACKAGE.validate_release_acceptance(ROOT, changed, target, '001')
 
+    def test_extracted_snapshot_utility_preserves_nested_payload_without_project_validation(self):
+        payload = self.base / "snapshot-payload"
+        state = payload / ".agents/STATE.md"
+        proposal = payload / "campaign-output/proposals/ownership.json"
+        state.parent.mkdir(parents=True)
+        proposal.parent.mkdir(parents=True)
+        state.write_bytes(b"# Saved state\r\n<!-- project-os-checkpoint: complete-receipt -->\r\n")
+        proposal.write_bytes(b'{"reviewed":"portable"}\n')
+        (payload / "MANIFEST.json").write_bytes(b'{"original":"manifest"}\n')
+        before = file_hashes(payload)
+        helper = self.skill / "scripts/snapshot.py"
+        archive_path = self.base / "payload-snapshot.zip"
+        arguments = ("create", "--root", str(payload), "--output", str(archive_path),
+                     "--require", "campaign-output/proposals/ownership.json")
+        preview = self.command(helper, *arguments, "--dry-run")
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        self.assertFalse(archive_path.exists())
+        self.assertEqual(file_hashes(payload), before)
+        applied = self.command(helper, *arguments)
+        self.assertEqual(applied.returncode, 0, applied.stderr)
+        self.assertEqual(json.loads(applied.stdout)["project_os_validation"], "NOT_PERFORMED")
+        with zipfile.ZipFile(archive_path) as snapshot:
+            for name in before:
+                self.assertEqual(snapshot.read(name), (payload / name).read_bytes(), name)
+            self.assertIn("PROJECT-OS-SNAPSHOT.json", snapshot.namelist())
+        checked = self.command(helper, "check", "--root", str(payload), "--archive", str(archive_path),
+                               "--require", "campaign-output/proposals/ownership.json")
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertEqual(json.loads(checked.stdout)["transport_integrity"], "VERIFIED")
+        self.assertEqual(file_hashes(payload), before)
+
     def test_packaged_document_link_check_detects_missing_guide(self):
         broken = self.base / "missing-guide.zip"
         with zipfile.ZipFile(self.archive) as source, zipfile.ZipFile(broken, "w") as output:
@@ -209,6 +240,58 @@ class DistributionTests(unittest.TestCase):
                     self.assertEqual(value["gates"][0]["status"], "verified")
                 self.assertTrue(case["restart_prompt"])
                 self.assertTrue(case["host_evidence"])
+
+    def test_packaged_brief_fixture_recovers_current_records_after_exact_archive_roundtrip(self):
+        target = self.base / "brief-source"
+        prepared = self.command(self.skill / "evals/prepare_fixture.py", "--case",
+                                "brief-connected-readonly-recovery", "--target", str(target))
+        self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+        before = file_hashes(target)
+        state_bytes = (target / ".agents/STATE.md").read_bytes()
+        self.assertIn(b"<!-- project-os-checkpoint:", state_bytes)
+        original_requests = json.loads((target / ".agents/requests.json").read_text())["requests"]
+        self.assertEqual(original_requests[0]["owner_note"], {"marker": "BRIEF-OWNER-001", "preserve": True})
+        self.assertIn("Keep owner approval BRIEF-OWNER-001 separate", original_requests[0]["source_text"])
+        self.assertEqual(original_requests[0]["decision"],
+                         "Local source verification does not authorize owner acceptance or the independent followup.")
+
+        snapshot = self.base / "brief-result.zip"
+        with zipfile.ZipFile(snapshot, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(target.rglob("*")):
+                if path.is_file():
+                    archive.writestr(path.relative_to(target).as_posix(), path.read_bytes())
+        reconstructed = self.base / "brief-reconstructed"
+        with zipfile.ZipFile(snapshot) as archive:
+            self.assertIsNone(archive.testzip())
+            self.assertEqual(archive.read(".agents/STATE.md"), state_bytes)
+            archive.extractall(reconstructed)
+        self.assertEqual(file_hashes(reconstructed), before)
+
+        helper = self.skill / "scripts/project_os.py"
+        for repository in (target, reconstructed):
+            with self.subTest(repository=repository.name):
+                checked = self.command(helper, "check", "--target", str(repository))
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                checkpoint = self.command(helper, "checkpoint", "--target", str(repository), "--check", "--json")
+                self.assertEqual(checkpoint.returncode, 0, checkpoint.stdout + checkpoint.stderr)
+                self.assertEqual(json.loads(checkpoint.stdout)["checkpoint"], "CURRENT")
+                result = self.command(helper, "brief", "--target", str(repository), "--json")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                report = json.loads(result.stdout)
+                self.assertEqual(report["integrity"], "PASS")
+                self.assertEqual(report["checkpoint"]["status"], "CURRENT")
+                self.assertEqual(report["unresolved_requests"], original_requests)
+                self.assertEqual(report["active_plan"]["readiness"], "NOT_READY")
+                self.assertEqual(report["active_plan"]["gate_counts"],
+                                 {"verified": 1, "pending": 1, "not_applicable": 0})
+                self.assertEqual(report["active_plan"]["pending_gates"][0]["id"], "owner-review")
+                self.assertEqual([(plan["id"], plan["status"]) for plan in report["other_plans"]],
+                                 [("002", "planned")])
+                readiness = self.command(helper, "plan", "status", "--target", str(repository),
+                                         "--require-ready", "--json")
+                self.assertEqual(readiness.returncode, 1, readiness.stdout + readiness.stderr)
+                self.assertEqual(json.loads(readiness.stdout)["readiness"], "NOT_READY")
+                self.assertEqual(file_hashes(repository), before)
 
     def test_checker_accepts_documented_block_and_resume_registry_transitions(self):
         target = self.base / "plan-transition"

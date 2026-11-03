@@ -21,6 +21,8 @@ The records have different jobs:
 
 `AGENTS.md` routes Codex to relevant files under `.agents/`. Codex reads the records needed for the task. The checkpoint is a compact handoff, separate from the plan.
 
+When helper execution is available and permitted, the read-only `brief` helper gives Codex a compact first view of record integrity, checkpoint freshness and unfinished work at the start of a fresh session or resumed work. Complete open requests stay visible without reloading the historical registries. Codex then reads the context, checkpoint, any active Program contract and active plan with its contract. Original registries remain necessary before edits or when history or errors require them. A successful inspection can still show an active plan that is not ready. See [Reference](REFERENCE.md#interfaces).
+
 <a id="scene-two-track-the-proof-that-is-still-missing"></a>
 <a id="readiness-before-delivery"></a>
 
@@ -57,11 +59,15 @@ Standard is the normal setup. A bounded repair can stay plan-free while saving f
 
 ## Installation and repository connection
 
-Install Project OS 2.2.4 primarily through the [Directory](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9). Connecting a repository separately creates or adopts records after a preview. Existing instructions remain authoritative. [Setup](SETUP.md) covers alternatives and upgrades.
+Directory is the primary [installation channel](https://chatgpt.com/plugins/plugins_6aa793523ba481918ea921c5438d98c9). This guide describes 2.3.0 source; verify the actual channel and installed version separately. Connecting a repository creates or adopts records after a preview. Existing instructions remain authoritative. [Setup](SETUP.md) covers alternatives and upgrades.
 
 ## ChatGPT is the companion surface
 
 ChatGPT uses supplied files and bundles, without live repository access from installation. Check actual returned file bytes before applying them. Codex works directly with the repository and its current Git state.
+
+If ChatGPT can read the files but cannot run the helper, it can explain the recorded state while leaving integrity and freshness unverified. It preserves the files and pending acceptance, reports the missing execution and does not invent successful checks or a validated download. A user prohibition on execution follows the same read-only route. An older selected helper uses its supported checks without being silently replaced. See the capability routes in [Reference](REFERENCE.md#interfaces).
+
+Generic file tools may still produce a transport copy with matching bytes and hashes. That is useful for moving the records, but it does not prove Project OS validation ran. A supplied skill copy and a working returned ZIP also do not prove that an installed plugin was discovered or that account Memory was isolated.
 
 <a id="what-the-helper-can-and-cannot-do"></a>
 

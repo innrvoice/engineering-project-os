@@ -22,7 +22,7 @@ Open the repository and ask:
 Continue the current work from the repository records. Verify what remains before changing code.
 ~~~
 
-Codex reads the checkpoint, unresolved requests, active plan and acceptance conditions, then checks relevant findings and evidence. It verifies consistency and freshness before relying on the saved next action. This also applies after context compaction.
+When execution is available and permitted, Codex first runs the selected helper's read-only `brief`. That compact report keeps complete unfinished requests visible and routes the context, checkpoint and active plan with its acceptance conditions. Codex reads original registries before changing them or when errors or missing detail require it. It verifies consistency and freshness before relying on the saved next action. This also applies after context compaction.
 
 Codex verifies whether a recorded blocker is resolved and asks for a plan choice only when ambiguous. A new chat needs no resume command when the active plan already identifies the work.
 
@@ -36,9 +36,9 @@ Also handle reconnecting after the app has been offline. Keep the existing retry
 
 Codex records a material instruction while handling your message, without waiting for a separate save command. A compatible addition joins the current outcome and its acceptance conditions. An independent outcome becomes a planned slice with a recorded order; only one plan runs at a time.
 
-The saved request retains your wording, interpretation, destination and decision. Inclusion in a plan does not mean implementation; completion requires linked conditions and evidence.
+The saved request retains your complete relevant wording verbatim, including conditions, alongside Codex's interpretation, destination and decision. Inclusion in a plan does not mean implementation; completion requires linked conditions and evidence.
 
-If the addition conflicts with an earlier requirement, Codex preserves the conflict and asks for the needed decision while continuing independent authorized work. If you explicitly cancel or replace a requirement, it records that decision instead of silently dropping the request. These records are part of fresh-task recovery even when no plan is active.
+If the addition conflicts with an earlier requirement, Codex preserves the conflict and asks for the needed decision while continuing independent authorized work. If you explicitly cancel or replace a requirement, it keeps the original request and records your exact cancellation wording with the decision. These records are part of fresh-task recovery even when no plan is active.
 
 ## See what prevents closure
 
@@ -86,7 +86,7 @@ Supply the bundle and destination context to Codex or the ChatGPT companion. Ask
 
 ## Upgrade Project OS
 
-Update the selected installation using [Setup](SETUP.md#upgrade-to-224), then ask `$project-os upgrade` in each connected repository. Codex identifies the installed helper, previews changes, handles any ownership review and applies only the reviewed operation after authorization.
+Update the selected installation using [Setup](SETUP.md#upgrade-to-230), then ask `$project-os upgrade` in each connected repository. Codex identifies the installed helper, previews changes, handles any ownership review and applies only the reviewed operation after authorization.
 
 The upgrade checks and saved checkpoint describe the actual result. Managed files, migration metadata and reviewed historical proof may change; application changes need their own authority. Conflicts stay pending. Do not simulate an upgrade by editing version or schema fields.
 
@@ -104,6 +104,14 @@ The [request catalog](REFERENCE.md#project-os-requests), [plan rules](REFERENCE.
 ## ChatGPT companion boundaries
 
 Select `@Engineering Project OS` for explanations, supplied project files and portable bundles. Reviewing an existing setup requires the relevant files. Changed copies remain chat artifacts until you deliberately apply them to the real checkout and validate in Codex.
+
+With a runnable selected helper and permission to execute it, ChatGPT can check the supplied copy and return a validated snapshot. That snapshot must preserve hidden files and the whole checkpoint receipt, use freshly read file bytes and pass checks after the actual archive is reconstructed. A text report alone is not the returned artifact.
+
+The agent keeps your original scoped instructions verbatim beside its interpretation, including conditions and later cancellation wording. For returned files, it inventories the actual source tree before copying and includes promised nested proposals and reports. The bundled snapshot utility can check that byte-preserving archive when execution is permitted; it does not run project checks or establish acceptance. See [complete byte snapshots](REFERENCE.md#complete-byte-snapshots).
+
+If execution is unavailable or forbidden, ChatGPT can review readable files provisionally. It must distinguish recorded claims from checks performed now, preserve pending acceptance and leave integrity, freshness and readiness checks unverified. It must not change records, create a receipt or close a plan through this fallback. A missing helper or a genuinely older helper is reported without silently choosing a different installed copy.
+
+When generic file operations are allowed, ChatGPT may return a byte-preserving transport copy with actual file hashes and the full STATE receipt. That proves only the stated byte checks; it is not a helper-validated Project OS export. If reading or creating an actual downloadable file is unavailable, the response must state the limitation. Detailed capability routes are in [Reference](REFERENCE.md#interfaces).
 
 ## Safety rules
 

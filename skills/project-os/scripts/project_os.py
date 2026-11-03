@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Sequence
 
 
-VERSION = "2.2.4"
+VERSION = "2.3.0"
 SCHEMA_VERSION = 5
 PROGRAM_RELATIVE_PATH = ".agents/PROGRAM.md"
 PACK_NAMES = ("service", "web", "mobile", "data", "delivery")
@@ -1234,8 +1234,17 @@ def with_workflow_writeback_route(text: str) -> str:
         "before the final response. Plan-free does not mean record-free. Recovery reads "
         "the saved files and verifies checkpoint freshness before relying on STATE."
     )
+    capability_template_route = (
+        "When required execution is available and permitted, follow WORKFLOW's required "
+        "writeback even for a bounded bug fix: record reproduced defects with the helper, "
+        "save a current checkpoint and pass `checkpoint --check` before the final response. "
+        "Plan-free does not mean record-free. Otherwise preserve files and report the missing "
+        "writeback and verification under WORKFLOW's capability route. Recovery reads the "
+        "saved files and verifies checkpoint freshness before relying on STATE as current."
+    )
     if WORKFLOW_WRITEBACK_ROUTE in text or (
-        ".agents/WORKFLOW.md" in text and template_route in text
+        ".agents/WORKFLOW.md" in text
+        and any(route in text for route in (template_route, capability_template_route))
     ):
         return text
     separator = "" if text.endswith("\n\n") else "\n" if text.endswith("\n") else "\n\n"
@@ -3493,7 +3502,7 @@ def render_checkpoint(
     return written, receipt
 
 
-def checkpoint_check(root: Path, as_json: bool = False) -> int:
+def checkpoint_report(root: Path) -> dict[str, Any]:
     root = root.resolve()
     report: dict[str, Any] = {"checkpoint": "STALE", "errors": []}
     try:
@@ -3527,6 +3536,11 @@ def checkpoint_check(root: Path, as_json: bool = False) -> int:
         report["receipt"] = receipt
     except (ProjectOSError, OSError, UnicodeError, ValueError) as error:
         report["errors"].append(str(error))
+    return report
+
+
+def checkpoint_check(root: Path, as_json: bool = False) -> int:
+    report = checkpoint_report(root)
     if as_json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
@@ -3534,6 +3548,130 @@ def checkpoint_check(root: Path, as_json: bool = False) -> int:
         for error in report["errors"]:
             print("remaining: " + error)
     return 1 if report["errors"] else 0
+
+
+def brief_report(root: Path) -> dict[str, Any]:
+    """Reduce validated records to routing facts, never to overall readiness."""
+    root = root.resolve()
+    report: dict[str, Any] = {
+        "schema_version": 1, "integrity": "FAIL", "errors": [],
+        "structure": "FAIL", "checkpoint": {"status": "UNAVAILABLE", "errors": []},
+        "records_available": False, "mode": None, "execution_state": None, "active_plan": None,
+        "unresolved_requests": [], "other_plans": [], "counts": {},
+        "record_paths": {}, "read_next": [".agents/SYSTEM.json"],
+    }
+    try:
+        # Bind the manifest before validation so a changed owner map cannot be
+        # consumed as though the initial structural check had validated it.
+        snapshots: dict[Path, str] = {}
+        system_path = root / ".agents/SYSTEM.json"
+        reject_symlink_path(root, system_path)
+        system_bytes, _ = read_regular_at_path(system_path)
+        retain_snapshot(snapshots, system_path, hashlib.sha256(system_bytes).hexdigest())
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            structural_status = check_project(root)
+        if structural_status:
+            report["errors"] = [line.removeprefix("error: ") for line in output.getvalue().splitlines()
+                                if line.startswith("error: ")]
+            if not report["errors"]:
+                report["errors"] = [output.getvalue().strip() or "Structural check failed"]
+            return report
+        report["structure"] = "PASS"
+        system = require_current_system(root, snapshots)
+        errors: list[str] = []
+        index, _, requests = validate_plan_records(root, system, errors, snapshots)
+        if errors:
+            raise ProjectOSError("Brief inputs are invalid: " + "; ".join(errors))
+        paths = system["paths"]
+        program_path = None
+        if system["mode"] == "program":
+            program_path = safe_relative(root, paths.get("program"))
+            if program_path is None:
+                raise ProjectOSError("Brief requires a safe active Program owner")
+            reject_symlink_path(root, program_path)
+            program_bytes, _ = read_regular_at_path(program_path)
+            retain_snapshot(snapshots, program_path, hashlib.sha256(program_bytes).hexdigest())
+        state = safe_relative(root, paths["state"])
+        assert state is not None
+        reject_symlink_path(root, state)
+        state_bytes, _ = read_regular_at_path(state)
+        retain_snapshot(snapshots, state, hashlib.sha256(state_bytes).hexdigest())
+        checkpoint = checkpoint_report(root)
+        if checkpoint["checkpoint"] == "CURRENT":
+            for item in checkpoint["receipt"]["inputs"]:
+                path = safe_relative(root, item["path"])
+                assert path is not None
+                retain_snapshot(snapshots, path, item["sha256"].removeprefix("sha256:"))
+        report["checkpoint"] = {"status": checkpoint["checkpoint"], "errors": checkpoint["errors"]}
+        report["errors"].extend("Checkpoint: " + error for error in checkpoint["errors"])
+        plans = index["plans"]
+        active = next((plan for plan in plans if plan["status"] == "active"), None)
+        record_paths = {key: paths[key] for key in ("context", "state", "plans", "requests")}
+        read_next = [paths[key] for key in ("context", "state")]
+        if program_path is not None:
+            record_paths["program"] = paths["program"]
+            read_next.append(paths["program"])
+        active_summary = None
+        if active is not None:
+            status = plan_status_report(root, active["id"], snapshots)
+            gates = status["gates"]
+            active_summary = {
+                "id": active["id"], "outcome": active["outcome"],
+                "path": active["path"], "contract_path": active.get("contract_path"),
+                "readiness": status["readiness"], "blockers": status["readiness_blockers"],
+                "pending_gates": [gate for gate in gates if gate["status"] == "pending"],
+                "gate_counts": {value: sum(gate["status"] == value for gate in gates)
+                                for value in ("pending", "verified", "not_applicable")},
+            }
+            report["errors"].extend(status["errors"])
+            read_next.extend(active[key] for key in ("path", "contract_path") if active.get(key))
+        unresolved = [request for request in requests if request["status"] not in ("implemented", "withdrawn")]
+        other = [plan for plan in plans if plan["status"] in ("planned", "blocked")]
+        # Recheck the actual bytes used by the summary, including contract proof.
+        for path, digest in snapshots.items():
+            reject_symlink_path(root, path)
+            content, _ = read_regular_at_path(path)
+            if hashlib.sha256(content).hexdigest() != digest:
+                raise ProjectOSError(f"Brief input changed during inspection: {path.relative_to(root)}")
+        report.update(
+            records_available=True, mode=system["mode"], execution_state=index["execution_state"], active_plan=active_summary,
+            unresolved_requests=unresolved,
+            other_plans=[{key: plan.get(key) for key in ("id", "status", "outcome", "path", "contract_path")}
+                         for plan in other],
+            counts={"plans": len(plans), "requests": len(requests), "unresolved_requests": len(unresolved)},
+            record_paths=record_paths,
+            read_next=list(dict.fromkeys(read_next)),
+        )
+        report["integrity"] = "PASS" if not report["errors"] else "FAIL"
+    except (ProjectOSError, OSError, UnicodeError, ValueError) as error:
+        report["errors"].append(str(error))
+    return report
+
+
+def project_brief(root: Path, as_json: bool = False) -> int:
+    report = brief_report(root)
+    if as_json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(f"Record integrity: {report['integrity']}; checkpoint: {report['checkpoint']['status']}")
+        if report["records_available"]:
+            print("Mode: " + report["mode"])
+            print("Execution: " + report["execution_state"])
+            active = report["active_plan"]
+            if active is not None:
+                print(f"Plan {active['id']}: {active['readiness']} - {active['outcome']}")
+                for blocker in active["blockers"]:
+                    print("remaining: " + blocker)
+            for request in report["unresolved_requests"]:
+                print(f"request {request['id']}: {request['status']} - {request['interpretation']}")
+            for plan in report["other_plans"]:
+                print(f"{plan['status']}: {plan['id']} - {plan['outcome']}")
+        for error in report["errors"]:
+            print("error: " + error)
+        for path in report["read_next"]:
+            print("read: " + path)
+    return 0 if report["integrity"] == "PASS" else 1
 
 
 def write_checkpoint(root: Path, draft_path: Path, dry_run: bool) -> int:
@@ -4039,6 +4177,15 @@ def read_selected_system(
         raise ProjectOSError("SYSTEM overlay_paths do not match selected overlays")
     if not isinstance(system.get("paths"), dict):
         raise ProjectOSError("SYSTEM paths must contain an object")
+    # Validate the owner map that callers will consume, even if a concurrent
+    # writer restored these same bytes after a different manifest was checked.
+    for key in ("context", "state", "plans", "requests", "findings", "reusable_knowledge"):
+        if safe_relative(root, system["paths"].get(key)) is None:
+            raise ProjectOSError(f"SYSTEM paths.{key} must be a safe repository-relative file path")
+    for key in ("project_knowledge", "legacy_knowledge"):
+        values = system["paths"].get(key, [])
+        if not isinstance(values, list) or any(safe_relative(root, value) is None for value in values):
+            raise ProjectOSError(f"SYSTEM paths.{key} must be an array of safe repository-relative paths")
     require_safe_system_owners(root, system)
     lifecycle_errors: list[str] = []
     raw_program = system["paths"].get("program")
@@ -6290,6 +6437,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    brief_parser = subparsers.add_parser("brief", help="Inspect record integrity and unresolved work without writing")
+    brief_parser.add_argument("--target", required=True, type=Path)
+    brief_parser.add_argument("--json", action="store_true")
+
     checkpoint_parser = subparsers.add_parser("checkpoint", help="Save or verify a compact handoff bound to current records")
     checkpoint_parser.add_argument("--target", required=True, type=Path)
     checkpoint_mode = checkpoint_parser.add_mutually_exclusive_group(required=True)
@@ -6467,6 +6618,8 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if args.command == "brief":
+            return project_brief(args.target, args.json)
         if args.command == "finding":
             return record_finding(args.target, args.input, args.id, args.dry_run)
         if args.command == "plan":

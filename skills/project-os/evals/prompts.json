@@ -273,12 +273,71 @@
       ]
     },
     {
+      "name": "brief-connected-readonly-recovery",
+      "prompt": "Continue from the supplied project records only. Recover the current work, unresolved requirements, acceptance boundaries and next action. This is read-only: do not change files or start the next task.",
+      "expected": [
+        "use the exact selected helper for brief when execution is available and permitted, then follow read_next without rereading full registries merely to recover facts already returned",
+        "report record integrity PASS and checkpoint CURRENT separately from active plan 001 NOT_READY",
+        "preserve the complete unresolved R-001 source_text, decision and owner_note extension while explaining the pending owner-review gate",
+        "keep marker BRIEF-OWNER-001 unapproved and successor 002 planned",
+        "preserve every supplied file byte, including the complete STATE receipt, and distinguish explicit candidate-file selection from installed plugin loading",
+        "when returning a project snapshot, verify the actual serialized file and report any unavailable execution or artifact capability without inventing success"
+      ]
+    },
+    {
+      "name": "chatgpt-helper-execution-forbidden",
+      "prompt": "Recover the current work and next permitted action from the attached project files. You may read the supplied files, but do not execute the helper, application tests or other project code and do not change files.",
+      "expected": [
+        "respect the explicit execution prohibition even when the host has execution tools",
+        "read only supplied records and identify observations as a provisional file review rather than an executed helper result",
+        "do not claim an executed PASS, CURRENT or readiness check and do not treat a saved receipt as independently verified freshness",
+        "preserve pending acceptance, original permissions, planned successors and every supplied byte",
+        "state which checks remain unverified and what separate permission would allow them without treating elapsed time as authorization",
+        "classify this observation as forbidden execution, not proof that execution tools are unavailable"
+      ]
+    },
+    {
+      "name": "chatgpt-helper-execution-unavailable",
+      "prompt": "Recover the current work, unfinished acceptance and next action from the attached project records. Keep this read-only and identify which checks you actually performed.",
+      "expected": [
+        "replay this case on a host where helper execution genuinely is unavailable and record the concrete capability limitation; if execution is available, leave this route unexercised",
+        "when reading tools work, review only supplied records and label the recovery provisional with structure, receipt freshness and readiness checks unverified",
+        "when archive or file reading is also unavailable, request the missing readable project material instead of inspecting an empty host workspace",
+        "do not fabricate commands, outputs, PASS, CURRENT, a returned artifact or receipt validation",
+        "preserve input and pending obligations, name the first missing capability or material and do not switch helpers, install packages or use an external service to bypass the limit",
+        "record actual host capability evidence separately from deterministic fixture checks and the execution-forbidden case"
+      ]
+    },
+    {
+      "name": "older-selected-helper-without-brief",
+      "prompt": "Recover the supplied project state read-only using the explicitly selected older helper provided for this check. Keep the selected helper unchanged and report any compatibility limit.",
+      "expected": [
+        "verify the selected legacy helper identity from the retained byte manifest and observe that it lacks brief instead of assuming support from version text",
+        "use that same helper's check and checkpoint --check plus targeted original record reads when those commands are available and permitted",
+        "preserve the actual unsupported-command diagnostic and disclose the compatibility fallback without silently substituting another helper",
+        "do not misclassify a supported brief command's stale, invalid-record or permission failure as an older-helper limit",
+        "keep incomplete or unavailable checks unverified, owner acceptance pending and all input bytes unchanged"
+      ]
+    },
+    {
       "name": "upgrade-refuses-downgrade",
       "prompt": "$project-os upgrade",
       "expected": [
         "compare repository and installed helper release versions",
         "refuse to downgrade a repository from a newer release",
         "request a matching or newer helper without editing version fields manually"
+      ]
+    },
+    {
+      "name": "chatgpt-snapshot-preserves-nested-proposals",
+      "prompt": "Return a byte-preserving snapshot of the supplied synthetic tree, including campaign-output/proposals/ownership.json and every hidden record/full STATE receipt. File operations and the bundled snapshot utility are permitted. Project OS validation, application code and tests are forbidden. Keep every source file unchanged.",
+      "expected": [
+        "inventory the actual authorized source tree recursively before copying; include nested proposals rather than only top-level files",
+        "when snapshot utility execution is available, preview/create with the promised required path and verify the serialized archive against the original source path/hash inventory",
+        "reject an omitted or missing required proposal even when a copied subset and its own manifest are internally consistent",
+        "preserve original MANIFEST/AUDIT and complete STATE bytes, keep the new output outside the source tree and refuse overwrite",
+        "do not run forbidden project checks or claim PASS/CURRENT/readiness from transport-byte preservation",
+        "return a real artifact only when available; retain first failed snapshots without silently repairing their historical bytes"
       ]
     }
   ]

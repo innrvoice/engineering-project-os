@@ -70,6 +70,41 @@ def add_finding(value, head=HEAD, resolved=True):
     return comment
 
 
+def security_receipt(value):
+    """Observed canonical v1 template, with synthetic IDs, commit and report."""
+    update_state(value, kind="security_review", has_any_findings=None, has_unresolved_findings=None)
+    receipt = {"id": 101, "created_at": "2026-10-16T09:59:00Z", "updated_at": "2026-10-16T09:59:00Z",
+               "html_url": URL + "#issuecomment-101", "user": {"login": GUARD.BOT, "type": "Bot"},
+               "body": """<!-- codex-review-receipt:v1 -->
+
+### 🛡️ Codex Security Review · _Automatically triggered_
+
+Security review completed. No security issues were found in this pull request.
+
+**Reviewed commit:** `aaaaaaaaaa`
+
+[View security finding report](https://chatgpt.com/codex/cloud/tasks/task_e_0123456789abcdef0123456789abcdef)
+
+_Only the user who started this review can view the report in Codex._
+
+<details> <summary>ℹ️ About Codex security reviews in GitHub</summary>
+<br/>
+
+This is an experimental Codex feature. Security reviews are triggered when:
+- You comment "@codex security review"
+- A regular code review gets triggered (for example, "@codex review" or when a PR is opened), and you’re opted in so security review runs alongside code review
+
+Once complete, Codex will leave suggestions, or a comment if no findings are found.
+
+
+</details>"""}
+    value["issue_comments"].append(receipt)
+    pr(value)["comments"]["totalCount"] += 1
+    value["receipt_commits"] = {HEAD[:10]: {"sha": HEAD,
+        "html_url": "https://github.com/" + REPOSITORY + "/commit/" + HEAD}}
+    return receipt
+
+
 class FakeLive:
     def __init__(self, value, on_refresh=None, source_after=None):
         self.value = value
@@ -155,6 +190,171 @@ class CodexReviewTests(unittest.TestCase):
                     update_state(value, kind=kind, **change)
                     with self.assertRaises(GUARD.NotReady):
                         self.inspect(value)
+
+    def test_canonical_clean_security_receipt_attests_explicit_null_flags_without_mutating_them(self):
+        value = snapshot(); receipt = security_receipt(value)
+        before = copy.deepcopy(value)
+        result = self.run_check(value)
+        self.assertEqual(result["readiness"], "READY")
+        proof = result["review_evidence"]["security_review"]
+        self.assertEqual(proof["source"], "canonical_clean_receipt")
+        self.assertEqual(proof["url"], receipt["html_url"])
+        self.assertEqual(proof["body_sha256"], GUARD.digest(receipt["body"].encode("utf-8")))
+        self.assertEqual(proof["reviewed_head"], HEAD)
+        self.assertIsNone(proof["has_any_findings"])
+        self.assertIsNone(proof["has_unresolved_findings"])
+        self.assertEqual(value, before)
+
+    def test_security_receipt_never_substitutes_for_unknown_code_or_partial_security_flags(self):
+        for kind, changes in [("code_review", {"has_any_findings": None, "has_unresolved_findings": None}),
+                              ("security_review", {"has_any_findings": True}),
+                              ("security_review", {"has_unresolved_findings": True}),
+                              ("security_review", {"has_any_findings": False}),
+                              ("security_review", {"has_unresolved_findings": False})]:
+            with self.subTest(kind=kind, changes=changes):
+                value = snapshot(); security_receipt(value); update_state(value, kind=kind, **changes)
+                with self.assertRaises(GUARD.NotReady):
+                    self.inspect(value)
+
+    def test_security_receipt_requires_canonical_unedited_unambiguous_current_head_evidence(self):
+        changes = [lambda v, r: r["user"].update(login="lookalike-bot[bot]"),
+                   lambda v, r: r["user"].update(type="User"),
+                   lambda v, r: r.update(html_url=URL.replace("/10", "/11") + "#issuecomment-101"),
+                   lambda v, r: r.update(body=r["body"].replace("receipt:v1", "receipt:v2")),
+                   lambda v, r: r.update(body=r["body"].replace("No security issues", "Security issues")),
+                   lambda v, r: r.update(body=r["body"] + "\nP1: unresolved issue"),
+                   lambda v, r: r.update(body=r["body"].replace("`aaaaaaaaaa`", "`bbbbbbbbbb`")),
+                   lambda v, r: r.update(updated_at="2026-10-16T09:59:01Z"),
+                   lambda v, r: r.update(created_at="not-a-timestamp", updated_at="not-a-timestamp"),
+                   lambda v, r: r.update(created_at="2026-02-30T09:59:00Z", updated_at="2026-02-30T09:59:00Z"),
+                   lambda v, r: r.update(created_at="2026-10-16T11:00:00Z", updated_at="2026-10-16T11:00:00Z"),
+                   lambda v, r: v["issue_comments"][0].update(updated_at="unknown"),
+                   lambda v, r: pr(v).update(updatedAt="2026-10-16T09:00:00Z"),
+                   lambda v, r: v.update(receipt_commits={}),
+                   lambda v, r: v["receipt_commits"][HEAD[:10]].update(sha=HEAD[:10] + "b" * 30),
+                   lambda v, r: v["receipt_commits"][HEAD[:10]].update(html_url="https://github.com/other/repo/commit/" + HEAD)]
+        for change in changes:
+            with self.subTest(change=change):
+                value = snapshot(); receipt = security_receipt(value); change(value, receipt)
+                with self.assertRaises(GUARD.NotReady):
+                    self.inspect(value)
+        value = snapshot(); receipt = security_receipt(value)
+        duplicate = copy.deepcopy(receipt); duplicate.update(id=102, html_url=URL + "#issuecomment-102")
+        value["issue_comments"].append(duplicate); pr(value)["comments"]["totalCount"] += 1
+        with self.assertRaisesRegex(GUARD.NotReady, "ambiguous"):
+            self.inspect(value)
+
+    def test_newer_dirty_or_wrong_head_security_receipt_cannot_be_hidden(self):
+        for dirty in (True, False):
+            value = snapshot(); receipt = security_receipt(value)
+            newer = copy.deepcopy(receipt)
+            newer.update(id=102, html_url=URL + "#issuecomment-102", created_at="2026-10-16T09:59:30Z",
+                         updated_at="2026-10-16T09:59:30Z")
+            newer["body"] = newer["body"].replace("No security issues", "Security issues") if dirty else newer["body"].replace("`aaaaaaaaaa`", "`bbbbbbbbbb`")
+            value["issue_comments"].append(newer); pr(value)["comments"]["totalCount"] += 1
+            with self.subTest(dirty=dirty), self.assertRaises(GUARD.NotReady):
+                self.inspect(value)
+
+    def test_newer_security_activity_cannot_hide_behind_an_absent_or_changed_receipt_marker(self):
+        bodies = [lambda body: body.replace(GUARD.RECEIPT_MARKER, ""),
+                  lambda body: body.replace(GUARD.RECEIPT_MARKER, "<!-- codex-review-result:v2 -->"),
+                  lambda body: body.replace(GUARD.RECEIPT_MARKER, "<!-- codex-review-receipt:v2 -->"),
+                  lambda body: "Security analysis found a problem; this result uses an unknown format.",
+                  lambda body: "SECURITY REVIEW IS STILL RUNNING"]
+        for body in bodies:
+            value = snapshot(); receipt = security_receipt(value)
+            newer = copy.deepcopy(receipt)
+            newer.update(id=102, html_url=URL + "#issuecomment-102", created_at="2026-10-16T09:59:30Z",
+                         updated_at="2026-10-16T09:59:30Z")
+            newer["body"] = body(newer["body"].replace("No security issues", "Security issues"))
+            value["issue_comments"].append(newer); pr(value)["comments"]["totalCount"] += 1
+            with self.subTest(body=newer["body"]), self.assertRaisesRegex(GUARD.NotReady, "not a supported affirmative clean"):
+                self.inspect(value)
+
+    def test_unknown_receipt_and_absent_security_flags_cannot_reuse_an_older_clean_receipt(self):
+        value = snapshot(); security_receipt(value)
+        value["issue_comments"].append({"id": 102, "updated_at": "2026-10-16T09:59:30Z",
+            "html_url": URL + "#issuecomment-102", "user": {"login": GUARD.BOT, "type": "Bot"},
+            "body": "<!-- codex-review-receipt:v2 -->\nUnknown review result"})
+        pr(value)["comments"]["totalCount"] += 1
+        with self.assertRaisesRegex(GUARD.NotReady, "Unknown canonical review receipt"):
+            self.inspect(value)
+        value = snapshot(); security_receipt(value)
+        summary = value["issue_comments"][0]
+        states = json.loads(GUARD.STATE_PATTERN.search(summary["body"]).group(1))
+        del states["security_review"]["has_any_findings"]
+        summary["body"] = GUARD.SUMMARY_MARKER + "\n<!-- codex-review-state:v1 " + json.dumps(states) + " -->"
+        with self.assertRaisesRegex(GUARD.NotReady, "unknown or unresolved findings"):
+            self.inspect(value)
+
+    def test_receipt_fallback_preserves_findings_dispositions_and_rejects_later_findings(self):
+        value = snapshot(); comment = add_finding(value)
+        comment["body"] = comment["body"].replace("codex-code-review", "codex-security-review")
+        comment["updatedAt"] = "2026-10-16T09:58:00Z"
+        update_state(value, has_any_findings=False)
+        security_receipt(value)
+        with self.assertRaisesRegex(GUARD.NotReady, "Missing private"):
+            self.run_check(value)
+        data = self.dispositions_file()
+        data["findings"][0]["comment_sha256"] = GUARD.digest(comment["body"].encode("utf-8"))
+        self.dispositions.write_text(json.dumps(data))
+        self.assertEqual(self.run_check(value, self.dispositions)["findings"], 1)
+        for timestamp, resolved in [("2026-10-16T10:00:00Z", True), ("2026-10-16T09:58:00Z", False)]:
+            comment["updatedAt"] = timestamp; pr(value)["reviewThreads"]["nodes"][0]["isResolved"] = resolved
+            with self.subTest(timestamp=timestamp, resolved=resolved), self.assertRaises(GUARD.NotReady):
+                self.run_check(value, self.dispositions)
+
+    def test_concurrent_receipt_or_commit_resolution_change_blocks_readiness(self):
+        for change in (lambda v: v["issue_comments"][1].update(body="changed"),
+                       lambda v: v["receipt_commits"][HEAD[:10]].update(sha="b" * 40)):
+            value = snapshot(); security_receipt(value)
+            with self.assertRaisesRegex(GUARD.NotReady, "GitHub review/head changed"):
+                self.run_check(value, on_refresh=change)
+
+    def test_receipt_fallback_rejects_newer_security_or_unknown_review_submissions(self):
+        # Coverage of the review-submission projection, not a live provider incident.
+        for body in ("Security review completed. Security issues were found.",
+                     "New unsupported review result", None):
+            value = snapshot(); security_receipt(value)
+            pr(value)["reviews"] = connection([{"id": "REVIEW", "state": "COMMENTED", "body": body,
+                "submittedAt": "2026-10-16T09:59:30Z", "lastEditedAt": None,
+                "author": {"__typename": "Bot", "login": GUARD.BOT_GRAPHQL},
+                "commit": {"oid": HEAD}}])
+            with self.subTest(body=body), self.assertRaises(GUARD.NotReady):
+                self.run_check(value)
+
+    def test_receipt_fallback_keeps_known_code_and_older_security_review_submissions(self):
+        for timestamp, body in [("2026-10-16T09:58:00Z", "Historical Security review result"),
+                                ("2026-10-16T09:59:30Z", "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.")]:
+            value = snapshot(); security_receipt(value)
+            pr(value)["reviews"] = connection([{"id": "REVIEW", "state": "COMMENTED", "body": body,
+                "submittedAt": timestamp, "lastEditedAt": None, "author": {"__typename": "Bot", "login": GUARD.BOT_GRAPHQL},
+                "commit": {"oid": HEAD}}])
+            with self.subTest(timestamp=timestamp, body=body):
+                self.assertEqual(self.run_check(value)["readiness"], "READY")
+            for invalid in ("unknown", "2026-10-16T11:00:00Z"):
+                pr(value)["reviews"]["nodes"][0]["submittedAt"] = invalid
+                with self.subTest(invalid=invalid), self.assertRaises(GUARD.NotReady):
+                    self.run_check(value)
+
+    def test_receipt_fallback_observes_security_review_body_edits_after_submission(self):
+        # A review body may be edited without changing its original submittedAt.
+        value = snapshot(); security_receipt(value)
+        review = {"id": "REVIEW", "state": "COMMENTED", "body": "Historical Security review result",
+                  "submittedAt": "2026-10-16T09:58:00Z", "lastEditedAt": None,
+                  "author": {"__typename": "Bot", "login": GUARD.BOT_GRAPHQL}, "commit": {"oid": HEAD}}
+        pr(value)["reviews"] = connection([review])
+        for edit in (None, "2026-10-16T09:58:30Z"):
+            review["lastEditedAt"] = edit
+            with self.subTest(edit=edit):
+                self.assertEqual(self.run_check(value)["readiness"], "READY")
+        for edit in ("2026-10-16T09:59:30Z", "unknown"):
+            review["lastEditedAt"] = edit
+            with self.subTest(edit=edit), self.assertRaises(GUARD.NotReady):
+                self.run_check(value)
+        del review["lastEditedAt"]
+        with self.assertRaisesRegex(GUARD.NotReady, "edit timestamp"):
+            self.run_check(value)
 
     def test_missing_untrusted_or_malformed_summary_is_not_ready(self):
         cases = []
@@ -346,6 +546,18 @@ class CodexReviewTests(unittest.TestCase):
             self.assertEqual(call.args[0][:4], [str(self.gh), "api", "--hostname", "github.com"])
         self.assertIn("--paginate", command.call_args_list[1].args[0])
         self.assertIn("--slurp", command.call_args_list[1].args[0])
+
+    def test_live_security_receipt_abbreviation_is_resolved_by_canonical_api(self):
+        value = snapshot(); security_receipt(value)
+        live = self.live()
+        responses = [json.dumps(value["graphql"]), json.dumps([value["issue_comments"]]),
+                     json.dumps(dict(value["receipt_commits"][HEAD[:10]], ignored="not proof"))]
+        with mock.patch.object(live, "command", side_effect=responses) as command:
+            observed = live.snapshot(REPOSITORY, 10)
+        self.assertEqual(observed, value)
+        self.assertEqual(command.call_args_list[2].args[0], [str(self.gh), "api", "--hostname", "github.com",
+            "repos/owner/project/commits/aaaaaaaaaa"])
+        self.assertEqual(self.inspect(observed)["review_evidence"]["security_review"]["reviewed_head"], HEAD)
 
     def test_live_timeout_and_api_failure_return_nonzero_json(self):
         for failure in [subprocess.TimeoutExpired(["gh"], 1), OSError("gh missing")]:

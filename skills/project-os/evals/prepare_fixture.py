@@ -8,6 +8,7 @@ import hashlib
 import json
 import sys
 import subprocess
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -18,7 +19,10 @@ import project_os  # noqa: E402
 
 CASES = json.loads((Path(__file__).parent / "submission.json").read_text(encoding="utf-8"))["cases"]
 CONTINUITY_CASES = json.loads((Path(__file__).parent / "continuity.json").read_text(encoding="utf-8"))["cases"]
-ALL_CASES = CASES + CONTINUITY_CASES
+BRIEF_CASE = "brief-connected-readonly-recovery"
+BRIEF_CASES = [case for case in json.loads((Path(__file__).parent / "prompts.json").read_text(encoding="utf-8"))["cases"]
+               if case["name"] == BRIEF_CASE]
+ALL_CASES = CASES + CONTINUITY_CASES + BRIEF_CASES
 
 
 def reusable_entry(identifier: str, applies_to: list[str], mechanism: str) -> dict[str, object]:
@@ -79,6 +83,7 @@ def prepare(case: str, target: Path) -> None:
         "private-lesson-is-not-approved",
         "conflicting-import-does-not-write",
         "resume-blocked-plan-after-condition-clears",
+        BRIEF_CASE,
     }
     if case not in connected and not case.startswith("continuity-"):
         return
@@ -87,7 +92,7 @@ def prepare(case: str, target: Path) -> None:
     project_os.init_project(target, packs, overlays, False)
     creates = []
     updates = {}
-    if case.startswith("continuity-"):
+    if case.startswith("continuity-") or case == BRIEF_CASE:
         contract = {"schema_version": 1, "plan_id": "001", "revision": 1, "gates": [
             {"id": "normalization", "condition": "Whitespace is normalized and empty input is rejected.",
              "evidence_class": "source", "target": "local", "status": "pending", "evidence": [],
@@ -110,6 +115,41 @@ def prepare(case: str, target: Path) -> None:
         ])
         context_path = target / ".agents/CONTEXT.md"
         updates[".agents/CONTEXT.md"] = context_path.read_text() + "\n## Synthetic verification command\n\nRun python3 -B -m unittest -v test_retry.py from this fixture. Empty input rejection is part of the current contract. Remote access is unavailable and external actions are not authorized.\n"
+        if case == BRIEF_CASE:
+            contract["gates"][1].update(
+                id="owner-review", condition="The owner separately approves marker BRIEF-OWNER-001.",
+                evidence_class="manual", target="owner",
+                next_action="Wait for an actual separate owner decision for BRIEF-OWNER-001.",
+            )
+            index["plans"][0]["outcome"] = "Verify retry input behavior while preserving separate owner acceptance."
+            index["plans"].append({"id": "002", "status": "planned", "path": ".agents/plans/002-followup.md",
+                                   "contract_path": ".agents/plans/002-followup.json",
+                                   "outcome": "Consider an independent followup only after owner authorization."})
+            index["next_id"] = 3
+            request = {
+                "id": "R-001", "recorded_on": date.today().isoformat(),
+                "source_text": "Preserve whitespace normalization and empty-input rejection. Keep owner approval BRIEF-OWNER-001 separate and do not start the followup.",
+                "interpretation": "Keep the current local behavior and the unapproved owner decision visible during recovery.",
+                "origin_plan": "001", "target_plan": "001", "relation": "same_outcome",
+                "status": "integrated", "gate_ids": ["owner-review"],
+                "decision": "Local source verification does not authorize owner acceptance or the independent followup.",
+                "owner_note": {"marker": "BRIEF-OWNER-001", "preserve": True},
+            }
+            updates[".agents/plans/index.json"] = json.dumps(index, indent=2) + "\n"
+            updates[".agents/requests.json"] = json.dumps(
+                {"schema_version": 1, "next_id": 2, "requests": [request]}, indent=2) + "\n"
+            creates[0] = (target / ".agents/plans/001-retry.json", json.dumps(contract, indent=2) + "\n")
+            creates[1] = (target / ".agents/plans/001-retry.md", "# Plan 001: Retry input behavior\n\nPreserve whitespace normalization and empty-input rejection. Local source checks do not authorize owner approval BRIEF-OWNER-001. The adjacent JSON owns acceptance. Do not start planned followup 002.\n")
+            creates.extend([
+                (target / ".agents/plans/002-followup.md", "# Plan 002: Independent followup\n\nConsider later only when the owner separately authorizes it.\n"),
+                (target / ".agents/plans/002-followup.json", json.dumps({
+                    "schema_version": 1, "plan_id": "002", "revision": 1, "gates": [{
+                        "id": "proposal", "condition": "The owner requests and reviews an independent proposal.",
+                        "evidence_class": "manual", "target": "owner", "status": "pending", "evidence": [],
+                        "next_action": "Wait for a separate owner request.", "reason": "",
+                    }]}, indent=2) + "\n"),
+            ])
+            updates[".agents/CONTEXT.md"] = context_path.read_text() + "\n## Synthetic recovery boundary\n\nRun python3 -B -m unittest -v test_retry.py only when execution is available and permitted. This fixture retains separate owner approval BRIEF-OWNER-001 and an unapproved planned successor. Do not infer acceptance from local source checks.\n"
     if case in {"prepare-and-approve-reusable-lessons", "private-lesson-is-not-approved"}:
         private = case == "private-lesson-is-not-approved"
         lesson = {
@@ -166,7 +206,7 @@ def prepare(case: str, target: Path) -> None:
     if creates or replacements:
         project_os.execute_sync_transaction(target, creates, replacements,
             after_write=lambda: project_os.require_passing_check(target, "Reviewer fixture"))
-    if case in {"continuity-remote-prerequisite", "continuity-premature-release"}:
+    if case in {"continuity-remote-prerequisite", "continuity-premature-release", BRIEF_CASE}:
         checked = subprocess.run([sys.executable, "-B", "-m", "unittest", "-v", "test_retry.py"], cwd=target,
                                  capture_output=True, text=True, check=False)
         if checked.returncode:
@@ -192,6 +232,20 @@ def prepare(case: str, target: Path) -> None:
         project_os.execute_sync_transaction(target, [(target / ".agents/evidence/source-baseline.md", proof)],
             [(contract_path, json.dumps(contract, indent=2) + "\n", hashlib.sha256(contract_path.read_bytes()).hexdigest())],
             after_write=lambda: project_os.require_passing_check(target, "Synthetic source baseline"))
+    if case == BRIEF_CASE:
+        # Save the receipt only after every record and proof has its final bytes.
+        with tempfile.TemporaryDirectory(prefix="project-os-reviewer-", dir=target.parent) as directory:
+            draft = Path(directory) / "checkpoint.md"
+            draft.write_text(
+                "# Current checkpoint\n\nUpdated: " + date.today().isoformat() + ".\n"
+                "Execution state: running.\nActive plan: 001.\n"
+                "Outcome: Local retry behavior verified while separate owner acceptance stays pending.\n"
+                "Verified: Focused source tests pass; .agents/evidence/source-baseline.md records the actual result.\n"
+                "Remaining: R-001 and owner-review remain pending for BRIEF-OWNER-001; successor002 remains planned.\n"
+                "Next action: Await a separate owner decision; do not close001 or start002 automatically.\n",
+                encoding="utf-8",
+            )
+            project_os.write_checkpoint(target, draft, False)
 
 
 def main() -> int:

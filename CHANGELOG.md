@@ -4,7 +4,34 @@ All notable changes to Engineering Project OS are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased documentation
+## [2.3.0] - Unreleased
+
+### Added
+
+- Add the read-only `brief` command for record integrity, checkpoint freshness, active-plan readiness and complete unresolved requests. Route recovery to the context, checkpoint and active plan while keeping original registry paths available before edits or deeper inspection.
+- Add behavioral cases for compact recovery, forbidden or unavailable helper execution and older selected helpers, with a synthetic current-checkpoint fixture and exact snapshot roundtrip checks.
+- Add a separate recursive byte-snapshot utility with required-path checks and source-to-archive inventory verification, including hidden records and nested proposal files without automatic project execution. Traversal bounds descriptors by depth and rejects case or canonically equivalent path collisions.
+
+### Changed
+
+- Use compact inspection during fresh-session recovery without treating structural success as completed acceptance or permission to start planned work.
+- Distinguish permitted helper execution, an older helper without `brief` and provisional file reading when execution is missing or forbidden. Preserve input bytes and report unperformed checks instead of inventing validation or writeback.
+- Align the reader guides with the compact recovery and supplied-file companion workflows. Keep installed-copy discovery, returned-file validation and release acceptance separate.
+- Keep SYSTEM schema 5, plans schema 2 and existing request, contract, finding and knowledge formats unchanged. Preserve legacy proof-ownership and historical-evidence migration rules.
+
+### Fixed
+
+- Recognize the capability-aware AGENTS writeback paragraph during upgrade so a newly initialized current repository stays idempotent without appending a duplicate legacy notice.
+- Return a structured failure when SYSTEM ownership changes during compact inspection instead of crashing on a missing record path.
+- Route an active Program contract during compact recovery so its authority remains visible even when no plan is active or the checkpoint is stale.
+- Remove contradictory short-source guidance: retain complete original scoped instructions and conditions verbatim, keep interpretation separate and preserve exact cancellation wording without replacing the original request.
+- Guard snapshot completeness against omitted nested proposals by checking the actual source tree rather than only a copied subset or the archive's own manifest.
+
+### Validation boundary
+
+- This entry describes an unreleased candidate. Local source and package checks do not establish final Codex or ChatGPT host acceptance, installation availability, completed final-source reviews or publication.
+
+## Repository documentation update after 2.2.4
 
 - On 2026-10-24, the maintainer confirmed that Directory offers the published 2.2.4 plugin. Make Directory the primary installation route again, with GitHub marketplace and the pinned standalone skill as alternatives.
 - Reorganize the reader guides around ordinary requests, saved results and human decisions. Keep detailed commands and formats in Reference and release procedures in the maintainer guide.

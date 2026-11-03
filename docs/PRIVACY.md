@@ -20,6 +20,8 @@ Project OS has no publisher-controlled data store and therefore retains no user 
 
 Project OS uses only the file and command access provided by the current ChatGPT or Codex conversation. Installation does not grant repository access or authority to change application code, install dependencies, delete files, commit, push, deploy or contact external systems. Those actions remain subject to the user's instructions and the host environment's permission controls.
 
+Readable files do not imply permission or capability to execute the helper. When execution is unavailable or forbidden, the companion preserves the supplied records and reports its verification limits. A transport copy can preserve bytes without establishing Project OS integrity or checkpoint freshness; it has the same user-controlled and host-provider data boundary as the supplied material.
+
 Security details and vulnerability reporting instructions are available in the [Security Policy](../SECURITY.md).
 
 ## Changes and contact

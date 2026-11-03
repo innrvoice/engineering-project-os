@@ -14,9 +14,33 @@ python3 /absolute/path/to/project-os/scripts/project_os.py check --target /path/
 
 The command is read-only. Report each concrete error and the owning record. Do not turn a structural pass into a claim about application, artifact, deployment, production, manual or physical behavior.
 
+## Start with a compact inspection
+
+First identify readable project files, the selected helper and whether execution is available and permitted. Choose the applicable route before running any command:
+
+| Available capability | Recovery route | Verification limit |
+| --- | --- | --- |
+| Selected helper can run and implements `brief` | Run `brief`, follow `read_next` and inspect original owners when needed | Report actual integrity, freshness and outcome readiness separately |
+| Selected older helper can run but lacks `brief` | Keep that helper selected; use its supported `check` and `checkpoint --check` commands and read configured owners | Disclose unsupported checks; never silently substitute another helper |
+| Execution is unavailable or forbidden, or the selected helper is missing | Read supplied SYSTEM and configured owners where accessible; describe recorded work provisionally | Integrity, checkpoint freshness and readiness checks remain unverified; preserve files and pending gates |
+
+A real structural or stale-checkpoint failure is not an older-helper compatibility case. Inspect the actual error. If an older helper also lacks a required validation, finding, checkpoint or closure command, leave that operation incomplete and request a suitable selected helper. Do not test execution with a command the user has forbidden. If project material is missing or unreadable, request the specific files needed; an empty host workspace is not the supplied project.
+
+With permitted helper execution, run `brief` before reading the relevant source records during repository recovery:
+
+~~~shell
+python3 /absolute/path/to/project-os/scripts/project_os.py brief --target /path/to/repository --json
+~~~
+
+The read-only report combines structural validation, checkpoint freshness, the active plan's readiness and pending gates, complete unresolved request objects and planned or blocked slices. Original request text, decisions and extension fields are preserved. Follow `read_next` for CONTEXT, STATE, the active Program contract when present and the active plan with its contract; `record_paths` separately names the original owners. Read Program authority, phases and cost boundaries even when no plan is active. Do not reread full registries or repeat successful standalone inspection checks just to recover facts already returned by `brief`. Read the original owner before editing it or when a needed field, history or error requires it. Verified and not-applicable gates are counted rather than copied, while resolved requests and historical plan bodies are omitted. Read the original contract for their proof and reasons. No unresolved item is truncated.
+
+Exit zero means record integrity passed and the checkpoint is current; pending work can still make the active plan NOT_READY. There is no overall project-readiness claim. A failed structural check sets `records_available: false`; empty work arrays then mean unavailable data, not an empty backlog. A stale checkpoint fails inspection while retaining validated pending work. The report does not activate work, write a checkpoint or replace final `plan status --require-ready`. Without `--json`, it prints a text overview.
+
+Without the required execution, do not change records, save a receipt or close a plan. Say which checks and required writeback were not performed and what capability or material would allow them. A stored PASS or CURRENT is historical file content, not a newly executed check. Do not synthesize a brief report or invent command output. If file operations are permitted, return an unchanged input or byte-preserving transport copy with factual hashes and the whole STATE receipt, labeling helper checks and Project OS export validation unperformed. This does not establish record integrity or freshness. If the host cannot create an actual downloadable file, state that limitation; do not claim the export protocol passed without its checks.
+
 ## Save findings and a current handoff
 
-The connected WORKFLOW requires writeback even for a bounded repair without a plan and for supplied project copies in ChatGPT. Reproduce the defect and save observed commands/results in a repository evidence file, then use the finding helper with a temporary JSON input:
+The connected WORKFLOW requires writeback even for a bounded repair without a plan and for supplied project copies in ChatGPT. First apply the capability route above; unavailable required execution leaves the input unchanged and writeback explicitly unperformed. With execution available and permitted, reproduce the defect and save observed commands/results in a repository evidence file, then use the finding helper with a temporary JSON input:
 
 ~~~json
 {
@@ -56,8 +80,8 @@ A plan owns one observable outcome that must survive checkpoints. It is independ
 
 Before opening, checkpointing, resuming or closing a plan:
 
-1. Read `.agents/CONTEXT.md`, `.agents/STATE.md`, the plan index, `.agents/WORKFLOW.md`, unresolved `.agents/requests.json` entries and the active plan with its JSON contract if present and only relevant packs and knowledge.
-2. Compare the checkpoint with Git HEAD, worktree status and current files.
+1. Read AGENTS and `.agents/WORKFLOW.md` and choose the recovery capability route above. With permitted execution, run the selected helper's `brief --target <repository> --json` and follow `read_next` for CONTEXT, STATE, the active Program contract when present and the active plan with its contract. Use complete unresolved requests from a successful report; read original registries before editing them or when required details or errors demand it. Load only relevant packs and knowledge. Without required execution, keep the assessment read-only and checks unverified.
+2. Compare the checkpoint with current files and Git HEAD/worktree status where available and permitted.
 3. Revalidate evidence made stale by later code or external state.
 4. Preview the intended record transition.
 
@@ -75,7 +99,9 @@ Run the checker after every plan transition.
 
 ### Intake and contract ownership
 
-Apply the managed WORKFLOW on ordinary engineering turns without requiring a Project OS prefix. Immediately save material corrections, clarifications and new instructions in the requests registry before long work or ending the response. Preserve a short source formulation and interpretation. Route compatible same-outcome and prerequisite additions into the origin plan's contract; route independent outcomes into planned slices with their own contracts and explicit sequence. A conflict stays needs_clarification until the necessary decision arrives. Alternatives discussed during brainstorming are not automatically implementation instructions.
+Apply the managed WORKFLOW on ordinary engineering turns without requiring a Project OS prefix. Immediately save material corrections, clarifications and new instructions in the requests registry before long work or ending the response. Copy the complete relevant original wording verbatim into source_text, including conditions, exclusions and approval limits. Do not shorten, summarize, translate or replace wording with ellipses; write your interpretation separately in interpretation. For a message covering several outcomes, preserve this outcome's complete block and every shared condition that applies to it without copying unrelated project material. Compare saved source_text with the actual message before continuing. Route compatible same-outcome and prerequisite additions into the origin plan's contract; route independent outcomes into planned slices with their own contracts and explicit sequence. A conflict stays needs_clarification until the necessary decision arrives. Alternatives discussed during brainstorming are not automatically implementation instructions.
+
+On explicit withdrawal, keep the original source_text unchanged and quote the complete relevant cancellation wording verbatim in decision before explaining the disposition. Do not replace the original request with the cancellation or retain only a translated summary. Apply the same original-wording rule to a knowledge approval, including its selection, conditions and exclusions. The helper validates stored records and proof, not whether an agent copied the original conversation accurately; a passing check or current receipt does not establish that fidelity.
 
 The index owns status and contract_path. Plan Markdown describes implementation and decisions, not a second acceptance register. The adjacent JSON contract owns gates. Requests own intake and routing. STATE links the current checkpoint. Read the connected WORKFLOW canonical intake and proof examples and the plans README contract template. Use literal request keys origin_plan, target_plan, relation, source_text, recorded_on, status, gate_ids and decision. Validate and repair records immediately after intake, routing, withdrawal and revision before continuing application work. Increment contract revision on material outcome changes, record the reason and controlling request in Markdown and reassess evidence before attaching it to the new revision.
 
@@ -104,6 +130,22 @@ Guarded plan completion already writes the now-idle checkpoint and its fresh rec
 ### Return exact project files
 
 After all writes and checks, collect each exported file with a fresh `read_bytes()` from its actual path. Preserve the whole STATE file, including its HTML receipt; compute each exported content hash from those exact bytes. Do not rebuild a snapshot from checkpoint drafts, cached variables, response prose or rendered Markdown. Serialize one snapshot file, reconstruct that exact serialized file into a new temporary directory and run both `check` and `checkpoint --check` there. Verify every reconstructed path and hash and compare the source hashes again after export to detect concurrent changes. Return only that validated snapshot file. A source CURRENT result does not override missing or altered bytes in the returned file set: report NOT_READY and repair the export before delivery. Read-only recovery must inspect the actual supplied files and preserve them.
+
+Build the inventory from the actual authorized source tree, not a staging subset. Include every promised project, hidden owner, full STATE receipt and nested proposal or report, including files prepared outside a project directory. A manifest can accurately describe an incomplete staging copy, so compare the source path set as well as hashes. Do not retroactively repair a historical snapshot after its omission is discovered; retain that first observation separately from a corrected current artifact.
+
+Run read-only Python checks with `python3 -B` or `PYTHONDONTWRITEBYTECODE=1`, including inline imports of the selected helper. Compare the complete protected path set and hashes before and after execution, including newly added cache files or directories. Do not delete pre-existing caches or exclude required input files to make that comparison pass. The bundled snapshot utility suppresses bytecode for its own runtime import, but other Python imports still need this protection.
+
+When execution of this bundled utility is permitted, preview and apply a byte snapshot with explicit required paths:
+
+~~~shell
+python3 -B /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/actual-source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json --dry-run
+python3 -B /absolute/path/to/project-os/scripts/snapshot.py create --root /path/to/actual-source-tree --output /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
+python3 -B /absolute/path/to/project-os/scripts/snapshot.py check --root /path/to/actual-source-tree --archive /path/outside/source-tree/snapshot.zip --require campaign-output/proposals/ownership.json
+~~~
+
+Repeat --require for all promised files or nonempty directories. The output must be new and outside the source tree. The utility recursively includes every regular file without implicit exclusions, preserves existing MANIFEST.json/AUDIT.json and reserves PROJECT-OS-SNAPSHOT.json for its own inventory. Missing required paths, symlinks, special files, unsafe paths, a reserved-name collision or detected source drift refuse the snapshot. It verifies the actual serialized ZIP against the original inventory and never runs project helpers, application code or tests. A successful transport-byte result does not establish record integrity, freshness or readiness: reconstruct that ZIP and run only the project checks actually permitted. An execution prohibition remains controlling; if the utility is unavailable or forbidden, report that limit and use only permitted file tools with equivalent inventory checks.
+
+Dry-run includes the full path/size/hash inventory and creates no output. Save large JSON outside the source tree. File bytes and directory paths are preserved; original permissions, ownership, timestamps and extended attributes are not. A failed create after exclusive output creation may leave an unverified file. Do not deliver it as a successful snapshot or delete a pathname whose ownership may have changed; inspect the error and use the read-only check against the actual source. The utility deliberately does not unlink a potentially replaced published pathname during failure cleanup.
 
 ## Start a Program
 
